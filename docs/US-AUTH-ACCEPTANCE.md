@@ -18,7 +18,7 @@ TypeScript and optimized webpack build are included in GitHub CI, together with 
 
 - Configure a separate US Supabase project consistently in frontend and backend, callback/allowlist and email settings; do not reuse Indian production identity implicitly.
 - Real hosted sign-in, expiry/refresh, revocation/sign-out, outage and cross-account tests.
-- Self-service signup/confirmation remains open. Password recovery source is implemented in [US-PASSWORD-RECOVERY.md](US-PASSWORD-RECOVERY.md); real link delivery, expiry and hosted lifecycle acceptance remain open.
+- Signup source is implemented behind a default-off UI rollout flag; provider signup/confirmation configuration and real acceptance remain open. See [US-SIGNUP-CONFIRMATION.md](US-SIGNUP-CONFIRMATION.md). Password recovery source is implemented in [US-PASSWORD-RECOVERY.md](US-PASSWORD-RECOVERY.md); real link delivery, expiry and hosted lifecycle acceptance remain open.
 - Desktop/mobile/keyboard browser acceptance. No fresh browser verification was available for this increment.
 - Owner-isolated durable plans/research remain issue #4. Authentication alone does not satisfy storage isolation.
 

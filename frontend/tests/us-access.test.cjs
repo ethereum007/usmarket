@@ -11,6 +11,7 @@ function load(file, auth, configured = true) {
   const context = { exports: {}, require(name) {
     if (name === 'react') return { ...React, useEffect: fn => effects.push(fn) };
     if (name === 'next/navigation') return { useRouter: () => ({ replace: url => redirects.push(url) }) };
+    if (name.endsWith('us-signup')) return { US_SIGNUP_ENABLED: false };
     if (name.endsWith('AuthContext')) return { useAuth: () => auth };
     if (name.endsWith('supabase')) return { supabase: configured ? {} : null };
     return require(name);
@@ -22,8 +23,9 @@ function load(file, auth, configured = true) {
 for (const [label, user, loading, visible, redirected] of [
   ['signed out', null, false, false, true],
   ['initializing', null, true, false, false],
+  ['unconfirmed account', { id: 'owner', is_anonymous: false }, false, false, true],
   ['anonymous session', { is_anonymous: true }, false, false, true],
-  ['signed in', { id: 'owner', is_anonymous: false }, false, true, false],
+  ['signed in', { id: 'owner', is_anonymous: false, email_confirmed_at: '2026-01-01T00:00:00Z' }, false, true, false],
 ]) test(`US guard: ${label}`, () => {
   const fixture = load('components/auth/USAccessGuard.tsx', { user, loading });
   const html = renderToStaticMarkup(React.createElement(fixture.component, null, 'PRIVATE_RESEARCH'));
@@ -41,7 +43,7 @@ test('US sign-in fails closed with missing configuration and has no inherited pr
   assert.match(html, /autoComplete="current-password"/);
 });
 test('US sign-in redirects authenticated users back to workspace', () => {
-  const fixture = load('us/login/page.tsx', { user: { id: 'owner' }, loading: false });
+  const fixture = load('us/login/page.tsx', { user: { id: 'owner', email_confirmed_at: '2026-01-01T00:00:00Z' }, loading: false });
   renderToStaticMarkup(React.createElement(fixture.component));
   fixture.effects.forEach(fn => fn());
   assert.deepEqual(fixture.redirects, ['/us']);

@@ -5,6 +5,8 @@ local user. The explicit loopback preview harness owns its test override.
 """
 from __future__ import annotations
 
+from datetime import datetime
+
 import httpx
 from fastapi import HTTPException, Request
 from app.config import settings
@@ -39,7 +41,15 @@ async def verify_us_token(token: str) -> dict:
         raise HTTPException(503, 'US authentication returned an invalid identity')
     if user.get('is_anonymous') is True:
         raise unauthorized()
-    return {'id':user['id'],'email':user.get('email'),'auth_source':'supabase'}
+    if not isinstance(user.get('email'), str) or '@' not in user['email'] or not user.get('email_confirmed_at'):
+        raise HTTPException(403, 'Confirm your US account email before accessing research')
+    try:
+        confirmed = datetime.fromisoformat(user['email_confirmed_at'].replace('Z', '+00:00'))
+        if confirmed.utcoffset() is None:
+            raise ValueError()
+    except (ValueError, TypeError, AttributeError):
+        raise HTTPException(503, 'US authentication returned invalid confirmation evidence') from None
+    return {'id':user['id'],'email':user['email'],'auth_source':'supabase'}
 
 
 async def require_us_user(request: Request) -> dict:

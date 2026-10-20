@@ -46,8 +46,13 @@ def provider_client(response=None,error=None):
 
 
 @pytest.mark.parametrize('status,body,expected',[
-    (200,{'id':'owner-a','email':'owner@example.com'},200),
+    (200,{'id':'owner-a','email':'owner@example.com','email_confirmed_at':'2026-01-01T00:00:00Z'},200),
     (200,{'id':'owner-a','is_anonymous':True},401),
+    (200,{'id':'owner-a','email':'owner@example.com'},403),
+    (200,{'id':'owner-a','email':'owner@example.com','email_confirmed_at':None},403),
+    (200,{'id':'owner-a','email':'owner@example.com','email_confirmed_at':'bad'},503),
+    (200,{'id':'owner-a','email':'owner@example.com','email_confirmed_at':'2026-01-01T00:00:00'},503),
+    (200,{'id':'owner-a','email_confirmed_at':'2026-01-01T00:00:00Z'},403),
     (200,{},503), (200,{'id':123},503), (200,[],503),
     (401,{'message':'expired'},401), (403,{},401),
     (429,{},503), (500,{},503), (302,{},503),

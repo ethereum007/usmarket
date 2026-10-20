@@ -8,7 +8,7 @@ import { useAuth } from "../../contexts/AuthContext";
 export function USAccessGuard({ children }: { children: ReactNode }) {
   const { user, loading, recoverySession } = useAuth();
   const router = useRouter();
-  const allowed = Boolean(user && !user.is_anonymous);
+  const allowed = Boolean(user && !user.is_anonymous && user.email_confirmed_at);
   useEffect(() => {
     if (!loading && recoverySession) router.replace("/us/recover");
     else if (!loading && !allowed) router.replace("/us/login");
