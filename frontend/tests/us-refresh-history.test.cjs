@@ -75,3 +75,11 @@ test('transport errors are sanitized in history feedback', async () => {
   assert.match(error[1],/history is unavailable/);
   assert.doesNotMatch(error[1],/private/);
 });
+
+test('interrupted history reports unknown completion without opening a guessed result', () => {
+  const fixture=load([[{id:'interrupted',state:'interrupted',completion_unknown:true,error:'Completion is unknown. Check saved research before retrying.',package_id:'a'.repeat(64)}],false,'']);
+  const html=renderToStaticMarkup(fixture.element);
+  assert.match(html,/Completion is unknown/);
+  assert.doesNotMatch(html,/Open saved research/);
+  assert.equal(buttons(fixture.element).length,1);
+});

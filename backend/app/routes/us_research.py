@@ -166,6 +166,11 @@ def refresh(payload: RefreshRequest, tasks: BackgroundTasks, user: dict = Depend
     job_id = str(uuid4())
     data = {'id': job_id, 'owner': user['id'], 'state': 'queued'}
     try:
+        # Exclusive ownership proves earlier API workers no longer hold this
+        # coordinator. It does not prove whether their publication completed.
+        repository.interrupt_jobs(database_path=job_database(),
+            updated_at=datetime.now(timezone.utc).isoformat(),
+            message='Previous refresh worker no longer owns coordination; completion is unknown. Check saved research before retrying.')
         persist_job(data)
         tasks.add_task(refresh_job, data, payload.model_copy(update={'symbols':','.join(symbols)}), lock)
     except BaseException as exc:
@@ -180,7 +185,7 @@ def refresh(payload: RefreshRequest, tasks: BackgroundTasks, user: dict = Depend
 def recent_jobs(user: dict = Depends(require_us_user)):
     try:
         rows = repository.list_jobs(user['id'], database_path=job_database(), limit=20)
-        jobs = [{k: v for k, v in row.items() if k in {'id', 'state', 'updated_at', 'package_id', 'error'}} for row in rows]
+        jobs = [{k: v for k, v in row.items() if k in {'id', 'state', 'updated_at', 'package_id', 'error', 'completion_unknown'}} for row in rows]
     except STORAGE_ERRORS:
         raise HTTPException(503, 'Refresh status storage is temporarily unavailable') from None
     return {'success': True, 'jobs': jobs}

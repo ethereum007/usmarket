@@ -304,3 +304,55 @@ def test_task_scheduling_failure_releases_reservation(client):
     tasks=Mock();tasks.add_task.side_effect=RuntimeError('scheduling failed')
     with pytest.raises(RuntimeError):api.refresh(api.RefreshRequest(symbols='AAPL'),tasks,{'id':'owner'})
     lock=api.acquire_refresh_lock(api.settings.DATA_DIR/'us-refresh-lock.sqlite3');lock.release()
+
+
+def test_next_exclusive_refresh_reconciles_old_jobs_without_claiming_publication_failure(client):
+    from unittest.mock import AsyncMock
+    c,_=client
+    for owner,state in [('owner','running'),('other','queued')]:
+        api.persist_job({'id':owner+'-old','owner':owner,'state':state})
+    api.persist_job({'id':'completed','owner':'owner','state':'completed','package_id':'a'*64})
+    with patch.object(api,'run',AsyncMock(return_value={'id':'b'*64})):
+        response=c.post('/api/us/research/refresh',json={'symbols':'AAPL'})
+    assert response.status_code==200
+    old=c.get('/api/us/research/jobs/owner-old').json()['job']
+    assert old['state']=='interrupted' and old['completion_unknown'] is True
+    assert 'completion is unknown' in old['error'] and 'package_id' not in old
+    assert c.get('/api/us/research/jobs/other-old').status_code==404
+    other=api.repository.get_job('other-old','other',database_path=api.job_database(),stale_after=None)
+    assert other['state']=='interrupted' and other['completion_unknown'] is True
+    completed=c.get('/api/us/research/jobs/completed').json()['job']
+    assert completed['state']=='completed' and completed['package_id']=='a'*64
+    listing=c.get('/api/us/research/jobs').json()['jobs']
+    assert next(row for row in listing if row['id']=='owner-old')['completion_unknown'] is True
+
+
+def test_held_reservation_prevents_reconciliation_even_for_old_job(client):
+    c,_=client
+    api.persist_job({'id':'old','owner':'owner','state':'running'})
+    lock=api.acquire_refresh_lock(api.settings.DATA_DIR/'us-refresh-lock.sqlite3')
+    try:
+        assert c.post('/api/us/research/refresh',json={'symbols':'AAPL'}).status_code==409
+        assert c.get('/api/us/research/jobs/old').json()['job']['state']=='running'
+    finally:lock.release()
+
+
+def test_reconciliation_storage_failure_blocks_fetch_and_releases_lock(client):
+    from unittest.mock import AsyncMock
+    c,_=client
+    with patch.object(api.repository,'interrupt_jobs',side_effect=OSError('private path')),patch.object(api,'run',AsyncMock()) as provider:
+        response=c.post('/api/us/research/refresh',json={'symbols':'AAPL'})
+    assert response.status_code==503 and 'private path' not in response.text
+    provider.assert_not_called()
+    assert c.get('/api/us/research/jobs').json()['jobs']==[]
+    lock=api.acquire_refresh_lock(api.settings.DATA_DIR/'us-refresh-lock.sqlite3');lock.release()
+
+
+def test_reconciliation_transaction_rolls_back_on_invalid_record(client):
+    c,_=client
+    api.persist_job({'id':'valid','owner':'owner','state':'running'})
+    with api.repository.database(api.job_database()) as conn:
+        conn.execute('INSERT INTO research_jobs VALUES (?,?,?,?)',('broken','owner','now','{bad'))
+    with pytest.raises(ValueError):
+        api.repository.interrupt_jobs(database_path=api.job_database(),updated_at='2026-10-20T10:00:00+00:00',message='completion unknown')
+    assert c.get('/api/us/research/jobs/valid').json()['job']['state']=='running'

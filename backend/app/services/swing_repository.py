@@ -133,6 +133,24 @@ def get_job(job_id: str, owner: str, *, database_path: Path | None = None, stale
         return job
 
 
+def interrupt_jobs(*, database_path: Path, updated_at: str, message: str) -> int:
+    """Caller must exclusively own the refresh coordinator; age is not evidence."""
+    changed = 0
+    with database(database_path) as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        rows = conn.execute("SELECT id, payload FROM research_jobs").fetchall()
+        for row in rows:
+            job = json.loads(row['payload'])
+            if job['state'] not in {'queued', 'running'}:
+                continue
+            job.update(state='interrupted', updated_at=updated_at, error=message,
+                       completion_unknown=True)
+            conn.execute("UPDATE research_jobs SET updated_at=?, payload=? WHERE id=?",
+                         (updated_at, json.dumps(job), row['id']))
+            changed += 1
+    return changed
+
+
 def list_jobs(owner: str, *, database_path: Path | None = None, limit: int = 20) -> list[dict]:
     if not 1 <= limit <= 100:
         raise ValueError("Job history limit must be 1–100")
