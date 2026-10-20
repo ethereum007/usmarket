@@ -356,3 +356,63 @@ def test_reconciliation_transaction_rolls_back_on_invalid_record(client):
     with pytest.raises(ValueError):
         api.repository.interrupt_jobs(database_path=api.job_database(),updated_at='2026-10-20T10:00:00+00:00',message='completion unknown')
     assert c.get('/api/us/research/jobs/valid').json()['job']['state']=='running'
+
+
+
+def test_remote_package_read_never_falls_back_to_local_file(monkeypatch):
+    from app.routes import us_research as routes
+    from fastapi import HTTPException
+    monkeypatch.setenv('US_RESEARCH_STORE', 'supabase')
+    with patch.object(routes.remote_research, 'execute', return_value=None) as remote:
+        with pytest.raises(HTTPException) as error:
+            routes.read_package('a' * 64, 'test-token')
+    assert error.value.status_code == 404
+    remote.assert_called_once_with('get', 'test-token', 'a' * 64)
+
+
+def test_remote_package_rejects_wrong_identity(monkeypatch):
+    from app.routes import us_research as routes
+    from fastapi import HTTPException
+    monkeypatch.setenv('US_RESEARCH_STORE', 'supabase')
+    with patch.object(routes.remote_research, 'execute', return_value={'id':'b'*64}):
+        with pytest.raises(HTTPException) as error:
+            routes.read_package('a' * 64, 'test-token')
+    assert error.value.status_code == 409
+
+
+@pytest.mark.parametrize('status,payload,expected', [(500, {'secret':'provider'},503),
+    (409, {},409), (200, {'wrong':'shape'},503)])
+def test_remote_catalog_transport_errors_are_sanitized(status,payload,expected,monkeypatch):
+    import httpx
+    from types import SimpleNamespace
+    from app.services import us_remote_research as remote
+    from fastapi import HTTPException
+    monkeypatch.setattr(remote, 'settings', SimpleNamespace(SUPABASE_URL='https://us.example',SUPABASE_ANON_KEY='public-test'))
+    original = httpx.Client
+    transport = httpx.MockTransport(lambda request: httpx.Response(status,json=payload))
+    with patch.object(remote.httpx, 'Client', lambda **kwargs: original(transport=transport, **kwargs)):
+        with pytest.raises(HTTPException) as error:
+            remote.execute('list', 'test-token')
+    assert error.value.status_code == expected
+    assert 'provider' not in str(error.value) and 'test-token' not in str(error.value)
+
+
+@pytest.mark.parametrize('fails',[False,True])
+def test_remote_refresh_requires_publication_ack_and_never_persists_token(client,monkeypatch,fails):
+    from unittest.mock import AsyncMock
+    from fastapi import HTTPException
+    c, root = client
+    monkeypatch.setenv('US_RESEARCH_STORE','supabase')
+    c.app.dependency_overrides[require_us_user] = lambda: {'id':'owner','_access_token':'private-test-token'}
+    package = {'id':'e'*64}
+    with patch.object(api,'run',AsyncMock(return_value=package)), patch.object(api.remote_research,'execute',
+            side_effect=HTTPException(503,'private provider response') if fails else None,
+            return_value=package) as publish:
+        response = c.post('/api/us/research/refresh',json={'symbols':'AAPL'})
+    publish.assert_called_once_with('publish','private-test-token',package['id'],package)
+    job = c.get('/api/us/research/jobs/' + response.json()['job']['id']).json()['job']
+    assert job['state'] == ('failed' if fails else 'completed')
+    assert ('package_id' in job) is not fails
+    stored = api.repository.list_jobs('owner',database_path=api.job_database())[0]
+    assert 'private-test-token' not in json.dumps(stored)
+    assert 'private provider response' not in json.dumps(job)

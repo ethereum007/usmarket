@@ -9,3 +9,10 @@ The migration revokes direct table access from anon/authenticated, enables RLS a
 Before activation: apply the reviewed SQL only to the dedicated project; verify grants and two real test identities, concurrent expected_revision conflicts, source immutability, anonymous rejection and restart retention. Python transport mocks do not verify PostgreSQL semantics. Review the function and policies in Supabase before enabling the flag. Do not paste secrets into Git or chat.
 
 This adapter stores plans only. Research packages, refresh jobs and coordination still use local files/SQLite and remain ephemeral on Render Free. Exported plan history does not contain its research packages. No complete durable-MVP or backup/restore acceptance is claimed. Remote package/job storage is the next increment; never enable a new-user journey that promises complete restart recovery until it passes.
+
+
+## Research package adapter (not activated)
+
+Migration 202610200002 adds owner-scoped immutable research packages and a fixed-search-path RPC. US_RESEARCH_STORE=supabase selects it; default local remains unchanged. Catalog/read requests use the verified account token; background publication receives its token only in memory, never in the persisted job payload. Completion is recorded only after the remote publish acknowledges the package ID. Failed remote reads never fall back to local evidence. Source packages are validated by the existing US metadata boundary before use in a plan. Same-identity replay retains the original observation; conflicting content is rejected. No shared cross-account research grants are introduced.
+
+The SQL uses PostgREST PT409 errors for explicit conflicts. Python tests cover transport and routing only, not actual SQL execution. No migration has been applied. Jobs and refresh coordination remain local; token expiry during a long refresh can prevent remote publication and must remain a visible failure, not a completed claim. Research catalog reads return up to 120 newest recorded packages. A complete multi-host refresh/restore design remains open.

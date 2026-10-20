@@ -111,7 +111,7 @@ def revision(plan_id: UUID, revision: int = Query(..., ge=1), user: dict = Depen
 
 @router.post("/{plan_id}")
 def save(plan_id: UUID, payload: PlanRequest, user: dict = Depends(require_us_user)):
-    package = read_package(payload.package_id)
+    package = read_package(payload.package_id, user.get("_access_token"))
     if package.get("state") != "final" or package.get("currency") != "USD":
         raise HTTPException(422, "A US plan requires final USD research")
     setup = next((row for row in package.get("setups", []) if row.get("setup_version") == payload.setup_version), None)

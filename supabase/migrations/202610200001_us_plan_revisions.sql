@@ -29,7 +29,7 @@ begin
     return result;
   elsif action = 'export' then
     if (select count(*) from public.us_plan_revisions where owner = auth.uid()) > 10000 then
-      raise exception using errcode = '40001', message = 'Download limit exceeded';
+      raise exception using errcode = 'PT409', message = 'Download limit exceeded';
     end if;
     select coalesce(jsonb_agg(payload order by id, revision), '[]'::jsonb) into result
       from public.us_plan_revisions where owner = auth.uid();
@@ -48,12 +48,12 @@ begin
   select * into latest from public.us_plan_revisions
     where owner = auth.uid() and id = plan_id order by revision desc limit 1;
   if coalesce(latest.revision, 0) <> expected_revision then
-    raise exception using errcode = '40001', message = 'Revision conflict';
+    raise exception using errcode = 'PT409', message = 'Revision conflict';
   end if;
   if latest.revision is not null then
     foreach field in array array['setup_id','package_id','setup_version','source_snapshot_id','symbol','direction','provider_asset_id'] loop
       if latest.payload->field is distinct from plan_payload->field then
-        raise exception using errcode = '40001', message = 'Source identity changed';
+        raise exception using errcode = 'PT409', message = 'Source identity changed';
       end if;
     end loop;
   end if;
@@ -64,7 +64,7 @@ begin
       values(plan_id, expected_revision + 1, auth.uid(), saved);
   exception when unique_violation then
     -- Also hides a foreign owner's colliding UUID; never overwrite it.
-    raise exception using errcode = '40001', message = 'Plan unavailable or changed';
+    raise exception using errcode = 'PT409', message = 'Plan unavailable or changed';
   end;
   return saved;
 end $$;

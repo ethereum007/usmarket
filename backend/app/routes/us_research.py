@@ -31,6 +31,7 @@ from app.services.us_research import run
 from app.services import swing_repository as repository
 from app.services.us_refresh_lock import acquire as acquire_refresh_lock, RefreshBusy, RefreshLock
 from app.services.us_publication import validate as publication_order
+from app.services import us_remote_research as remote_research
 
 router = APIRouter(prefix='/api/us/research', tags=['US research'])
 
@@ -70,9 +71,17 @@ def package_summary(data: dict):
     return {key: data[key] for key in ('id', 'universe', 'session', 'state', 'benchmark', 'feed', 'computed_at', 'symbols')}, order
 
 
-def read_package(package_id: str):
+def read_package(package_id: str, access_token=None):
     if not re.fullmatch(r'[a-f0-9]{64}', package_id):
         raise HTTPException(422, 'Invalid package identity')
+    if remote_research.enabled():
+        data = remote_research.execute('get', access_token, package_id)
+        if data is None:
+            raise HTTPException(404, 'US research package not found')
+        if data.get('id') != package_id:
+            raise HTTPException(409, 'Invalid US research package')
+        package_summary(data)
+        return data
     try:
         data = json.loads((directory() / (package_id + '.json')).read_text(encoding='utf-8'))
     except FileNotFoundError:
@@ -96,6 +105,16 @@ def access(user: dict = Depends(require_us_user)):
 def packages(user: dict = Depends(require_us_user)):
     rows = []
     unavailable = 0
+    if remote_research.enabled():
+        for data in remote_research.execute('list', user.get('_access_token')):
+            try:
+                row, order = package_summary(data)
+                rows.append((order, row['id'], row))
+            except HTTPException:
+                unavailable += 1
+        rows.sort(key=lambda item: (item[0], item[1]), reverse=True)
+        return {'success':True, 'packages':[item[2] for item in rows[:120]],
+                'unavailable_packages':unavailable, 'default_symbols':DEFAULT_SYMBOLS}
     try:
         paths = list(directory().glob('*.json'))
     except OSError:
@@ -118,7 +137,7 @@ def packages(user: dict = Depends(require_us_user)):
 
 def package(package_id: str, user: dict = Depends(require_us_user)):
 
-    return {'success': True, 'package': read_package(package_id)}
+    return {'success': True, 'package': read_package(package_id, user.get('_access_token'))}
 
 class RefreshRequest(BaseModel):
 
@@ -128,7 +147,7 @@ class RefreshRequest(BaseModel):
 
     feed: Literal['sip','iex'] = 'sip'
 
-async def refresh_job(job_data: dict, payload: RefreshRequest, lock: RefreshLock):
+async def refresh_job(job_data: dict, payload: RefreshRequest, lock: RefreshLock, access_token=None):
     data = {**job_data, 'state': 'running'}
     try:
         # Do not fetch or publish if durable running status cannot be recorded.
@@ -136,6 +155,8 @@ async def refresh_job(job_data: dict, payload: RefreshRequest, lock: RefreshLock
         try:
             package = await run(SimpleNamespace(symbols=payload.symbols, benchmark=payload.benchmark,
                                                 feed=payload.feed, output=str(directory())))
+            if remote_research.enabled():
+                await asyncio.to_thread(remote_research.execute, 'publish', access_token, package['id'], package)
             data.update(state='completed', package_id=package['id'])
         except Exception:
             data.update(state='failed', error='Research refresh failed; saved research remains available')
@@ -177,7 +198,7 @@ def refresh(payload: RefreshRequest, tasks: BackgroundTasks, user: dict = Depend
             updated_at=datetime.now(timezone.utc).isoformat(),
             message='Previous refresh worker no longer owns coordination; completion is unknown. Check saved research before retrying.')
         persist_job(data)
-        tasks.add_task(refresh_job, data, payload.model_copy(update={'symbols':','.join(symbols)}), lock)
+        tasks.add_task(refresh_job, data, payload.model_copy(update={'symbols':','.join(symbols)}), lock, user.get('_access_token'))
     except BaseException as exc:
         lock.release()
         if isinstance(exc, STORAGE_ERRORS):
