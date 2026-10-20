@@ -125,13 +125,13 @@ async def refresh_job(job_id: str, payload: RefreshRequest):
 
         job['package_id'] = package['id']
 
-    except Exception as exc:
+    except Exception:
 
         job['state'] = 'failed'
 
         # Provider response bodies and credentials must never enter the job API.
 
-        job['error'] = str(exc) if isinstance(exc, ValueError) else 'Provider refresh failed; saved research remains available'
+        job['error'] = 'Research refresh failed; saved research remains available'
 
     finally:
 

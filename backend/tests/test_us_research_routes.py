@@ -141,3 +141,21 @@ def test_pointer_files_are_not_counted_as_invalid_packages(client):
     write_catalog_package(root,catalog_package())
     (root/'us-research'/'us-test-latest-final.json').write_text('{}')
     assert c.get('/api/us/research/packages').json()['unavailable_packages']==0
+
+
+@pytest.mark.parametrize('failure', [ValueError, RuntimeError, OSError])
+def test_refresh_failure_never_discloses_exception_and_releases_worker(client, failure):
+    from unittest.mock import AsyncMock
+    c,_=client
+    secret='credential=private-provider-value /private/runtime/path'
+    with patch.object(api,'run',AsyncMock(side_effect=failure(secret))):
+        response=c.post('/api/us/research/refresh',json={'symbols':'AAPL'})
+    result=c.get('/api/us/research/jobs/'+response.json()['job']['id'])
+    job=result.json()['job']
+    assert job['state']=='failed'
+    assert job['error']=='Research refresh failed; saved research remains available'
+    assert secret not in result.text and 'owner' not in job
+    with patch.object(api,'run',AsyncMock(return_value={'id':'c'*64})):
+        retry=c.post('/api/us/research/refresh',json={'symbols':'AAPL'})
+    assert retry.status_code==200
+    assert c.get('/api/us/research/jobs/'+retry.json()['job']['id']).json()['job']['state']=='completed'
