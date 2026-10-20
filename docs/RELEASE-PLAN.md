@@ -43,6 +43,10 @@ First release is research and paper review. No order execution, guaranteed retur
 - [ ] G7 Operations: deployment smoke checks, rate limits, secret handling, error observability, stable shared storage, outage handling, privacy/terms/data-retention decisions and rollback.
 - [ ] G8 Product acceptance: first-time user can find a stock, inspect evidence, save a plan, reload it and review the outcome; desktop/mobile and keyboard paths verified.
 
+## Current hosting constraint
+
+20 October: user selected $0 initial hosting and reported deploying a Render Free preview. Build/live URL remains unverified. Paid compute/disk activation is deferred. Current SQLite/file repositories cannot satisfy restart persistence on Free; prioritize external durable storage adaptation before invited-user saved-plan acceptance. Preserve immutable revisions, owner isolation and publication/refresh coordination contracts. Do not treat a running preview as the weekend MVP gate passing.
+
 ## Decision log
 
 - Existing Alpaca keys have historical SIP and live IEX access in earlier tests. Real-time SIP was denied. Market-open coverage and commercial distribution remain explicit decisions/evidence, not assumptions.

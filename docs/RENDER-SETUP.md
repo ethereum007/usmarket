@@ -2,6 +2,16 @@
 
 Account creation confirmed by user. No Render connector is available in this chat; creating an account does not establish account access here. Do not share API keys in chat. No paid service or deployment has been created by this guide.
 
+## Current decision: $0 preview first
+
+On 20 October the user selected a $0 starting budget and reported submitting the Free service deployment. Its URL, build result and deployed commit have not yet been supplied or verified. Do not activate paid compute or a disk. The earlier paid-volume proposal below is deferred, not the current setup.
+
+For Free compute, remove any attached disk and use an ephemeral writable DATA_DIR such as /tmp/usmarket, not the former /var/data mount. Current SQLite plans, refresh jobs and file-based research are temporary on that service. A successful save/reload in one running process does not prove restart retention. Do not invite users to rely on saved plans until external durable storage is implemented and rehearsed.
+
+The next storage increment must preserve existing immutable revisions, expected_revision conflicts, owner isolation, exact package identities and atomic publication. It must also replace local refresh coordination for deployments that can lose their filesystem. Merely changing DATA_DIR or copying SQLite files to object storage is insufficient. Evaluate an external Postgres-backed repository and immutable package storage without buying services; no external database has yet been provisioned or integrated.
+
+Free services sleep after 15 minutes of inactivity and lose filesystem changes on restart, redeploy or spin-down. Free Render Postgres expires after 30 days, so it is not a durable launch solution. Avoid adding payment details or upgrading services as part of this preview.
+
 ## Review the service form
 
 - New Web Service, connect only ethereum007/usmarket, branch main.
@@ -11,8 +21,8 @@ Account creation confirmed by user. No Render connector is available in this cha
 - Health check: /api/health (liveness only, not authenticated readiness).
 - Auto-deploy: disabled during initial acceptance; deploy reviewed commits manually.
 - backend/.python-version selects the latest available Python 3.11 patch, matching the CI minor version. Do not override it with Render's newer default runtime.
-- Review a paid compute size sufficient for pandas/numpy research and a persistent disk; no exact cost or capacity is certified before the service form and load checks.
-- Proposed disk mount: /var/data; environment DATA_DIR=/var/data/usmarket. Only data under the mount persists.
+- Deferred paid alternative only: review a compute size sufficient for pandas/numpy research and a persistent disk; no exact cost or capacity is certified before the service form and load checks.
+- Deferred paid alternative disk mount: /var/data; environment DATA_DIR=/var/data/usmarket. Only data under the mount persists.
 
 Stop before activating paid compute/disk and review the displayed combined estimate with the user. The user's standing instructions prohibit buying subscriptions without authorization. Free ephemeral storage is not a substitute for persistent plans.
 
@@ -31,3 +41,5 @@ Official references checked 20 October 2026:
 - https://render.com/docs/python-version
 - https://render.com/docs/monorepo-support
 - https://render.com/docs/disks
+
+Free-tier reference checked 20 October 2026: https://render.com/docs/free

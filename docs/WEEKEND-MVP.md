@@ -2,6 +2,10 @@
 
 User confirmed a private hosted MVP for invited users on 20 October. Thanksgiving public beta remains separate. Sunday acceptance is a working hosted journey, not source/CI completion.
 
+## Budget and hosting decision
+
+Start with $0 hosting, per user decision on 20 October. The user reported submitting a Render Free deployment; live URL/build acceptance is pending. No paid activation is authorized under the current budget. Existing local SQLite/file storage on Free is ephemeral. External durable storage is a prerequisite for invited users to rely on saved plans; retain the restart/restore gate below. The paid-volume checklist is an alternative architecture, not an instruction to purchase a disk. See docs/RENDER-SETUP.md.
+
 ## Minimum journey
 
 1. Invited confirmed-email user signs in; uninvited/anonymous users cannot access research APIs.
