@@ -27,6 +27,7 @@ import LiveFeed from "./live-feed";
 import USPlans from "./plans";
 import USFilings from "./filings";
 import RefreshHistory from "./refresh-history";
+import SessionBrief from "./session-brief";
 import { observeRefresh, type RefreshJob as Job } from "../lib/us-refresh-status";
 import { useAuth } from "../contexts/AuthContext";
 const Chart = dynamic(
@@ -333,6 +334,7 @@ function USResearchContent() {
       )}
       {data && (
         <>
+          <SessionBrief data={data} onInspect={(candidate) => { setOnlySaved(false); setSearch(""); setSymbol(candidate); setStrategy(""); }} />
           <section
             id="market-context"
             className="us-stats"
