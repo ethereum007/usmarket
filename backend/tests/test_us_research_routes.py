@@ -81,3 +81,63 @@ def test_live_quote_request_limits_and_premium_boundary(client):
     assert c.get('/api/us/research/live?symbols=../bad').status_code==422
     assert c.get('/api/us/research/live?symbols=&feed=iex').status_code==422
     assert c.get('/api/us/research/live?symbols=AAPL&feed=unknown').status_code==422
+
+
+def catalog_package(key='a', computed='2026-07-02T00:30:00+00:00', session='2026-07-01'):
+    return {'id':key*64, 'universe':'us-test', 'market':'US', 'currency':'USD', 'state':'final',
+            'session':session, 'computed_at':computed, 'symbols':['AAPL'], 'benchmark':'SPY', 'feed':'sip'}
+
+
+def write_catalog_package(root, package):
+    folder=root/'us-research'; folder.mkdir(exist_ok=True)
+    (folder/(package['id']+'.json')).write_text(json.dumps(package), encoding='utf-8')
+
+
+def test_catalog_sorts_by_session_then_actual_instant_not_offset_text(client):
+    c,root=client
+    newer=catalog_package('a')
+    offset_older=catalog_package('b', '2026-07-02T05:30:00+05:30')
+    previous_session=catalog_package('c', '2026-07-03T01:00:00+00:00', '2026-06-30')
+    for row in (offset_older, previous_session, newer):write_catalog_package(root,row)
+    result=c.get('/api/us/research/packages').json()
+    assert [row['id'] for row in result['packages']]==[newer['id'],offset_older['id'],previous_session['id']]
+    assert result['unavailable_packages']==0
+
+
+@pytest.mark.parametrize('content', ['{bad-json', '[]', 'null', '{"private":"not-package"}'])
+def test_malformed_files_are_explicitly_omitted_without_breaking_valid_research(client,content):
+    c,root=client
+    valid=catalog_package()
+    write_catalog_package(root,valid)
+    (root/'us-research'/('b'*64+'.json')).write_text(content,encoding='utf-8')
+    direct=c.get('/api/us/research/packages/'+'b'*64)
+    assert direct.status_code==409 and 'private' not in direct.text
+    result=c.get('/api/us/research/packages').json()
+    assert len(result['packages'])==1 and result['unavailable_packages']==1
+
+
+@pytest.mark.parametrize('change', [{'computed_at':'not-time'}, {'computed_at':'2026-07-02T00:00:00'},
+    {'session':None}, {'universe':'../bad'}, {'symbols':None}, {'symbols':[{}]},
+    {'symbols':['AAPL','AAPL']}, {'benchmark':'NIFTY'}, {'feed':None}, {'currency':'INR'}, {'state':'live'}])
+def test_invalid_catalog_metadata_never_reaches_frontend(client,change):
+    c,root=client
+    row={**catalog_package(),**change}
+    write_catalog_package(root,row)
+    assert c.get('/api/us/research/packages/'+row['id']).status_code==409
+    result=c.get('/api/us/research/packages').json()
+    assert result['packages']==[] and result['unavailable_packages']==1
+
+
+def test_storage_errors_are_sanitized(client):
+    from pathlib import Path
+    c,_=client
+    with patch.object(Path,'read_text',side_effect=PermissionError('private disk path')):
+        result=c.get('/api/us/research/packages/'+'a'*64)
+    assert result.status_code==503 and 'private disk path' not in result.text
+
+
+def test_pointer_files_are_not_counted_as_invalid_packages(client):
+    c,root=client
+    write_catalog_package(root,catalog_package())
+    (root/'us-research'/'us-test-latest-final.json').write_text('{}')
+    assert c.get('/api/us/research/packages').json()['unavailable_packages']==0

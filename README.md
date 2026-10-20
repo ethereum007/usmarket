@@ -12,6 +12,7 @@ The default frontend route redirects to `/us`. Its navigation, search, benchmark
 
 ## Working features
 
+- Saved catalog reads validate US metadata, order by actual timestamps and disclose unreadable records; see [catalog contract](docs/US-CATALOG-READS.md).
 - Immutable publication serialized across cooperating processes on one retained volume, with monotonic last-final pointers; see [publication contract](docs/US-PUBLICATION.md).
 - Completed-session, split-adjusted research packages; SPY/QQQ relative strength and breadth for an explicit custom universe.
 - Searchable research queue; daily/weekly source charts; detector-specific thesis levels.

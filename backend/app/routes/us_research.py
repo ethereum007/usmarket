@@ -27,6 +27,7 @@ from app.config import settings
 from app.us_auth import require_us_user
 
 from app.services.us_research import run
+from app.services.us_publication import validate as publication_order
 
 router = APIRouter(prefix='/api/us/research', tags=['US research'])
 
@@ -40,51 +41,61 @@ def directory():
 
     return settings.DATA_DIR / 'us-research'
 
-def read_package(package_id: str):
-
-    if not re.fullmatch(r'[a-f0-9]{64}', package_id):
-
-        raise HTTPException(422, 'Invalid package identity')
-
+def package_summary(data: dict):
     try:
+        if not isinstance(data, dict) or data.get('market') != 'US' or data.get('currency') != 'USD':
+            raise ValueError()
+        order = publication_order(data)
+        symbols = data.get('symbols')
+        if not isinstance(symbols, list) or not 1 <= len(symbols) <= 500:
+            raise ValueError()
+        if any(not isinstance(symbol, str) or not re.fullmatch(r'[A-Z][A-Z0-9.\-]{0,14}', symbol) for symbol in symbols):
+            raise ValueError()
+        if len(set(symbols)) != len(symbols) or data.get('benchmark') not in {'SPY', 'QQQ'} or data.get('feed') not in {'iex', 'sip'}:
+            raise ValueError()
+    except (ValueError, TypeError, AttributeError, KeyError):
+        raise HTTPException(409, 'Saved US research metadata is invalid') from None
+    return {key: data[key] for key in ('id', 'universe', 'session', 'state', 'benchmark', 'feed', 'computed_at', 'symbols')}, order
 
+
+def read_package(package_id: str):
+    if not re.fullmatch(r'[a-f0-9]{64}', package_id):
+        raise HTTPException(422, 'Invalid package identity')
+    try:
         data = json.loads((directory() / (package_id + '.json')).read_text(encoding='utf-8'))
-
     except FileNotFoundError:
-
-        raise HTTPException(404, 'US research package not found')
-
-    if data.get('market') != 'US' or data.get('id') != package_id:
-
+        raise HTTPException(404, 'US research package not found') from None
+    except (ValueError, UnicodeError):
+        raise HTTPException(409, 'Saved US research content is invalid') from None
+    except OSError:
+        raise HTTPException(503, 'Saved US research is temporarily unavailable') from None
+    if not isinstance(data, dict) or data.get('id') != package_id:
         raise HTTPException(409, 'Invalid US research package')
-
+    package_summary(data)
     return data
 
+
 @router.get('/packages')
-
 def packages(user: dict = Depends(require_us_user)):
-
     rows = []
-
-    for path in directory().glob('*.json'):
-
+    unavailable = 0
+    try:
+        paths = list(directory().glob('*.json'))
+    except OSError:
+        raise HTTPException(503, 'Saved US research catalog is temporarily unavailable') from None
+    for path in paths:
         if not re.fullmatch(r'[a-f0-9]{64}', path.stem):
-
             continue
-
         try:
-
             data = read_package(path.stem)
+            row, order = package_summary(data)
+            rows.append((order, row['id'], row))
+        except HTTPException:
+            unavailable += 1
+    rows.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    return {'success': True, 'packages': [item[2] for item in rows[:120]],
+            'unavailable_packages': unavailable, 'default_symbols': DEFAULT_SYMBOLS}
 
-            rows.append({key: data.get(key) for key in ('id','universe','session','state','benchmark','feed','computed_at','symbols')})
-
-        except (ValueError, HTTPException, OSError):
-
-            continue
-
-    rows.sort(key=lambda row: (row['session'], row.get('computed_at') or ''), reverse=True)
-
-    return {'success': True, 'packages': rows[:120], 'default_symbols': DEFAULT_SYMBOLS}
 
 @router.get('/packages/{package_id}')
 

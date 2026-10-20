@@ -56,6 +56,7 @@ function USResearchContent() {
   const [notes, setNotes] = useState<Notes>({});
   const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
+  const [catalogUnavailable, setCatalogUnavailable] = useState(0);
   const [storageError, setStorageError] = useState("");
   const [loading, setLoading] = useState(true);
   const [job, setJob] = useState<Job | null>(null);
@@ -81,8 +82,10 @@ function USResearchContent() {
     const result = await fetchAPI<{
       packages: USSummary[];
       default_symbols: string;
+      unavailable_packages?: number;
     }>(`${ROOT}/packages`);
     setPackages(result.packages);
+    setCatalogUnavailable(result.unavailable_packages || 0);
     setDraftSymbols((previous) => previous || result.default_symbols);
     {
       const chosen =
@@ -310,6 +313,7 @@ function USResearchContent() {
         </p>
       )}
       <LiveFeed symbol={symbol} benchmark={data?.benchmark || "SPY"} />
+      {catalogUnavailable > 0 && <p className="us-search-notice" role="status">The catalog is incomplete: {catalogUnavailable} saved package(s) could not be read or validated. This does not mean there is no saved research.</p>}
       {error && (
         <div role="alert" className="us-error">
           {error}
@@ -680,7 +684,7 @@ function USResearchContent() {
           </section>
         </>
       )}
-      {!loading && !data && !error && (
+      {!loading && !data && !error && catalogUnavailable === 0 && (
         <div className="us-panel us-empty">
           <h2>Start your US research library</h2>
           <p>

@@ -36,6 +36,8 @@ def fixture(tmp_path):
     folder = tmp_path / "us-research"
     folder.mkdir()
     package = {"id": PACKAGE, "market": "US", "currency": "USD", "state": "final",
+               "universe": "us-test", "computed_at": "2026-07-02T00:00:00+00:00",
+               "symbols": ["AAPL"], "benchmark": "SPY", "feed": "sip",
                "session": "2026-07-01", "setups": [{"setup_version": VERSION, "setup_id": SETUP,
                "source_snapshot_id": SNAPSHOT, "symbol": "AAPL", "signal": "BULL"}]}
     path = folder / (PACKAGE + ".json")
@@ -104,7 +106,7 @@ def test_invalid_or_spoofed_plan_fields_rejected(fixture, change):
 def test_partial_or_wrong_currency_cannot_back_plan(fixture, change):
     a, _, payload, path, package, _ = fixture
     path.write_text(json.dumps({**package, **change}), encoding="utf-8")
-    assert a.post("/api/us/plans/" + str(uuid4()), json=payload).status_code == 422
+    assert a.post("/api/us/plans/" + str(uuid4()), json=payload).status_code == (409 if "currency" in change else 422)
 
 
 def test_revision_cannot_change_source_package_even_for_same_thesis(fixture):
