@@ -39,6 +39,14 @@ Plans use `DATA_DIR/us-plans.sqlite3`, separate from inherited Indian research s
 
 SQLite persists across connections and application restarts **only when the file is retained on a persistent volume**. This is not yet a shared hosted store, and must not be treated as durable on ephemeral/serverless filesystems. Source research remains in the existing immutable JSON package store. There is no cloud storage deployment or credential change in this increment.
 
+## Workspace integration
+
+The US workspace now has a Plans section and navigation link. It adapts the imported swing editor flow: final setup -> explicit USD risk/expiry/notes -> private save -> reload account plans -> open exact revision and original source chart -> append revision. Existing plans stay pinned to their original evidence while other stocks/packages are browsed. Changing authenticated owner remounts the plan panel to clear prior account state. Browser-local shortlist/notes stay separate; no automatic import occurs.
+
+Conflict/timeout responses do not confirm a save or replace the draft. Users can reload the saved list, then explicitly reopen the latest revision; reopening replaces unsaved edits. Retries retain the same new-plan UUID to avoid duplicate records after an ambiguous timeout. A response from an unmounted editor cannot replace another source editor. Plans have no inferred fills or verified event clearance.
+
+Frontend checks render actual TSX and execute submit/API functions with mocked transport; they cover request allowlists, final-source guards, immutable source/revision verification, USD disclosures, duplicate submission, timeout/conflict and unmount behavior. These are not real browser or hosted identity/storage acceptance tests.
+
 ## Evidence and remaining work
 
 Tests use synthetic packages and temporary databases. They exercise fresh app/client reloads, owner read/write isolation, real concurrent writers, immutable old revisions, evidence binding, invalid/spoofed inputs, New York midnight expiry, decimal sizing, storage failure and SQLite online-backup restoration of both revisions and ownership. Backup tests prove the local database mechanism; they do not establish production backup schedules, encryption, retention, access controls or recovery time.
@@ -47,7 +55,7 @@ For backups of a live SQLite database, use the SQLite online backup API; copying
 
 Open issue #4 gates:
 
-- Connect the US frontend to these APIs; browser-local shortlist/notes are **not automatically migrated or account-synced** by this change.
+- Validate the integrated flow in a real browser and hosted US account environment. Browser-local shortlist/notes are **not automatically migrated or account-synced** by this change.
 - Choose and validate shared hosted storage, immutable package persistence and multi-worker refresh coordination.
 - Demonstrate real hosted account isolation, backups/restore, retention and outage behavior.
 - Add the daily plan/outcome journey and browser/mobile acceptance before claiming completion.

@@ -24,6 +24,8 @@ import {
 } from "../lib/us-research";
 import "./us.css";
 import LiveFeed from "./live-feed";
+import USPlans from "./plans";
+import { useAuth } from "../contexts/AuthContext";
 const Chart = dynamic(
   () =>
     import("../components/charts/CandlestickChart").then(
@@ -37,6 +39,7 @@ type Notes = Record<string, { note: string; saved: boolean }>;
 type Job = { id: string; state: string; error?: string; package_id?: string };
 
 function USResearchContent() {
+  const { user } = useAuth();
   const params = useSearchParams();
   const requestedSymbol = (params.get("symbol") || "").trim().toUpperCase();
   const requestedView = params.get("view") || "";
@@ -683,6 +686,7 @@ function USResearchContent() {
           </p>
         </div>
       )}
+      <USPlans key={user?.id || "signed-out"} data={data} setup={selected} />
       <section id="us-refresh" className="us-panel us-refresh">
         <div>
           <span className="us-eyebrow">RESEARCH UNIVERSE</span>

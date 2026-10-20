@@ -15,7 +15,7 @@ The default frontend route redirects to `/us`. Its navigation, search, benchmark
 - Completed-session, split-adjusted research packages; SPY/QQQ relative strength and breadth for an explicit custom universe.
 - Searchable research queue; daily/weekly source charts; detector-specific thesis levels.
 - Browser-local shortlist and notes; JSON export; custom-universe refresh.
-- US plan API with owner-isolated immutable revisions, concurrency conflicts and USD sizing; see [persistence contract](docs/US-PLAN-PERSISTENCE.md). Frontend integration and shared hosted storage remain open.
+- US plan API with owner-isolated immutable revisions, concurrency conflicts and USD sizing; see [persistence contract](docs/US-PLAN-PERSISTENCE.md). The workspace can save/reopen/revise these plans; shared hosted storage remains open.
 - Read-only live quote diagnostics: feed entitlements, quote/trade timestamps, freshness and spreads. Browser updates use REST polling, not streaming.
 
 ## Run locally (Windows PowerShell)
@@ -87,7 +87,7 @@ The US API uses its own strict bearer-token verifier; Host/Origin and admin head
 
 - US detector thresholds and predictive value remain uncalibrated.
 - Breadth represents the selected custom universe, not the entire US stock market.
-- Earnings calendar, industry leadership, portfolio risk, account-synced plans and fill-aware outcomes are unfinished.
+- Earnings calendar, industry leadership, portfolio risk, hosted plan durability validation and fill-aware outcomes are unfinished.
 - Notes/shortlist are browser-local. Jobs, refresh lock and quote cache are process-local; multiworker deployment needs shared state.
 - No order execution. Saved research bars are not overwritten by live quotes.
 - No deployment workflows or credentials from the original application are included.

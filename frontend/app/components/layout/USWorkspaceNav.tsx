@@ -77,6 +77,7 @@ export function USWorkspaceNav() {
           <Link href="/us#live-data">Live tape</Link>
           <Link href="/us#research-queue">Research</Link>
           <Link href="/us?view=shortlist#research-queue">Shortlist</Link>
+          <Link href="/us#us-plans">Plans</Link>
           <Link
             href="/us/guide"
             aria-current={pathname === "/us/guide" ? "page" : undefined}
