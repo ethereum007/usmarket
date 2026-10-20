@@ -1,0 +1,56 @@
+{
+  "milestone": "https://github.com/ethereum007/usmarket/milestone/1",
+  "milestone_number": 1,
+  "issues": [
+    {
+      "number": 1,
+      "title": "P0: Establish India-to-US capability map, release gates and CI",
+      "url": "https://github.com/ethereum007/usmarket/issues/1"
+    },
+    {
+      "number": 2,
+      "title": "P0: Implement fail-closed US authentication and remove India onboarding leakage",
+      "url": "https://github.com/ethereum007/usmarket/issues/2"
+    },
+    {
+      "number": 3,
+      "title": "P0: Resolve public market-data display and redistribution rights",
+      "url": "https://github.com/ethereum007/usmarket/issues/3"
+    },
+    {
+      "number": 4,
+      "title": "P0: Port durable owner-isolated US plans and research persistence",
+      "url": "https://github.com/ethereum007/usmarket/issues/4"
+    },
+    {
+      "number": 5,
+      "title": "P0: Add versioned US instruments, universes, adjustments and session contracts",
+      "url": "https://github.com/ethereum007/usmarket/issues/5"
+    },
+    {
+      "number": 6,
+      "title": "P0: Adapt announcement workflow to verified US earnings and catalysts",
+      "url": "https://github.com/ethereum007/usmarket/issues/6"
+    },
+    {
+      "number": 7,
+      "title": "P1: Port industry leadership and market context with US inputs",
+      "url": "https://github.com/ethereum007/usmarket/issues/7"
+    },
+    {
+      "number": 8,
+      "title": "P0: Validate US setups and paper outcomes without lookahead",
+      "url": "https://github.com/ethereum007/usmarket/issues/8"
+    },
+    {
+      "number": 9,
+      "title": "P0: Complete market-open reliability and release operations evidence",
+      "url": "https://github.com/ethereum007/usmarket/issues/9"
+    },
+    {
+      "number": 10,
+      "title": "P0: Finish daily research journey and public beta acceptance",
+      "url": "https://github.com/ethereum007/usmarket/issues/10"
+    }
+  ]
+}

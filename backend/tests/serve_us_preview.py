@@ -4,11 +4,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from fastapi import FastAPI
 import uvicorn
-from app.dependencies import require_premium
+from app.us_auth import require_us_user
 from app.routes.us_research import router
 
 if __name__ == '__main__':
     app = FastAPI()
     app.include_router(router)
-    app.dependency_overrides[require_premium] = lambda: {'id':'local-us-preview'}
+    app.dependency_overrides[require_us_user] = lambda: {'id':'local-us-preview'}
     uvicorn.run(app, host='127.0.0.1', port=9018)

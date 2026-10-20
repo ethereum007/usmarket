@@ -24,11 +24,9 @@ from typing import Literal
 
 from app.config import settings
 
-from app.dependencies import require_premium
+from app.us_auth import require_us_user
 
 from app.services.us_research import run
-
-
 
 router = APIRouter(prefix='/api/us/research', tags=['US research'])
 
@@ -38,17 +36,9 @@ _lock = threading.Lock()
 
 _jobs: dict[str, dict] = {}
 
-
-
-
-
 def directory():
 
     return settings.DATA_DIR / 'us-research'
-
-
-
-
 
 def read_package(package_id: str):
 
@@ -70,13 +60,9 @@ def read_package(package_id: str):
 
     return data
 
-
-
-
-
 @router.get('/packages')
 
-def packages(user: dict = Depends(require_premium)):
+def packages(user: dict = Depends(require_us_user)):
 
     rows = []
 
@@ -100,19 +86,11 @@ def packages(user: dict = Depends(require_premium)):
 
     return {'success': True, 'packages': rows[:120], 'default_symbols': DEFAULT_SYMBOLS}
 
-
-
-
-
 @router.get('/packages/{package_id}')
 
-def package(package_id: str, user: dict = Depends(require_premium)):
+def package(package_id: str, user: dict = Depends(require_us_user)):
 
     return {'success': True, 'package': read_package(package_id)}
-
-
-
-
 
 class RefreshRequest(BaseModel):
 
@@ -121,10 +99,6 @@ class RefreshRequest(BaseModel):
     benchmark: Literal['SPY','QQQ'] = 'SPY'
 
     feed: Literal['sip','iex'] = 'sip'
-
-
-
-
 
 async def refresh_job(job_id: str, payload: RefreshRequest):
 
@@ -152,13 +126,9 @@ async def refresh_job(job_id: str, payload: RefreshRequest):
 
         _lock.release()
 
-
-
-
-
 @router.post('/refresh')
 
-def refresh(payload: RefreshRequest, tasks: BackgroundTasks, user: dict = Depends(require_premium)):
+def refresh(payload: RefreshRequest, tasks: BackgroundTasks, user: dict = Depends(require_us_user)):
 
     symbols = sorted(set(s.strip().upper() for s in payload.symbols.split(',') if s.strip()))
 
@@ -192,13 +162,9 @@ def refresh(payload: RefreshRequest, tasks: BackgroundTasks, user: dict = Depend
 
     return {'success': True, 'job':{'id':job_id,'state':'queued'}}
 
-
-
-
-
 @router.get('/jobs/{job_id}')
 
-def job(job_id: str, user: dict = Depends(require_premium)):
+def job(job_id: str, user: dict = Depends(require_us_user)):
 
     data = _jobs.get(job_id)
 
@@ -208,10 +174,8 @@ def job(job_id: str, user: dict = Depends(require_premium)):
 
     return {'success': True, 'job':{k:v for k,v in data.items() if k != 'owner'}}
 
-
-
 @router.get('/live')
-async def live_quotes(symbols: str = 'AAPL,NVDA,SPY', feed: Literal['iex','sip'] = 'iex', user: dict = Depends(require_premium)):
+async def live_quotes(symbols: str = 'AAPL,NVDA,SPY', feed: Literal['iex','sip'] = 'iex', user: dict = Depends(require_us_user)):
     members = sorted(set(s.strip().upper() for s in symbols.split(',') if s.strip()))
     if not 1 <= len(members) <= 10 or any(not re.fullmatch(r'[A-Z][A-Z0-9.\-]{0,14}', s) for s in members):
         raise HTTPException(422, 'Use 1-10 valid US symbols for quote diagnostics')

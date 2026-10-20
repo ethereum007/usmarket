@@ -1,0 +1,57 @@
+name: US product CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: us-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  us-backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements-us.txt
+      - name: Install US runtime and test dependencies
+        run: python -m pip install -r requirements-us.txt 'pytest>=8,<10'
+      - name: Test US contracts, strict auth and reused swing engines
+        run: >-
+          python -m pytest
+          tests/test_us_auth.py tests/test_us_main.py tests/test_us_research.py
+          tests/test_us_live.py tests/test_us_research_routes.py
+          tests/test_swing_detector.py tests/test_swing_early_momentum.py
+          tests/test_swing_acceleration.py tests/test_swing_institutional_setups.py -q
+  us-frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Type check
+        run: npx tsc --noEmit
+      - name: Verify production build
+        run: npm run build -- --webpack

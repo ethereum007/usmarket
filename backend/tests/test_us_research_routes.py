@@ -5,7 +5,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from app.config import settings
-from app.dependencies import require_premium
+from app.us_auth import require_us_user
 from app.routes import us_research as api
 from app.services.us_research import research_package
 from datetime import datetime, timezone
@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 def client(tmp_path):
     app=FastAPI()
     app.include_router(api.router)
-    app.dependency_overrides[require_premium]=lambda:{'id':'owner'}
+    app.dependency_overrides[require_us_user]=lambda:{'id':'owner'}
     with patch.object(api,'settings',replace(settings,DATA_DIR=tmp_path)):
         yield TestClient(app), tmp_path
 
@@ -67,7 +67,7 @@ def test_production_routes_require_auth():
     from fastapi import HTTPException
     app=FastAPI();app.include_router(api.router)
     def reject(): raise HTTPException(401,'Unauthenticated')
-    app.dependency_overrides[require_premium]=reject
+    app.dependency_overrides[require_us_user]=reject
     c=TestClient(app)
     assert c.get('/api/us/research/packages').status_code==401
     assert c.post('/api/us/research/refresh',json={'symbols':'AAPL'}).status_code==401

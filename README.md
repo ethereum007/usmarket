@@ -27,7 +27,7 @@ Backend setup:
 cd backend
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
+python -m pip install -r requirements-us.txt
 python -m pip install pytest
 Copy-Item .env.example .env.us.local
 ```
@@ -66,7 +66,7 @@ Recent consolidated SIP data requires the corresponding provider entitlement. Su
 From `backend/`:
 
 ```powershell
-python -m pytest tests/test_us_research.py tests/test_us_live.py tests/test_us_research_routes.py tests/test_swing_research.py tests/test_swing_foundation.py -q
+python -m pytest tests/test_us_auth.py tests/test_us_main.py tests/test_us_research.py tests/test_us_live.py tests/test_us_research_routes.py tests/test_swing_detector.py tests/test_swing_early_momentum.py tests/test_swing_acceleration.py tests/test_swing_institutional_setups.py -q
 ```
 
 From `frontend/`:
@@ -80,7 +80,7 @@ npm run build -- --webpack
 
 Use `uvicorn app.us_main:app` from `backend/` for the US API, not the inherited `app.main` entry point. Configure authentication, a separate Supabase project, durable storage and the frontend's server-only `ALPHA_API_PROXY_URL` before hosting. The US entry point mounts only research routes and health; it does not start Kite/Arrow connections, Indian market schedulers or payment services.
 
-The current access dependencies and frontend authentication are inherited foundations requiring a production review. Do not treat the localhost preview as production-ready authentication.
+The US API uses its own strict bearer-token verifier; Host/Origin and admin headers cannot grant access. Local identity overrides exist only in the explicit preview harness. US frontend onboarding still needs its own access-flow implementation before release; do not treat the localhost preview as production-ready onboarding. The inherited full requirements.txt is retained for legacy-code audits, not the US runtime.
 
 ## Known product limits
 
@@ -92,3 +92,7 @@ The current access dependencies and frontend authentication are inherited founda
 - No deployment workflows or credentials from the original application are included.
 
 See `docs/PRODUCT-STATUS.md` and the component docs for the remaining work. Tests verify software behavior; they do not establish a trading edge.
+
+## Thanksgiving public beta
+
+Target: 26 November 2026. See [release gates](docs/RELEASE-PLAN.md), [India-to-US reuse map](docs/INDIA-US-PARITY.md) and [the GitHub milestone](https://github.com/ethereum007/usmarket/milestone/1). Development continuation runs every 30 minutes in the owning Codex chat; all completed source changes and evidence are pushed here. Public deployment is blocked until release gates pass.
