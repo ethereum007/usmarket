@@ -34,7 +34,7 @@ export default function USLoginPage() {
   }
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-6 px-6 py-12">
-      <div><p className="text-sm text-text-secondary">ALPHA RADAR US · PRIVATE BETA</p><h1 className="mt-3 text-3xl font-semibold">Your US research workspace</h1><p className="mt-3 text-sm text-text-secondary">Sign in with your US beta account to review stock setups, source charts and market-data diagnostics.</p></div>
+      <div><p className="text-sm text-text-secondary">ALPHA RADAR US · PRIVATE BETA</p><h1 className="mt-3 text-3xl font-semibold">Your US research workspace</h1><p className="mt-3 text-sm text-text-secondary">Sign in with your invited US beta account to review stock setups, source charts and market-data diagnostics. Confirmed email alone does not grant private MVP access.</p></div>
       {!supabase && <p role="alert">US sign-in is not configured. An administrator must configure the US authentication project before access is available.</p>}
       {user && !user.is_anonymous && !user.email_confirmed_at && <p role="status">Confirm your email before entering the workspace. Check your inbox, or sign out and retry.</p>}
       <form onSubmit={submit} className="flex flex-col gap-4">

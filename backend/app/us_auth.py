@@ -6,6 +6,8 @@ local user. The explicit loopback preview harness owns its test override.
 from __future__ import annotations
 
 from datetime import datetime
+import os
+from uuid import UUID
 
 import httpx
 from fastapi import HTTPException, Request
@@ -49,7 +51,20 @@ async def verify_us_token(token: str) -> dict:
             raise ValueError()
     except (ValueError, TypeError, AttributeError):
         raise HTTPException(503, 'US authentication returned invalid confirmation evidence') from None
-    return {'id':user['id'],'email':user['email'],'auth_source':'supabase'}
+    # Private MVP access follows stable provider user IDs, not request headers,
+    # email aliases or frontend signup settings. Missing configuration denies all.
+    try:
+        raw = os.getenv('US_INVITED_USER_IDS', '')
+        members = [value.strip() for value in raw.split(',') if value.strip()]
+        if not 1 <= len(members) <= 500 or len(raw) > 20000:
+            raise ValueError()
+        invited = {str(UUID(value)) for value in members}
+        identity = str(UUID(user['id']))
+    except (ValueError, TypeError, AttributeError):
+        raise HTTPException(503, 'Private US access is not configured') from None
+    if identity not in invited:
+        raise HTTPException(403, 'This account is not invited to the private US MVP')
+    return {'id':identity,'email':user['email'],'auth_source':'supabase'}
 
 
 async def require_us_user(request: Request) -> dict:

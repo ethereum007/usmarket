@@ -2,6 +2,10 @@
 
 Owner: Kiran Dutta. Repository: ethereum007/usmarket. Target: US Thanksgiving, Thursday 26 November 2026. Aim to complete the public launch rehearsal by 23 November and ship by 25 November; reserve the holiday as contingency, not a first live-market test.
 
+## Weekend milestone
+
+Private hosted MVP for invited users by Sunday, 25 October 2026, confirmed by the user on 20 October. Execute docs/WEEKEND-MVP.md before adding broader features. Private access and actual display permissions still apply; source tests alone do not satisfy hosted acceptance.
+
 ## Product promise
 
 A US swing-research workspace that answers: what is leading, why a stock deserves attention today, which evidence supports the setup, what invalidates the thesis, which events change the risk, and what happened afterward.

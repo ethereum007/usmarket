@@ -46,7 +46,7 @@ def provider_client(response=None,error=None):
 
 
 @pytest.mark.parametrize('status,body,expected',[
-    (200,{'id':'owner-a','email':'owner@example.com','email_confirmed_at':'2026-01-01T00:00:00Z'},200),
+    (200,{'id':'11111111-1111-4111-8111-111111111111','email':'owner@example.com','email_confirmed_at':'2026-01-01T00:00:00Z'},200),
     (200,{'id':'owner-a','is_anonymous':True},401),
     (200,{'id':'owner-a','email':'owner@example.com'},403),
     (200,{'id':'owner-a','email':'owner@example.com','email_confirmed_at':None},403),
@@ -59,10 +59,10 @@ def provider_client(response=None,error=None):
 ])
 def test_provider_identity_and_failure_mapping(status,body,expected):
     config=SimpleNamespace(SUPABASE_URL='https://us-auth.example',SUPABASE_ANON_KEY='test-public-key')
-    with patch.object(us_auth,'settings',config), patch.object(us_auth.httpx,'AsyncClient',provider_client(httpx.Response(status,json=body))):
+    with patch.dict(us_auth.os.environ,{'US_INVITED_USER_IDS':'11111111-1111-4111-8111-111111111111'}), patch.object(us_auth,'settings',config), patch.object(us_auth.httpx,'AsyncClient',provider_client(httpx.Response(status,json=body))):
         response=TestClient(auth_app()).get('/private',headers={'Authorization':'Bearer test-session'})
     assert response.status_code==expected
-    if expected==200:assert response.json()=={'id':'owner-a'}
+    if expected==200:assert response.json()=={'id':'11111111-1111-4111-8111-111111111111'}
     assert 'test-session' not in response.text
 
 
@@ -89,3 +89,33 @@ def test_hosted_refresh_requires_token_and_health_remains_public():
     with TestClient(hosted_app) as client:
         assert client.post('/api/us/research/refresh',json={'symbols':'AAPL'},headers={'Host':'localhost'}).status_code==401
         assert client.get('/api/health').status_code==200
+
+
+@pytest.mark.parametrize('members,expected',[
+    ('',503),('not-a-uuid',503),
+    ('22222222-2222-4222-8222-222222222222',403),
+    ('11111111-1111-4111-8111-111111111111',200),
+    (' 22222222-2222-4222-8222-222222222222, 11111111-1111-4111-8111-111111111111 ',200),
+    ('11111111-1111-4111-8111-111111111111,invalid',503),
+])
+def test_private_mvp_invitation_is_enforced_after_provider_verification(members,expected):
+    identity='11111111-1111-4111-8111-111111111111'
+    body={'id':identity,'email':'owner@example.com','email_confirmed_at':'2026-01-01T00:00:00Z'}
+    config=SimpleNamespace(SUPABASE_URL='https://us-auth.example',SUPABASE_ANON_KEY='test-public-key')
+    with patch.dict(us_auth.os.environ,{'US_INVITED_USER_IDS':members}),patch.object(us_auth,'settings',config),patch.object(us_auth.httpx,'AsyncClient',provider_client(httpx.Response(200,json=body))):
+        response=TestClient(auth_app()).get('/private',headers={'Authorization':'Bearer test-session',
+            'X-Invited-User':identity,'X-Admin-Secret':'forged','Origin':'http://localhost:3108'})
+    assert response.status_code==expected
+    if expected!=200:assert identity not in response.text and 'owner@example.com' not in response.text
+
+
+def test_invitation_revocation_applies_to_next_request_without_token_reissue():
+    identity='11111111-1111-4111-8111-111111111111'
+    body={'id':identity,'email':'owner@example.com','email_confirmed_at':'2026-01-01T00:00:00Z'}
+    config=SimpleNamespace(SUPABASE_URL='https://us-auth.example',SUPABASE_ANON_KEY='test-public-key')
+    client=TestClient(auth_app())
+    with patch.object(us_auth,'settings',config),patch.object(us_auth.httpx,'AsyncClient',provider_client(httpx.Response(200,json=body))):
+        with patch.dict(us_auth.os.environ,{'US_INVITED_USER_IDS':identity}):
+            assert client.get('/private',headers={'Authorization':'Bearer test-session'}).status_code==200
+        with patch.dict(us_auth.os.environ,{'US_INVITED_USER_IDS':'22222222-2222-4222-8222-222222222222'}):
+            assert client.get('/private',headers={'Authorization':'Bearer test-session'}).status_code==403
