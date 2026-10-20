@@ -27,6 +27,7 @@ import LiveFeed from "./live-feed";
 import USPlans from "./plans";
 import USFilings from "./filings";
 import RefreshHistory from "./refresh-history";
+import { observeRefresh, type RefreshJob as Job } from "../lib/us-refresh-status";
 import { useAuth } from "../contexts/AuthContext";
 const Chart = dynamic(
   () =>
@@ -38,7 +39,7 @@ const Chart = dynamic(
 const ROOT = "/api/us/research";
 const STORAGE = "alpha-us-research-notes-v1";
 type Notes = Record<string, { note: string; saved: boolean }>;
-type Job = { id: string; state: string; error?: string; package_id?: string };
+
 
 function USResearchContent() {
   const { user } = useAuth();
@@ -61,6 +62,8 @@ function USResearchContent() {
   const [storageError, setStorageError] = useState("");
   const [loading, setLoading] = useState(true);
   const [job, setJob] = useState<Job | null>(null);
+  const [jobStatusError, setJobStatusError] = useState("");
+  const [statusRetry, setStatusRetry] = useState(0);
   const [draftSymbols, setDraftSymbols] = useState("");
   const [benchmark, setBenchmark] = useState("SPY");
   const [sort, setSort] = useState("rs20");
@@ -161,22 +164,18 @@ function USResearchContent() {
       );
     }
   }, [notes, ready]);
+  useEffect(() => observeRefresh(job, (recorded) => {
+    setJobStatusError("");
+    setJob(recorded);
+  }, setJobStatusError), [job, statusRetry]);
   useEffect(() => {
-    if (!job || !["queued", "running"].includes(job.state)) return;
-    const timer = setTimeout(() => {
-      fetchAPI<{ job: Job }>(`${ROOT}/jobs/${job.id}`)
-        .then(async (r) => {
-          setJob(r.job);
-          if (r.job.state === "completed") {
-            await loadCatalog();
-            if (r.job.package_id) setPackageId(r.job.package_id);
-          }
-        })
-        .catch((e) => {
-          setJob({ ...job, state: "failed", error: e.message });
-        });
-    }, 2500);
-    return () => clearTimeout(timer);
+    if (job?.state !== "completed") return;
+    let active = true;
+    if (job.package_id) setPackageId(job.package_id);
+    loadCatalog().catch(() => {
+      if (active) setError("Refresh completed, but the research catalog could not be reloaded. Try opening the saved result from refresh history.");
+    });
+    return () => { active = false; };
   }, [job, loadCatalog]);
 
   const queue = useMemo(() => {
@@ -737,10 +736,14 @@ function USResearchContent() {
           <p role="status">
             Last recorded refresh status: {job.state}
             {job.error ? ` · ${job.error}` : ""}.{" "}
-            {job.state === "completed" ? "Saved research reloaded." : ""}
+            {job.state === "completed" ? "Refresh completed; saved research can be opened from history." : ""}
             {busy ? " Status is not a worker heartbeat; after an outage, check saved research before retrying." : ""}
           </p>
         )}
+        {jobStatusError && <div role="alert">
+          <p>{jobStatusError}</p>
+          <button type="button" className="workspace-button" onClick={() => { setJobStatusError(""); setStatusRetry(value => value + 1); }}>Check refresh status again</button>
+        </div>}
       </section>
       {user?.id && <RefreshHistory key={user.id} revision={`${job?.id || ""}:${job?.state || ""}`} onOpen={setPackageId} />}
     </div>
@@ -748,9 +751,10 @@ function USResearchContent() {
 }
 
 export default function USResearchPage() {
+  const { user } = useAuth();
   return (
     <Suspense fallback={<p className="us-loading">Loading US workspace…</p>}>
-      <USResearchContent />
+      <USResearchContent key={user?.id || "signed-out"} />
     </Suspense>
   );
 }

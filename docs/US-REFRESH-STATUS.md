@@ -19,3 +19,10 @@ History regression checks cover bounded ordering, authentication, owner isolatio
 Reservation tests cover two connections, thread handoff, separate spawned processes, forced holder termination/reacquisition, storage errors, exclusion before job creation, ownership during provider/status work and scheduling cleanup. Windows local checks plus Linux CI exercise these primitives; neither certifies an untested hosted filesystem.
 
 Reconciliation regressions cover multiple owners, preserved completed results, unknown-completion history, refusal while another worker holds the reservation, rollback on malformed storage, sanitized storage failure and reservation cleanup. Actual hosted crash/publication drills remain required.
+
+
+## Workspace status transport failures
+
+A failed status request leaves the last recorded job unchanged and displays separate, sanitized feedback with an explicit check-again action. It does not release the refresh button as if the server job had failed. Poll cleanup ignores late responses after unmount; the workspace remounts for each authenticated owner. Job identity and state must match the request contract before an observation is accepted. Only queued/running jobs poll.
+
+A completed job remains completed if catalog reloading fails. The exact package can still be selected, while catalog failure receives separate feedback; the UI no longer claims research reloaded merely because a completed status arrived. History remains available for explicit result opening. Unit tests simulate disconnect/retry, terminal outcomes, unexpected responses and late completion. These checks do not substitute for a real browser or market-open outage drill.
