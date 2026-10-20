@@ -17,6 +17,20 @@ jobs:
   us-backend:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: us_test
+          POSTGRES_PASSWORD: ci-only-disposable
+          POSTGRES_DB: usmarket_contract_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U us_test -d usmarket_contract_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      US_TEST_POSTGRES_DSN: postgresql://us_test:ci-only-disposable@localhost:5432/usmarket_contract_test
     defaults:
       run:
         working-directory: backend
@@ -28,11 +42,11 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements-us.txt
       - name: Install US runtime and test dependencies
-        run: python -m pip install -r requirements-us.txt 'pytest>=8,<10'
+        run: python -m pip install -r requirements-us.txt 'pytest>=8,<10' 'psycopg[binary]>=3.2,<4'
       - name: Test US contracts, strict auth and reused swing engines
         run: >-
           python -m pytest
-          tests/test_us_auth.py tests/test_us_readiness.py tests/test_us_backup.py tests/test_us_main.py tests/test_us_research.py
+          tests/test_us_postgres.py tests/test_us_auth.py tests/test_us_readiness.py tests/test_us_backup.py tests/test_us_main.py tests/test_us_research.py
           tests/test_us_live.py tests/test_us_refresh_lock.py tests/test_us_research_routes.py tests/test_us_plans.py tests/test_us_sessions.py tests/test_us_instruments.py tests/test_us_publication.py tests/test_us_filings.py
           tests/test_swing_detector.py tests/test_swing_early_momentum.py
           tests/test_swing_acceleration.py tests/test_swing_institutional_setups.py -q
