@@ -8,7 +8,6 @@ import json
 
 import re
 
-import threading
 import sqlite3
 from datetime import datetime, timezone
 
@@ -30,13 +29,13 @@ from app.us_auth import require_us_user
 
 from app.services.us_research import run
 from app.services import swing_repository as repository
+from app.services.us_refresh_lock import acquire as acquire_refresh_lock, RefreshBusy, RefreshLock
 from app.services.us_publication import validate as publication_order
 
 router = APIRouter(prefix='/api/us/research', tags=['US research'])
 
 DEFAULT_SYMBOLS = 'AAPL,MSFT,NVDA,AMZN,META,GOOGL,AVGO,TSLA,AMD,ORCL,CRM,PLTR,JPM,BAC,GS,V,MA,UNH,LLY,JNJ,XOM,CVX,CAT,GE,COST,WMT,HD,NFLX,MU,AMAT'
 
-_lock = threading.Lock()
 
 def job_database():
     return settings.DATA_DIR / 'us-refresh-jobs.sqlite3'
@@ -124,7 +123,7 @@ class RefreshRequest(BaseModel):
 
     feed: Literal['sip','iex'] = 'sip'
 
-async def refresh_job(job_data: dict, payload: RefreshRequest):
+async def refresh_job(job_data: dict, payload: RefreshRequest, lock: RefreshLock):
     data = {**job_data, 'state': 'running'}
     try:
         # Do not fetch or publish if durable running status cannot be recorded.
@@ -141,7 +140,7 @@ async def refresh_job(job_data: dict, payload: RefreshRequest):
         # or completion of publication; never replace it with an invented result.
         pass
     finally:
-        _lock.release()
+        lock.release()
 
 @router.post('/refresh')
 
@@ -157,18 +156,23 @@ def refresh(payload: RefreshRequest, tasks: BackgroundTasks, user: dict = Depend
 
         raise HTTPException(422, 'Keep the benchmark separate from stock symbols')
 
-    if not _lock.acquire(blocking=False):
-
-        raise HTTPException(409, 'A US research refresh is already running in this worker')
+    try:
+        lock = acquire_refresh_lock(settings.DATA_DIR / 'us-refresh-lock.sqlite3')
+    except RefreshBusy:
+        raise HTTPException(409, 'A US research refresh is already running') from None
+    except (OSError, sqlite3.Error):
+        raise HTTPException(503, 'Refresh coordination is temporarily unavailable') from None
 
     job_id = str(uuid4())
     data = {'id': job_id, 'owner': user['id'], 'state': 'queued'}
     try:
         persist_job(data)
-    except STORAGE_ERRORS:
-        _lock.release()
-        raise HTTPException(503, 'Refresh status storage is temporarily unavailable') from None
-    tasks.add_task(refresh_job, data, payload.model_copy(update={'symbols':','.join(symbols)}))
+        tasks.add_task(refresh_job, data, payload.model_copy(update={'symbols':','.join(symbols)}), lock)
+    except BaseException as exc:
+        lock.release()
+        if isinstance(exc, STORAGE_ERRORS):
+            raise HTTPException(503, 'Refresh status storage is temporarily unavailable') from None
+        raise
 
     return {'success': True, 'job':{'id':job_id,'state':'queued'}}
 

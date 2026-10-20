@@ -183,7 +183,7 @@ def test_status_write_failure_blocks_provider_and_releases_lock(client):
         result=c.post('/api/us/research/refresh',json={'symbols':'AAPL'})
     assert result.status_code==503 and 'private path' not in result.text
     provider.assert_not_called()
-    assert not api._lock.locked()
+    lock=api.acquire_refresh_lock(api.settings.DATA_DIR/'us-refresh-lock.sqlite3');lock.release()
 
 
 def test_running_write_failure_prevents_provider(client):
@@ -198,7 +198,7 @@ def test_running_write_failure_prevents_provider(client):
     job=c.get('/api/us/research/jobs/'+result.json()['job']['id']).json()['job']
     assert job['state']=='queued'  # Only the durable observation is asserted.
     provider.assert_not_called()
-    assert not api._lock.locked()
+    lock=api.acquire_refresh_lock(api.settings.DATA_DIR/'us-refresh-lock.sqlite3');lock.release()
 
 
 def test_completion_write_failure_does_not_invent_failed_publication(client):
@@ -212,7 +212,7 @@ def test_completion_write_failure_does_not_invent_failed_publication(client):
         result=c.post('/api/us/research/refresh',json={'symbols':'AAPL'})
     job=c.get('/api/us/research/jobs/'+result.json()['job']['id']).json()['job']
     assert job['state']=='running' and 'package_id' not in job
-    assert not api._lock.locked()
+    lock=api.acquire_refresh_lock(api.settings.DATA_DIR/'us-refresh-lock.sqlite3');lock.release()
 
 
 def test_old_running_job_remains_last_known_not_claimed_dead(client):
@@ -261,3 +261,46 @@ def test_recent_job_history_requires_auth():
     def reject():raise HTTPException(401,'Unauthenticated')
     app.dependency_overrides[require_us_user]=reject
     assert TestClient(app).get('/api/us/research/jobs').status_code==401
+
+
+def test_refresh_rejects_another_worker_before_creating_job(client):
+    c,_=client
+    lock=api.acquire_refresh_lock(api.settings.DATA_DIR/'us-refresh-lock.sqlite3')
+    try:
+        response=c.post('/api/us/research/refresh',json={'symbols':'AAPL'})
+        assert response.status_code==409
+        assert c.get('/api/us/research/jobs').json()['jobs']==[]
+    finally:lock.release()
+
+
+def test_lock_storage_failure_is_sanitized(client):
+    c,_=client
+    with patch.object(api,'acquire_refresh_lock',side_effect=OSError('private path')):
+        result=c.post('/api/us/research/refresh',json={'symbols':'AAPL'})
+    assert result.status_code==503 and 'private path' not in result.text
+
+
+def test_lock_is_held_during_provider_work_and_status_write(client):
+    from unittest.mock import AsyncMock
+    c,_=client
+    path=api.settings.DATA_DIR/'us-refresh-lock.sqlite3'
+    async def provider(args):
+        with pytest.raises(api.RefreshBusy):api.acquire_refresh_lock(path)
+        return {'id':'f'*64}
+    original=api.persist_job
+    def persist(data):
+        with pytest.raises(api.RefreshBusy):api.acquire_refresh_lock(path)
+        original(data)
+    with patch.object(api,'run',provider),patch.object(api,'persist_job',side_effect=persist):
+        result=c.post('/api/us/research/refresh',json={'symbols':'AAPL'})
+    assert result.status_code==200
+    assert c.get('/api/us/research/jobs/'+result.json()['job']['id']).json()['job']['state']=='completed'
+    lock=api.acquire_refresh_lock(path);lock.release()
+
+
+def test_task_scheduling_failure_releases_reservation(client):
+    from unittest.mock import Mock
+    c,_=client
+    tasks=Mock();tasks.add_task.side_effect=RuntimeError('scheduling failed')
+    with pytest.raises(RuntimeError):api.refresh(api.RefreshRequest(symbols='AAPL'),tasks,{'id':'owner'})
+    lock=api.acquire_refresh_lock(api.settings.DATA_DIR/'us-refresh-lock.sqlite3');lock.release()

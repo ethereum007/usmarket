@@ -33,7 +33,7 @@ jobs:
         run: >-
           python -m pytest
           tests/test_us_auth.py tests/test_us_main.py tests/test_us_research.py
-          tests/test_us_live.py tests/test_us_research_routes.py tests/test_us_plans.py tests/test_us_sessions.py tests/test_us_instruments.py tests/test_us_publication.py tests/test_us_filings.py
+          tests/test_us_live.py tests/test_us_refresh_lock.py tests/test_us_research_routes.py tests/test_us_plans.py tests/test_us_sessions.py tests/test_us_instruments.py tests/test_us_publication.py tests/test_us_filings.py
           tests/test_swing_detector.py tests/test_swing_early_momentum.py
           tests/test_swing_acceleration.py tests/test_swing_institutional_setups.py -q
   us-frontend:

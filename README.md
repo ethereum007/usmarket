@@ -93,7 +93,7 @@ The US API uses its own strict bearer-token verifier; Host/Origin and admin head
 - US detector thresholds and predictive value remain uncalibrated.
 - Breadth represents the selected custom universe, not the entire US stock market.
 - Earnings calendar, industry leadership, portfolio risk, hosted plan durability validation and fill-aware outcomes are unfinished.
-- Notes/shortlist are browser-local. Jobs, refresh lock and quote cache are process-local; multiworker deployment needs shared state.
+- Notes/shortlist are browser-local. Job observations persist in SQLite; API refreshes use a shared local-volume SQLite reservation. Quote caches remain process-local. Hosted/multi-host coordination, crash-result reconciliation and storage acceptance remain open (docs/US-REFRESH-STATUS.md).
 - No order execution. Saved research bars are not overwritten by live quotes.
 - No deployment workflows or credentials from the original application are included.
 
