@@ -32,6 +32,7 @@ from app.services import swing_repository as repository
 from app.services.us_refresh_lock import acquire as acquire_refresh_lock, RefreshBusy, RefreshLock
 from app.services.us_publication import validate as publication_order
 from app.services import us_remote_research as remote_research
+from app.services import us_remote_jobs as remote_jobs
 
 router = APIRouter(prefix='/api/us/research', tags=['US research'])
 
@@ -42,9 +43,12 @@ def job_database():
     return settings.DATA_DIR / 'us-refresh-jobs.sqlite3'
 
 
-def persist_job(data: dict):
+def persist_job(data: dict, access_token=None):
     saved = {**data, 'updated_at': datetime.now(timezone.utc).isoformat()}
-    repository.save_job(saved, database_path=job_database(), updated_at=saved['updated_at'])
+    if remote_jobs.enabled():
+        remote_jobs.execute('save', access_token, saved['id'], saved)
+    else:
+        repository.save_job(saved, database_path=job_database(), updated_at=saved['updated_at'])
 
 
 STORAGE_ERRORS = (OSError, sqlite3.Error, ValueError, TypeError, KeyError)
@@ -151,7 +155,7 @@ async def refresh_job(job_data: dict, payload: RefreshRequest, lock: RefreshLock
     data = {**job_data, 'state': 'running'}
     try:
         # Do not fetch or publish if durable running status cannot be recorded.
-        persist_job(data)
+        await asyncio.to_thread(persist_job, data, access_token)
         try:
             package = await run(SimpleNamespace(symbols=payload.symbols, benchmark=payload.benchmark,
                                                 feed=payload.feed, output=str(directory())))
@@ -160,8 +164,8 @@ async def refresh_job(job_data: dict, payload: RefreshRequest, lock: RefreshLock
             data.update(state='completed', package_id=package['id'])
         except Exception:
             data.update(state='failed', error='Research refresh failed; saved research remains available')
-        persist_job(data)
-    except STORAGE_ERRORS:
+        await asyncio.to_thread(persist_job, data, access_token)
+    except (*STORAGE_ERRORS, HTTPException):
         # Last durable state is retained. A failed status write cannot certify failure
         # or completion of publication; never replace it with an invented result.
         pass
@@ -194,10 +198,11 @@ def refresh(payload: RefreshRequest, tasks: BackgroundTasks, user: dict = Depend
     try:
         # Exclusive ownership proves earlier API workers no longer hold this
         # coordinator. It does not prove whether their publication completed.
-        repository.interrupt_jobs(database_path=job_database(),
-            updated_at=datetime.now(timezone.utc).isoformat(),
-            message='Previous refresh worker no longer owns coordination; completion is unknown. Check saved research before retrying.')
-        persist_job(data)
+        if not remote_jobs.enabled():
+            repository.interrupt_jobs(database_path=job_database(),
+                updated_at=datetime.now(timezone.utc).isoformat(),
+                message='Previous refresh worker no longer owns coordination; completion is unknown. Check saved research before retrying.')
+        persist_job(data, user.get('_access_token'))
         tasks.add_task(refresh_job, data, payload.model_copy(update={'symbols':','.join(symbols)}), lock, user.get('_access_token'))
     except BaseException as exc:
         lock.release()
@@ -210,7 +215,7 @@ def refresh(payload: RefreshRequest, tasks: BackgroundTasks, user: dict = Depend
 @router.get('/jobs')
 def recent_jobs(user: dict = Depends(require_us_user)):
     try:
-        rows = repository.list_jobs(user['id'], database_path=job_database(), limit=20)
+        rows = remote_jobs.execute('list', user.get('_access_token')) if remote_jobs.enabled() else repository.list_jobs(user['id'], database_path=job_database(), limit=20)
         jobs = [{k: v for k, v in row.items() if k in {'id', 'state', 'updated_at', 'package_id', 'error', 'completion_unknown'}} for row in rows]
     except STORAGE_ERRORS:
         raise HTTPException(503, 'Refresh status storage is temporarily unavailable') from None
@@ -222,7 +227,7 @@ def recent_jobs(user: dict = Depends(require_us_user)):
 def job(job_id: str, user: dict = Depends(require_us_user)):
 
     try:
-        data = repository.get_job(job_id, user['id'], database_path=job_database(), stale_after=None)
+        data = remote_jobs.execute('get', user.get('_access_token'), job_id) if remote_jobs.enabled() else repository.get_job(job_id, user['id'], database_path=job_database(), stale_after=None)
     except STORAGE_ERRORS:
         raise HTTPException(503, 'Refresh status storage is temporarily unavailable') from None
     if not data:

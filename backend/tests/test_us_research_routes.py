@@ -190,7 +190,7 @@ def test_running_write_failure_prevents_provider(client):
     from unittest.mock import AsyncMock
     c,_=client
     original=api.persist_job
-    def fail_running(data):
+    def fail_running(data, access_token=None):
         if data['state']=='running':raise OSError('private')
         original(data)
     with patch.object(api,'persist_job',side_effect=fail_running), patch.object(api,'run',AsyncMock()) as provider:
@@ -205,7 +205,7 @@ def test_completion_write_failure_does_not_invent_failed_publication(client):
     from unittest.mock import AsyncMock
     c,_=client
     original=api.persist_job
-    def fail_completed(data):
+    def fail_completed(data, access_token=None):
         if data['state']=='completed':raise OSError('private')
         original(data)
     with patch.object(api,'persist_job',side_effect=fail_completed), patch.object(api,'run',AsyncMock(return_value={'id':'e'*64})):
@@ -288,7 +288,7 @@ def test_lock_is_held_during_provider_work_and_status_write(client):
         with pytest.raises(api.RefreshBusy):api.acquire_refresh_lock(path)
         return {'id':'f'*64}
     original=api.persist_job
-    def persist(data):
+    def persist(data, access_token=None):
         with pytest.raises(api.RefreshBusy):api.acquire_refresh_lock(path)
         original(data)
     with patch.object(api,'run',provider),patch.object(api,'persist_job',side_effect=persist):
@@ -416,3 +416,41 @@ def test_remote_refresh_requires_publication_ack_and_never_persists_token(client
     stored = api.repository.list_jobs('owner',database_path=api.job_database())[0]
     assert 'private-test-token' not in json.dumps(stored)
     assert 'private provider response' not in json.dumps(job)
+
+
+
+def test_remote_jobs_route_forwards_token_and_never_uses_local_history(client,monkeypatch):
+    c,_ = client
+    monkeypatch.setenv('US_JOB_STORE','supabase')
+    monkeypatch.setenv('US_RESEARCH_STORE','supabase')
+    c.app.dependency_overrides[require_us_user] = lambda: {'id':'owner','_access_token':'private-token'}
+    with patch.object(api.remote_jobs,'execute',return_value=[]) as remote, patch.object(api.repository,'list_jobs') as local:
+        result=c.get('/api/us/research/jobs')
+    assert result.json() == {'success':True,'jobs':[]}
+    remote.assert_called_once_with('list','private-token')
+    local.assert_not_called()
+
+
+def test_remote_job_transport_strips_identity_credentials_and_arbitrary_errors(monkeypatch):
+    import httpx
+    from types import SimpleNamespace
+    from app.services import us_remote_jobs as remote
+    monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://us.example',SUPABASE_ANON_KEY='public-test'))
+    requests=[]
+    original=httpx.Client
+    transport=httpx.MockTransport(lambda request: (requests.append(request) or httpx.Response(200,json={'id':'one','state':'queued'})))
+    payload={'id':'one','state':'queued','owner':'foreign','_access_token':'secret','error':'provider secret'}
+    with patch.object(remote.httpx,'Client',lambda **kwargs:original(transport=transport,**kwargs)):
+        remote.execute('save','verified-token','one',payload)
+    body=json.loads(requests[0].content)
+    assert body=={'action':'save','job_id':'one','job_payload':{'id':'one','state':'queued'}}
+    assert requests[0].headers['authorization']=='Bearer verified-token'
+
+
+def test_remote_jobs_require_remote_research_and_reject_unknown_modes(monkeypatch):
+    from fastapi import HTTPException
+    for mode in ['supabase','typo']:
+        monkeypatch.setenv('US_JOB_STORE',mode)
+        monkeypatch.setenv('US_RESEARCH_STORE','local')
+        with pytest.raises(HTTPException) as error:api.remote_jobs.enabled()
+        assert error.value.status_code==503
