@@ -90,6 +90,7 @@ def save(plan_id: UUID, payload: PlanRequest, user: dict = Depends(require_us_us
     values.update(
         market="US", currency="USD", timezone="America/New_York",
         symbol=setup["symbol"], direction=direction, setup_id=setup["setup_id"],
+        provider_asset_id=setup.get("provider_asset_id"),
         source_snapshot_id=setup["source_snapshot_id"], session=package["session"],
         quantity=min(risk_qty, allocation_qty),
         sizing_policy="Whole shares; min(stop risk, allocation cap). Gaps, slippage, fees and liquidity unverified.",
@@ -100,6 +101,6 @@ def save(plan_id: UUID, payload: PlanRequest, user: dict = Depends(require_us_us
     saved = store(
         repo.save_plan, user["id"], str(plan_id), payload.expected_revision, values,
         updated_at=datetime.now(timezone.utc).isoformat(),
-        immutable_fields=("setup_id", "package_id", "setup_version", "source_snapshot_id", "symbol", "direction"),
+        immutable_fields=("setup_id", "package_id", "setup_version", "source_snapshot_id", "symbol", "direction", "provider_asset_id"),
     )
     return {"success": True, "plan": saved}

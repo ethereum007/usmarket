@@ -13,6 +13,7 @@ import httpx
 from dotenv import load_dotenv
 from app.services.swing_research import build_package
 from app.services.swing_repository import identity
+from app.services.us_instruments import load_instruments, bind_instruments
 from app.services.us_sessions import completed_calendar, missing_sessions, VERSION as SESSION_VERSION, FINALIZATION_MINUTES
 
 NY = ZoneInfo('America/New_York')
@@ -162,8 +163,13 @@ async def run(args):
     end = now.astimezone(NY).date().isoformat()
     start = (now - timedelta(days=800)).date().isoformat()
     async with httpx.AsyncClient(headers={'APCA-API-KEY-ID':key, 'APCA-API-SECRET-KEY':secret}, timeout=30) as client:
-        calendar, raw = await AlpacaHistory(client, args.feed).load([args.benchmark, *symbols], start, end)
+        instruments = await load_instruments(client, [args.benchmark, *symbols])
+        if instruments["records"][args.benchmark]["resolution"] != "resolved":
+            raise ValueError("Benchmark current asset identity could not be resolved; research was not published")
+        eligible = [symbol for symbol in symbols if instruments["records"][symbol]["resolution"] == "resolved"]
+        calendar, raw = await AlpacaHistory(client, args.feed).load([args.benchmark, *eligible], start, end)
     package = research_package(symbols, raw, calendar, now, args.feed, args.benchmark)
+    package = bind_instruments(package, instruments)
     target, package = save_package(package, Path(args.output))
     print(json.dumps({'path':str(target.resolve()), 'state':package['state'], 'session':package['session'],
                       'available':package['breadth']['available'], 'requested':len(symbols), 'setups':len(package['setups'])}))

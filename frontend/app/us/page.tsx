@@ -626,7 +626,7 @@ function USResearchContent() {
                   </>
                 ) : (
                   <p>
-                    {data.history_gaps?.[symbol]?.length ? `Setup evaluation withheld: ${data.history_gaps[symbol].length} provider sessions are missing in this stock history. Refresh the source history before relying on a setup.` : "No active detector thesis in this saved session. You can still inspect price history and keep research notes."}
+                    {data.instrument_exclusions?.[symbol] || (data.history_gaps?.[symbol]?.length ? `Setup evaluation withheld: ${data.history_gaps[symbol].length} provider sessions are missing in this stock history. Refresh the source history before relying on a setup.` : "No active detector thesis in this saved session. You can still inspect price history and keep research notes.")}
                   </p>
                 )}
               </div>
@@ -668,6 +668,7 @@ function USResearchContent() {
                 ))}
               </ul>
               <p>Package: {data.id}</p>
+              <p>{data.instrument_snapshot ? `Asset observation ${data.instrument_snapshot.observed_at} · ${symbol}: ${data.instrument_snapshot.records[symbol]?.provider_asset_id || data.instrument_snapshot.records[symbol]?.reason || "unresolved"} · current provider identity only; historical mappings unverified.` : "Legacy package: provider asset identity was not recorded."}</p>
               <p>{data.session_calendar ? `Calendar ${data.session_calendar.version} · ${data.session_calendar.sessions.length} completed provider sessions · ${data.session_calendar.finalization_buffer_minutes}-minute finalization buffer · ${data.session_calendar.timezone}` : "Legacy package: versioned provider calendar evidence was not recorded."}</p>
               <p>
                 Computed: {data.computed_at}. Weekly bars aggregate observed
