@@ -6,6 +6,7 @@ from typing import Callable, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.config import settings
@@ -79,6 +80,18 @@ def store(operation: Callable, *args, **kwargs):
 @router.get("")
 def plans(user: dict = Depends(require_us_user)):
     return {"success": True, "plans": store(repo.list_plans, user["id"])}
+
+
+@router.get("/export")
+def export_plans(user: dict = Depends(require_us_user)):
+    revisions = store(repo.export_plan_revisions, user["id"])
+    return JSONResponse({
+        'schema_version': 1, 'market': 'US', 'currency': 'USD',
+        'exported_at': datetime.now(timezone.utc).isoformat(),
+        'plan_revisions': revisions, 'revision_count': len(revisions),
+        'scope': 'Private plan history only. Research packages are not included. No restore is confirmed.',
+    }, headers={'Content-Disposition': 'attachment; filename="usmarket-plan-history.json"',
+                'Cache-Control': 'private, no-store', 'Vary': 'Authorization'})
 
 
 @router.get("/{plan_id}")

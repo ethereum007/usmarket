@@ -192,3 +192,15 @@ def save_plan(owner: str, plan_id: str, expected_revision: int, payload: dict, *
         conn.execute("INSERT INTO conditional_plans VALUES (?, ?, ?, ?, ?)",
                      (plan_id, revision + 1, owner, saved["updated_at"], json.dumps(saved)))
         return saved
+
+
+
+def export_plan_revisions(owner: str, *, database_path: Path | None = None) -> list[dict]:
+    """One owner-filtered snapshot; reject oversized exports rather than truncate."""
+    with database(database_path) as conn:
+        rows = conn.execute(
+            "SELECT payload FROM conditional_plans WHERE owner=? ORDER BY id, revision LIMIT 10001",
+            (owner,)).fetchall()
+        if len(rows) > 10000:
+            raise ValueError("Plan history exceeds download limit")
+        return [json.loads(row[0]) for row in rows]

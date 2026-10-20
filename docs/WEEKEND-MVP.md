@@ -68,3 +68,8 @@ This is UX gating only. Every backend request still checks the current token and
 ## Private HTTP cache policy
 
 The hosted API sets `Cache-Control: private, no-store`, legacy no-cache headers and `Vary: Authorization` on `/api/us` responses, including handled authentication, validation and missing-route errors. Existing Vary dimensions are preserved. Compliant HTTP caches must not store these private responses across account changes. This does not erase downloaded content or replace per-request ownership checks. Hosting/proxy acceptance must verify these headers reach the browser without an overriding CDN cache rule; source tests do not establish that evidence.
+
+
+## Interim private plan download
+
+Authenticated GET `/api/us/plans/export` downloads all revisions belonging to the verified account, ordered by plan ID/revision, with exact saved source identities and an export timestamp. It accepts no owner selector, excludes other accounts and does not modify records. More than 10,000 revisions fails rather than silently truncates. Keep the downloaded JSON private; notes and conditional research are sensitive. Research packages are not included, and no import/restore facility or durable hosted storage is implied. A download must happen before ephemeral storage disappears; it cannot recover already-lost data. External persistence remains the next storage gate.

@@ -221,3 +221,41 @@ def test_preview_requires_auth_and_rejects_unsafe_integer_precision(fixture):
     response=a.post('/api/us/plans/sizing-preview',json={**values,'direction':'BEAR','trigger':0.0001,
         'stop':0.00010000000000000002,'capital':1000000000000,'risk_pct':5,'allocation_cap_pct':100})
     assert response.status_code==422 and 'precision' in response.text
+
+
+
+def test_export_preserves_all_owner_revisions_and_exact_source(fixture):
+    a, b, payload, _, _, root = fixture
+    plan_id, foreign_id = str(uuid4()), str(uuid4())
+    first = a.post('/api/us/plans/' + plan_id, json=payload).json()['plan']
+    second = a.post('/api/us/plans/' + plan_id,
+                    json={**payload, 'expected_revision': 1, 'notes': 'Private second revision'}).json()['plan']
+    b.post('/api/us/plans/' + foreign_id, json={**payload, 'notes': 'Foreign private notes'})
+    response = a.get('/api/us/plans/export')
+    assert response.status_code == 200
+    body = response.json()
+    assert body['plan_revisions'] == [first, second]
+    assert body['revision_count'] == 2 and body['market'] == 'US'
+    assert body['schema_version'] == 1
+    assert body['exported_at'].endswith('+00:00')
+    assert 'Foreign private notes' not in response.text and foreign_id not in response.text
+    assert 'owner-a' not in response.text
+    assert response.headers['cache-control'] == 'private, no-store'
+    assert 'attachment' in response.headers['content-disposition']
+    assert client_for('empty-owner').get('/api/us/plans/export').json()['plan_revisions'] == []
+    assert a.get('/api/us/plans/' + plan_id + '?revision=1').json()['plan'] == first
+
+
+def test_export_storage_failure_does_not_return_partial_history(fixture):
+    a, *_ = fixture
+    with patch.object(repo, 'export_plan_revisions', side_effect=sqlite3.OperationalError('private path')):
+        result = a.get('/api/us/plans/export')
+    assert result.status_code == 503
+    assert 'private path' not in result.text and 'plan_revisions' not in result.json()
+
+
+def test_export_requires_authentication():
+    app = FastAPI()
+    app.include_router(api.router)
+    response = TestClient(app).get('/api/us/plans/export')
+    assert response.status_code == 401
