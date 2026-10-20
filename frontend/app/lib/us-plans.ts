@@ -42,3 +42,17 @@ export function saveUSPlan(id: string, data: USPackage, setup: ResearchSetup, ex
     notes: fields.get("notes"), exit_policy: fields.get("exit_policy"), state: fields.get("state"),
   });
 }
+
+
+export async function loadUSPlanRevision(plan: USPlan, revision: number) {
+  if (!Number.isInteger(revision) || revision < 1 || revision > plan.revision) {
+    throw new Error("Choose an existing saved revision.");
+  }
+  const result = await loadUSPlan({ ...plan, revision });
+  if (result.plan.symbol !== plan.symbol || result.plan.direction !== plan.direction ||
+      result.plan.setup_version !== plan.setup_version || result.plan.setup_id !== plan.setup_id ||
+      result.plan.source_snapshot_id !== plan.source_snapshot_id) {
+    throw new Error("Saved revision does not match the original thesis.");
+  }
+  return result.plan;
+}

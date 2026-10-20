@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import dynamic from "next/dynamic";
 import { useTheme } from "../lib/theme";
+import PlanHistory from "./plan-history";
 import type { ResearchSetup } from "../lib/swing-research";
 import { listUSPlans, loadUSPlan, saveUSPlan, type USPlan } from "../lib/us-plans";
 import { usd, type USPackage } from "../lib/us-research";
@@ -79,6 +80,7 @@ export default function USPlans({ data, setup }: { data: USPackage | null; setup
       </li>)}</ul>
       {opening && <p role="status">Checking original research and saved revision…</p>}
       {editing && <div className="text-sm"><p>Editing saved {editing.plan.symbol} revision {editing.plan.revision} from {editing.data.session}. This stays bound to its original setup when you browse other stocks.</p><button className="workspace-button mt-2" type="button" disabled={opening} onClick={() => { reviewRequest.current++; setEditing(null); setSavedMessage(""); }}>Start a new plan for the selected setup</button></div>}
+      {editing && <PlanHistory key={`${editing.plan.id}:${editing.plan.revision}`} plan={editing.plan} />}
       {editing && <details><summary>Original saved research · {editing.setup.symbol} · {editing.data.session}</summary>
         <p className="my-2 text-sm">{editing.setup.strategy} · {editing.data.benchmark} benchmark · {editing.data.feed.toUpperCase()} · Original snapshot {editing.plan.source_snapshot_id}</p>
         <Chart appearance={theme} data={editing.data.source_bars[editing.plan.symbol] || []} symbol={editing.plan.symbol} height={280} priceLevels={[{ price: editing.plan.trigger, title: "Saved trigger", color: "#3b82f6" }, { price: editing.plan.stop, title: "Saved stop", color: "#ef4444" }]} />

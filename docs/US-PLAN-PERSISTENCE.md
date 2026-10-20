@@ -59,3 +59,8 @@ Open issue #4 gates:
 - Choose and validate shared hosted storage, immutable package persistence and multi-worker refresh coordination.
 - Demonstrate real hosted account isolation, backups/restore, retention and outage behavior.
 - Add the daily plan/outcome journey and browser/mobile acceptance before claiming completion.
+
+
+## Read-only revision review
+
+Opening saved evidence now includes bounded older/newer revision navigation for that exact plan. Each requested revision reuses the existing owner-authenticated revision API and original-package/setup verification. Out-of-range or mismatched revisions are rejected. The history panel displays saved trigger/stop, expiry, state, notes and exit policy with ET write time; it never writes, replaces the current draft or opens a different thesis. Failed/late reads preserve the displayed revision; panel keys and cleanup isolate plan/revision changes. This reviews thesis history only, not triggers, fills, returns or forward outcomes. Real browser and hosted lifecycle acceptance remain open.

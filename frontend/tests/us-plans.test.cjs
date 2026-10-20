@@ -7,7 +7,7 @@ const ts = require('typescript');
 const React = require('react');
 const { renderToStaticMarkup } = require('react-dom/server');
 function compile(file, mocks = {}, globals = {}) {
-  const context = { exports: {}, Error, ...globals, require: name => mocks[name] || require(name) };
+  const context = { exports: {}, Error, ...globals, require: name => mocks[name] || (name === "./plan-history" ? { default: () => null } : require(name)) };
   vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(__dirname, '../app', file), 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
   }).outputText, context);
@@ -107,4 +107,20 @@ test('a save response from an unmounted editor cannot replace another source edi
 test('a different returned revision is never silently opened', async () => {
   const lib = compile('lib/us-plans.ts', { './api': { fetchAPI: async url => url.includes('/research/') ? { package: data } : { plan: { ...plan, revision: 3 } } } });
   await assert.rejects(lib.loadUSPlan(plan), /could not be verified/);
+});
+
+test('historical revision reload reuses source verification and never posts', async () => {
+  const calls=[];const old={...plan,revision:1};
+  const lib=compile('lib/us-plans.ts',{'./api':{fetchAPI:async url=>{calls.push(url);return url.includes('/research/')?{package:data}:{plan:old};},postAPI:()=>{throw new Error('must not save');}}});
+  const saved=await lib.loadUSPlanRevision(plan,1);
+  assert.equal(saved.revision,1);assert.ok(calls.includes('/api/us/plans/plan-id?revision=1'));
+});
+for(const revision of [0,-1,1.5,3,NaN])test(`invalid history revision never fetches: ${revision}`,async()=>{
+  let calls=0;const lib=compile('lib/us-plans.ts',{'./api':{fetchAPI:()=>calls++}});
+  await assert.rejects(()=>lib.loadUSPlanRevision(plan,revision),/existing saved revision/);assert.equal(calls,0);
+});
+test('history refuses a rebound historical thesis',async()=>{
+  const old={...plan,revision:1,setup_version:'changed'};
+  const lib=compile('lib/us-plans.ts',{'./api':{fetchAPI:async url=>url.includes('/research/')?{package:data}:{plan:old}}});
+  await assert.rejects(()=>lib.loadUSPlanRevision(plan,1),/evidence|thesis/);
 });
