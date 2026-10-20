@@ -38,3 +38,97 @@ def test_feed_denied_is_not_silently_downgraded():
         assert result['rows'][0]['quote_status']=='invalid'
     asyncio.run(run())
     assert all(r.url.params.get('feed')=='sip' for r in requests if 'data.alpaca' in str(r.url))
+
+
+@pytest.mark.parametrize('value',[True,False,{},[],10**1000])
+def test_non_price_values_never_become_valid_prices(value):
+    row=quote_diagnostic('AAPL',quote(bp=value),{'p':value,'t':NOW.isoformat()},NOW)
+    assert row['quote_status']=='invalid' and row['trade_status']=='invalid'
+
+
+@pytest.mark.parametrize('value',[True,'private-provider-text',[1],23])
+def test_non_object_rows_are_unavailable_without_crashing(value):
+    row=quote_diagnostic('AAPL',value,value,NOW)
+    assert row['quote_status']=='invalid' and row['trade_status']=='invalid'
+    assert row['quote_timestamp'] is None and row['trade_timestamp'] is None
+
+
+def live_result(overrides):
+    observed=datetime.now(timezone.utc).isoformat()
+    payloads={'clock':{'is_open':True,'timestamp':observed},
+              'quotes':{'quotes':{'AAPL':{'bp':100,'ap':101,'t':observed}}},
+              'trades':{'trades':{'AAPL':{'p':100,'t':observed}}}}
+    payloads.update(overrides)
+    def handler(request):
+        name='clock' if '/clock' in request.url.path else 'quotes' if '/quotes/' in request.url.path else 'trades'
+        return httpx.Response(200,json=payloads[name])
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            return await snapshot(['AAPL'],'iex',client)
+    return asyncio.run(run())
+
+
+@pytest.mark.parametrize('endpoint,payload', [('clock',[]),('quotes',[]),('quotes',{'quotes':[]}),
+    ('trades',None),('trades',{'trades':True}),('quotes',{}),('trades',{})])
+def test_malformed_envelopes_degrade_without_hiding_valid_other_endpoint(endpoint,payload):
+    result=live_result({endpoint:payload})
+    assert result['state']=='degraded' and endpoint in result['errors']
+    assert result['feed']=='iex'
+    if endpoint!='quotes':assert result['rows'][0]['quote_status']=='fresh'
+    if endpoint!='trades':assert result['rows'][0]['trade_status']=='fresh'
+
+
+@pytest.mark.parametrize('payload',[{'quotes':{}},{'quotes':{'AAPL':['private']}},
+    {'quotes':{'AAPL':{'bp':True,'ap':101,'t':{'private':'value'}}}}])
+def test_missing_or_malformed_requested_rows_never_claim_connected(payload):
+    result=live_result({'quotes':payload})
+    assert result['state']=='degraded' and result['rows'][0]['quote_status']=='invalid'
+    assert result['rows'][0]['quote_timestamp'] is None
+    assert 'private' not in str(result)
+
+
+@pytest.mark.parametrize('clock',[{'is_open':'true','timestamp':NOW.isoformat()},
+    {'is_open':True,'timestamp':'2026-10-20T10:00:00'},
+    {'is_open':True,'timestamp':'bad'}, {'is_open':True,'timestamp':'2000-01-01T00:00:00+00:00'}])
+def test_bad_or_stale_clock_cannot_claim_market_open(clock):
+    result=live_result({'clock':clock})
+    assert result['state']=='degraded' and result['market']['is_open'] is None
+    assert result['market']['timestamp'] is None
+
+
+def test_invalid_schedule_is_removed_without_discarding_valid_clock():
+    result=live_result({'clock':{'is_open':False,'timestamp':datetime.now(timezone.utc).isoformat(),
+                                'next_open':{'private':'value'}}})
+    assert result['state']=='degraded'
+    assert result['market']['is_open'] is False and result['market']['next_open'] is None
+    assert 'private' not in str(result)
+
+
+def test_connected_requires_valid_requested_observations_and_clock():
+    result=live_result({})
+    assert result['state']=='connected' and result['errors']=={}
+    assert result['rows'][0]['quote_status']=='fresh'
+
+
+def test_old_valid_quote_is_stale_not_invalid_or_fresh():
+    old=(datetime.now(timezone.utc)-timedelta(hours=1)).isoformat()
+    result=live_result({'quotes':{'quotes':{'AAPL':{'bp':100,'ap':101,'t':old}}}})
+    assert result['rows'][0]['quote_status']=='stale'
+    assert result['rows'][0]['quote_timestamp']==old
+    assert result['state']=='connected'  # Transport validity is separate from freshness.
+
+
+def test_non_json_response_is_degraded_and_body_is_not_exposed():
+    def handler(request):return httpx.Response(200,content=b'private malformed response')
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            return await snapshot(['AAPL'],'sip',client)
+    result=asyncio.run(run())
+    assert result['state']=='degraded' and result['feed']=='sip'
+    assert 'private' not in str(result)
+
+
+def test_large_finite_prices_do_not_overflow_spread_midpoint():
+    row=quote_diagnostic('AAPL',quote(bp=1e308,ap=1.7e308),{},NOW)
+    assert row['spread_bps']==pytest.approx(5185.185185)
+    assert row['wide_spread'] is True
