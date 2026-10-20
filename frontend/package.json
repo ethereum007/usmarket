@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test:intraday": "node --test tests/intraday-priority.test.cjs",
-    "test:us": "node --test tests/us-access.test.cjs tests/us-plans.test.cjs"
+    "test:us": "node --test tests/us-access.test.cjs tests/us-plans.test.cjs tests/us-filings.test.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",

@@ -17,6 +17,7 @@ The default frontend route redirects to `/us`. Its navigation, search, benchmark
 - Searchable research queue; daily/weekly source charts; detector-specific thesis levels.
 - Current provider asset observations and setup identity binding; unresolved/inactive assets make refreshes partial. Historical aliases and corporate actions remain unverified. See [instrument contract](docs/US-INSTRUMENT-CONTRACT.md).
 - Versioned provider-session evidence, benchmark completeness checks and partial publication for stock history gaps; see [session contract](docs/US-SESSION-CONTRACT.md).
+- On-demand issuer-level SEC filing evidence with original links and acceptance times; forthcoming earnings remain unknown. Configure server-only SEC_USER_AGENT before access. See [filing evidence contract](docs/US-FILING-EVIDENCE.md).
 - Browser-local shortlist and notes; JSON export; custom-universe refresh.
 - US plan API with owner-isolated immutable revisions, concurrency conflicts and USD sizing; see [persistence contract](docs/US-PLAN-PERSISTENCE.md). The workspace can save/reopen/revise these plans; shared hosted storage remains open.
 - Read-only live quote diagnostics: feed entitlements, quote/trade timestamps, freshness and spreads. Browser updates use REST polling, not streaming.
@@ -70,7 +71,7 @@ Recent consolidated SIP data requires the corresponding provider entitlement. Su
 From `backend/`:
 
 ```powershell
-python -m pytest tests/test_us_auth.py tests/test_us_main.py tests/test_us_research.py tests/test_us_live.py tests/test_us_research_routes.py tests/test_us_plans.py tests/test_us_sessions.py tests/test_us_instruments.py tests/test_us_publication.py tests/test_swing_detector.py tests/test_swing_early_momentum.py tests/test_swing_acceleration.py tests/test_swing_institutional_setups.py -q
+python -m pytest tests/test_us_auth.py tests/test_us_main.py tests/test_us_research.py tests/test_us_live.py tests/test_us_research_routes.py tests/test_us_plans.py tests/test_us_sessions.py tests/test_us_instruments.py tests/test_us_publication.py tests/test_us_filings.py tests/test_swing_detector.py tests/test_swing_early_momentum.py tests/test_swing_acceleration.py tests/test_swing_institutional_setups.py -q
 ```
 
 From `frontend/`:

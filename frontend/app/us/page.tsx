@@ -25,6 +25,7 @@ import {
 import "./us.css";
 import LiveFeed from "./live-feed";
 import USPlans from "./plans";
+import USFilings from "./filings";
 import { useAuth } from "../contexts/AuthContext";
 const Chart = dynamic(
   () =>
@@ -630,6 +631,7 @@ function USResearchContent() {
                   </p>
                 )}
               </div>
+              <USFilings key={symbol} symbol={symbol} />
               <div className="us-notes">
                 <label htmlFor="us-thesis-note">
                   Your research notes{" "}

@@ -44,10 +44,10 @@ export function dateRange(date: string) {
   return { start: start.toISOString(), end: new Date(start.getTime() + 86_400_000).toISOString() };
 }
 
-export function sourceLink(value: string | null): string | null {
+export function sourceLink(value: string | null, hosts: readonly string[] = ["nseindia.com"]): string | null {
   try {
     const url = new URL(value || "");
-    return url.protocol === "https:" && (url.hostname === "nseindia.com" || url.hostname.endsWith(".nseindia.com")) ? url.href : null;
+    return url.protocol === "https:" && hosts.some(host => url.hostname === host || url.hostname.endsWith(`.${host}`)) ? url.href : null;
   } catch { return null; }
 }
 
