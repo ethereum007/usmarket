@@ -90,3 +90,10 @@ test('password success followed by failed sign-out is reported as updated, not f
   assert.deepEqual(fixture.calls, ['update']);
   assert.ok(fixture.updates.some(value => typeof value === 'string' && value.includes('Password updated, but sign-out')));
 });
+test('thrown SDK failures are sanitized for both recovery operations', async () => {
+  const fail = async () => { throw new Error('private provider account details'); };
+  const api = load('lib/us-recovery.ts', { './supabase': { supabase: { auth: { resetPasswordForEmail: fail, updateUser: fail } } } });
+  const clean = error => !error.message.includes('private provider');
+  await assert.rejects(api.requestUSRecovery('account@example.test', 'https://us.example.test'), clean);
+  await assert.rejects(api.updateUSRecoveredPassword('synthetic-long-password', 'synthetic-long-password', true), clean);
+});
