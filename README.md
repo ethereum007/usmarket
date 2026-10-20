@@ -1,0 +1,94 @@
+# US Market Research
+
+Standalone US equity research product. Initial source snapshot from the Alpha Radar US work, developed independently in this repository from now on.
+
+## Layout
+
+- `frontend/`: Next.js 16, React 19, TypeScript; US terminal at `/us` and guide at `/us/guide`.
+- `backend/`: FastAPI, historical research, Alpaca feed diagnostics, reused swing detectors and tests.
+- `docs/`: product status and separation notes.
+
+The default frontend route redirects to `/us`. Its navigation, search, benchmarks, prices and market clock use the US workspace. Indian source modules retained for reuse are not a claim of supported US features.
+
+## Working features
+
+- Completed-session, split-adjusted research packages; SPY/QQQ relative strength and breadth for an explicit custom universe.
+- Searchable research queue; daily/weekly source charts; detector-specific thesis levels.
+- Browser-local shortlist and notes; JSON export; custom-universe refresh.
+- Read-only live quote diagnostics: feed entitlements, quote/trade timestamps, freshness and spreads. Browser updates use REST polling, not streaming.
+
+## Run locally (Windows PowerShell)
+
+Requirements: Python 3.11+, Node.js 20.9+ and npm.
+
+Backend setup:
+
+```powershell
+cd backend
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+python -m pip install pytest
+Copy-Item .env.example .env.us.local
+```
+
+Enter Alpaca credentials into the ignored `backend/.env.us.local` file. Never put credentials into frontend environment variables or commits.
+
+Start the loopback-only local API:
+
+```powershell
+python tests/serve_us_preview.py
+```
+
+This harness uses a development identity. It binds to `127.0.0.1:9018`; do not deploy it or expose it publicly.
+
+In another terminal:
+
+```powershell
+cd frontend
+npm ci
+Copy-Item .env.example .env.local
+npm run dev -- --webpack --hostname 127.0.0.1 --port 3108
+```
+
+Open `http://localhost:3108/us` (use `localhost` for the existing frontend development access handling).
+
+A fresh clone has no market-data packages. Use the terminal's universe refresh, or run from `backend/`:
+
+```powershell
+python -m app.services.us_research --symbols AAPL,MSFT,NVDA,AMZN,META --benchmark SPY --feed sip
+```
+
+Recent consolidated SIP data requires the corresponding provider entitlement. Successful historical SIP requests do not establish real-time SIP access. No account funding, order placement or subscription purchase is performed by this code.
+
+## Validation
+
+From `backend/`:
+
+```powershell
+python -m pytest tests/test_us_research.py tests/test_us_live.py tests/test_us_research_routes.py tests/test_swing_research.py tests/test_swing_foundation.py -q
+```
+
+From `frontend/`:
+
+```powershell
+npx tsc --noEmit
+npm run build -- --webpack
+```
+
+## Hosted entry point
+
+Use `uvicorn app.us_main:app` from `backend/` for the US API, not the inherited `app.main` entry point. Configure authentication, a separate Supabase project, durable storage and the frontend's server-only `ALPHA_API_PROXY_URL` before hosting. The US entry point mounts only research routes and health; it does not start Kite/Arrow connections, Indian market schedulers or payment services.
+
+The current access dependencies and frontend authentication are inherited foundations requiring a production review. Do not treat the localhost preview as production-ready authentication.
+
+## Known product limits
+
+- US detector thresholds and predictive value remain uncalibrated.
+- Breadth represents the selected custom universe, not the entire US stock market.
+- Earnings calendar, industry leadership, portfolio risk, account-synced plans and fill-aware outcomes are unfinished.
+- Notes/shortlist are browser-local. Jobs, refresh lock and quote cache are process-local; multiworker deployment needs shared state.
+- No order execution. Saved research bars are not overwritten by live quotes.
+- No deployment workflows or credentials from the original application are included.
+
+See `docs/PRODUCT-STATUS.md` and the component docs for the remaining work. Tests verify software behavior; they do not establish a trading edge.

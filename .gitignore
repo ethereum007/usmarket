@@ -1,0 +1,26 @@
+# Dependencies, build output and local environments
+**/node_modules/
+**/.next/
+**/out/
+**/dist/
+**/.venv/
+**/venv/
+**/__pycache__/
+**/.pytest_cache/
+**/*.py[cod]
+**/*.tsbuildinfo
+**/next-env.d.ts
+**/.env
+**/.env.*
+!**/.env.example
+**/data/
+**/*.sqlite*
+**/*.db
+**/*.log
+**/*.pem
+**/*.key
+.DS_Store
+Thumbs.db
+
+# Inherited audit captures are not part of the US product source
+frontend/docs/ui-audit/

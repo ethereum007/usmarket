@@ -1,0 +1,263 @@
+@import "tailwindcss";
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* ── Dark Theme (default) ──────────────────────────────────────────────── */
+:root {
+  --background: #0c1017;
+  --page-bg: #0c1017;
+  --foreground: #d0d8e4;
+  --card: #131a24;
+  --card-border: #263140;
+  --muted: #96a3b5;
+  --profit: #53d6a0;
+  --profit-bg: rgba(83, 214, 160, 0.09);
+  --loss: #f7808c;
+  --loss-bg: rgba(247, 128, 140, 0.09);
+  --accent: #79a9ff;
+  --accent-bg: rgba(121, 169, 255, 0.12);
+  --accent-solid: #3266c9;
+  --accent-alt: #f4bd68;
+  --accent-alt-bg: rgba(244, 189, 104, 0.12);
+  --warning: #eabf75;
+  --sidebar-bg: #10161f;
+  --sidebar-border: #263140;
+  --ticker-bg: #10161f;
+  --hover-bg: rgba(255, 255, 255, 0.04);
+  --stripe-bg: rgba(255, 255, 255, 0.02);
+  --heatmap-stroke: #0b0e14;
+  --chart-bg: #131a24;
+  --nav-bg: #10161f;
+  --nav-border: rgba(255, 255, 255, 0.06);
+  --input-bg: rgba(255, 255, 255, 0.04);
+  --input-border: rgba(255, 255, 255, 0.08);
+  --dropdown-bg: #1a1d23;
+  --dropdown-border: rgba(255, 255, 255, 0.08);
+  --text-heading: #f1f5f9;
+  --text-secondary: #96a3b5;
+  --text-tertiary: #8996a8;
+  --divider: rgba(255, 255, 255, 0.08);
+  --surface-subtle: rgba(255, 255, 255, 0.03);
+  --surface-hover: rgba(255, 255, 255, 0.06);
+}
+
+/* ── Light Theme ───────────────────────────────────────────────────────── */
+[data-theme="light"] {
+  --background: #f4f6f8;
+  --page-bg: #f4f6f8;
+  --foreground: #354154;
+  --card: #ffffff;
+  --card-border: #e0e5eb;
+  --muted: #637084;
+  --profit: #167953;
+  --profit-bg: rgba(22, 163, 74, 0.08);
+  --loss: #bd3b4b;
+  --loss-bg: rgba(220, 38, 38, 0.08);
+  --accent: #285dbe;
+  --accent-solid: #285dbe;
+  --accent-bg: rgba(40, 93, 190, 0.09);
+  --accent-alt: #925c0d;
+  --accent-alt-bg: rgba(210, 145, 43, 0.13);
+  --warning: #d97706;
+  --sidebar-bg: #ffffff;
+  --sidebar-border: #e2e8f0;
+  --ticker-bg: #f0f2f6;
+  --hover-bg: rgba(0, 0, 0, 0.04);
+  --stripe-bg: rgba(0, 0, 0, 0.02);
+  --heatmap-stroke: #f8fafc;
+  --chart-bg: #ffffff;
+  --nav-bg: #ffffff;
+  --nav-border: #e2e8f0;
+  --input-bg: #f1f5f9;
+  --input-border: #e2e8f0;
+  --dropdown-bg: #ffffff;
+  --dropdown-border: #e2e8f0;
+  --text-heading: #0f172a;
+  --text-secondary: #64748b;
+  --text-tertiary: #6c798b;
+  --divider: #e2e8f0;
+  --surface-subtle: rgba(0, 0, 0, 0.02);
+  --surface-hover: rgba(0, 0, 0, 0.04);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-page-bg: var(--page-bg);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-border: var(--card-border);
+  --color-muted: var(--muted);
+  --color-profit: var(--profit);
+  --color-profit-bg: var(--profit-bg);
+  --color-loss: var(--loss);
+  --color-loss-bg: var(--loss-bg);
+  --color-accent: var(--accent);
+  --color-accent-bg: var(--accent-bg);
+  --color-accent-alt: var(--accent-alt);
+  --color-accent-alt-bg: var(--accent-alt-bg);
+  --color-warning: var(--warning);
+  --color-sidebar-bg: var(--sidebar-bg);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-ticker-bg: var(--ticker-bg);
+  --color-hover-bg: var(--hover-bg);
+  --color-heatmap-stroke: var(--heatmap-stroke);
+  --color-chart-bg: var(--chart-bg);
+  --color-nav-bg: var(--nav-bg);
+  --color-nav-border: var(--nav-border);
+  --color-input-bg: var(--input-bg);
+  --color-input-border: var(--input-border);
+  --color-dropdown-bg: var(--dropdown-bg);
+  --color-dropdown-border: var(--dropdown-border);
+  --color-text-heading: var(--text-heading);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-divider: var(--divider);
+  --color-surface-subtle: var(--surface-subtle);
+  --color-surface-hover: var(--surface-hover);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  overflow-x: hidden;
+}
+
+html {
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+}
+
+html,
+body {
+  min-height: 100%;
+  overflow-anchor: none;
+}
+
+.app-viewport {
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+.app-main-scroll {
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  overflow-anchor: none;
+  scrollbar-gutter: stable;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--background); }
+::-webkit-scrollbar-thumb { background: var(--card-border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+/* Table striping */
+.table-striped tr:nth-child(even) { background: var(--stripe-bg); }
+
+/* Light theme scrollbar */
+[data-theme="light"] ::-webkit-scrollbar-thumb { background: #cbd5e1; }
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* Trader cockpit: scoped bridge for the Bloomberg-style dark desk to read cleanly in light mode. */
+.trader-cockpit {
+  color-scheme: dark;
+}
+
+[data-theme="light"] .trader-cockpit {
+  color-scheme: light;
+  background: #f4f7fb !important;
+  color: #334155 !important;
+}
+
+[data-theme="light"] .trader-cockpit [class*="bg-[#06111d]"] {
+  background-color: #f4f7fb !important;
+}
+
+[data-theme="light"] .trader-cockpit [class*="bg-[#07111b]"],
+[data-theme="light"] .trader-cockpit [class*="bg-[#0a1724]"] {
+  background-color: #ffffff !important;
+}
+
+[data-theme="light"] .trader-cockpit [class*="bg-[#081320]"],
+[data-theme="light"] .trader-cockpit [class*="bg-[#0b1a29]"] {
+  background-color: #f8fafc !important;
+}
+
+[data-theme="light"] .trader-cockpit [class*="bg-[#1a2d40]"] {
+  background-color: #e2e8f0 !important;
+}
+
+[data-theme="light"] .trader-cockpit [class*="border-[#13263a]"],
+[data-theme="light"] .trader-cockpit [class*="border-[#14273a]"],
+[data-theme="light"] .trader-cockpit [class*="border-[#183047]"],
+[data-theme="light"] .trader-cockpit [class*="border-[#21364d]"],
+[data-theme="light"] .trader-cockpit [class*="border-[#24415c]"],
+[data-theme="light"] .trader-cockpit [class*="border-[#28435b]"],
+[data-theme="light"] .trader-cockpit [class*="border-[#3a5168]"] {
+  border-color: #dbe5ef !important;
+}
+
+[data-theme="light"] .trader-cockpit [class*="bg-white/5"],
+[data-theme="light"] .trader-cockpit [class*="bg-white/[0.04]"] {
+  background-color: rgba(15, 23, 42, 0.04) !important;
+}
+
+[data-theme="light"] .trader-cockpit [class*="hover:bg-white"]:hover {
+  background-color: rgba(15, 23, 42, 0.06) !important;
+}
+
+[data-theme="light"] .trader-cockpit [class*="text-[#60768d]"],
+[data-theme="light"] .trader-cockpit [class*="text-[#688098]"],
+[data-theme="light"] .trader-cockpit [class*="text-[#71869e]"],
+[data-theme="light"] .trader-cockpit [class*="text-[#7890aa]"],
+[data-theme="light"] .trader-cockpit [class*="text-[#8aa2bb]"],
+[data-theme="light"] .trader-cockpit [class*="text-[#8fa6bf]"],
+[data-theme="light"] .trader-cockpit [class*="text-[#93a9c1]"] {
+  color: #64748b !important;
+}
+
+[data-theme="light"] .trader-cockpit [class*="text-[#9fb3c8]"],
+[data-theme="light"] .trader-cockpit [class*="text-[#b7c7d8]"],
+[data-theme="light"] .trader-cockpit [class*="text-[#dbeafe]"],
+[data-theme="light"] .trader-cockpit [class*="text-slate-100"],
+[data-theme="light"] .trader-cockpit [class*="text-slate-200"],
+[data-theme="light"] .trader-cockpit [class*="text-slate-300"] {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .trader-cockpit [class*="text-slate-400"],
+[data-theme="light"] .trader-cockpit [class*="text-[#486177]"] {
+  color: #94a3b8 !important;
+}
+
+[data-theme="light"] .trader-cockpit [class*="hover:text-white"]:hover {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .trader-cockpit [class*="shadow-[0_18px_70px"] {
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.08) !important;
+}
+
+/* Fade up animation */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up {
+  animation: fadeUp 0.5s ease;
+}
+
+/* Hide scrollbar for horizontal-scrolling tabs */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
