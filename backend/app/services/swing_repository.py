@@ -104,10 +104,10 @@ def package_sessions(universe: str) -> list[dict]:
         return list(sessions.values())
 
 
-def save_job(job: dict) -> None:
-    with database() as conn:
+def save_job(job: dict, *, database_path: Path | None = None, updated_at: str | None = None) -> None:
+    with database(database_path) as conn:
         conn.execute("INSERT OR REPLACE INTO research_jobs VALUES (?, ?, ?, ?)",
-                     (job["id"], job["owner"], now_iso(), json.dumps(job)))
+                     (job["id"], job["owner"], updated_at or now_iso(), json.dumps(job)))
 
 
 def create_job(job: dict) -> None:
@@ -121,14 +121,14 @@ def create_job(job: dict) -> None:
         conn.execute("INSERT INTO research_jobs VALUES (?, ?, ?, ?)", (job["id"], job["owner"], now_iso(), json.dumps(job)))
 
 
-def get_job(job_id: str, owner: str) -> dict | None:
-    with database() as conn:
+def get_job(job_id: str, owner: str, *, database_path: Path | None = None, stale_after: int | None = 900) -> dict | None:
+    with database(database_path) as conn:
         row = conn.execute("SELECT payload, updated_at FROM research_jobs WHERE id=? AND owner=?", (job_id, owner)).fetchone()
         if not row:
             return None
         job = json.loads(row[0])
         age = (datetime.now(settings.TIMEZONE) - datetime.fromisoformat(row[1])).total_seconds()
-        if job["state"] in {"queued", "running"} and age > 900:
+        if stale_after is not None and job["state"] in {"queued", "running"} and age > stale_after:
             return {**job, "state": "interrupted", "error": "No progress for 15 minutes. Retry refresh; last final package is preserved."}
         return job
 

@@ -49,9 +49,8 @@ def test_refresh_rejects_invalid_universe_and_foreign_jobs(client):
     c,_=client
     assert c.post('/api/us/research/refresh',json={'symbols':'../bad'}).status_code==422
     assert c.post('/api/us/research/refresh',json={'symbols':'SPY'}).status_code==422
-    api._jobs['foreign']={'id':'foreign','owner':'other','state':'completed'}
+    api.persist_job({'id':'foreign','owner':'other','state':'completed'})
     assert c.get('/api/us/research/jobs/foreign').status_code==404
-    del api._jobs['foreign']
 
 
 def test_refresh_returns_exact_package_and_preserves_error_boundary(client):
@@ -159,3 +158,77 @@ def test_refresh_failure_never_discloses_exception_and_releases_worker(client, f
         retry=c.post('/api/us/research/refresh',json={'symbols':'AAPL'})
     assert retry.status_code==200
     assert c.get('/api/us/research/jobs/'+retry.json()['job']['id']).json()['job']['state']=='completed'
+
+
+def test_job_result_survives_fresh_application_and_is_owner_isolated(client):
+    from unittest.mock import AsyncMock
+    c,_=client
+    with patch.object(api,'run',AsyncMock(return_value={'id':'d'*64})):
+        response=c.post('/api/us/research/refresh',json={'symbols':'AAPL'})
+    url='/api/us/research/jobs/'+response.json()['job']['id']
+    app=FastAPI();app.include_router(api.router)
+    app.dependency_overrides[require_us_user]=lambda:{'id':'owner'}
+    fresh=TestClient(app)
+    assert fresh.get(url).json()['job']['package_id']=='d'*64
+    assert fresh.get(url).json()['job']['updated_at'].endswith('+00:00')
+    app.dependency_overrides[require_us_user]=lambda:{'id':'other'}
+    assert fresh.get(url).status_code==404
+
+
+def test_status_write_failure_blocks_provider_and_releases_lock(client):
+    from unittest.mock import AsyncMock
+    c,_=client
+    provider=AsyncMock(return_value={'id':'e'*64})
+    with patch.object(api,'persist_job',side_effect=OSError('private path')), patch.object(api,'run',provider):
+        result=c.post('/api/us/research/refresh',json={'symbols':'AAPL'})
+    assert result.status_code==503 and 'private path' not in result.text
+    provider.assert_not_called()
+    assert not api._lock.locked()
+
+
+def test_running_write_failure_prevents_provider(client):
+    from unittest.mock import AsyncMock
+    c,_=client
+    original=api.persist_job
+    def fail_running(data):
+        if data['state']=='running':raise OSError('private')
+        original(data)
+    with patch.object(api,'persist_job',side_effect=fail_running), patch.object(api,'run',AsyncMock()) as provider:
+        result=c.post('/api/us/research/refresh',json={'symbols':'AAPL'})
+    job=c.get('/api/us/research/jobs/'+result.json()['job']['id']).json()['job']
+    assert job['state']=='queued'  # Only the durable observation is asserted.
+    provider.assert_not_called()
+    assert not api._lock.locked()
+
+
+def test_completion_write_failure_does_not_invent_failed_publication(client):
+    from unittest.mock import AsyncMock
+    c,_=client
+    original=api.persist_job
+    def fail_completed(data):
+        if data['state']=='completed':raise OSError('private')
+        original(data)
+    with patch.object(api,'persist_job',side_effect=fail_completed), patch.object(api,'run',AsyncMock(return_value={'id':'e'*64})):
+        result=c.post('/api/us/research/refresh',json={'symbols':'AAPL'})
+    job=c.get('/api/us/research/jobs/'+result.json()['job']['id']).json()['job']
+    assert job['state']=='running' and 'package_id' not in job
+    assert not api._lock.locked()
+
+
+def test_old_running_job_remains_last_known_not_claimed_dead(client):
+    c,_=client
+    api.repository.save_job({'id':'old','owner':'owner','state':'running'},
+        database_path=api.job_database(),updated_at='2020-01-01T00:00:00+00:00')
+    assert c.get('/api/us/research/jobs/old').json()['job']['state']=='running'
+    with patch.object(api.repository,'get_job',side_effect=OSError('private path')):
+        result=c.get('/api/us/research/jobs/old')
+    assert result.status_code==503 and 'private path' not in result.text
+
+
+def test_job_can_be_read_in_separate_python_process(client):
+    import subprocess,sys
+    c,_=client
+    api.persist_job({'id':'persisted','owner':'owner','state':'completed','package_id':'f'*64})
+    script="from pathlib import Path; import sys,json; from app.services.swing_repository import get_job; print(json.dumps(get_job('persisted','owner',database_path=Path(sys.argv[1]),stale_after=None)))"
+    result=subprocess.run([sys.executable,'-c',script,str(api.job_database())],capture_output=True,text=True,check=True)
+    assert json.loads(result.stdout)['package_id']=='f'*64

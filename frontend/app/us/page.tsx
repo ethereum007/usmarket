@@ -734,9 +734,10 @@ function USResearchContent() {
         </div>
         {job && (
           <p role="status">
-            Refresh: {job.state}
+            Last recorded refresh status: {job.state}
             {job.error ? ` · ${job.error}` : ""}.{" "}
             {job.state === "completed" ? "Saved research reloaded." : ""}
+            {busy ? " Status is not a worker heartbeat; after an outage, check saved research before retrying." : ""}
           </p>
         )}
       </section>

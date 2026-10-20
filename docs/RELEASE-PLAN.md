@@ -52,4 +52,4 @@ Provider rights reference: https://alpaca.markets/support/redistribute-alpaca-ap
 
 US refresh jobs return a fixed failure message for all exception types, including validation errors. Exception text is not a safe public diagnostic: a provider adapter or storage validator may include credentials, response fragments or local paths. Regression tests inject ValueError, RuntimeError and OSError failures, assert owner/exception details are absent, then verify a subsequent refresh completes after the failed worker releases its lock.
 
-This does not satisfy durable job coordination or operator observability. Job status and refresh locking remain process-local; multi-worker/restart recovery stays open in issue #4. Market-open and hosted acceptance gates remain open.
+This does not satisfy durable job coordination or operator observability. Refresh locking remains process-local; durable last-recorded job status is now implemented (docs/US-REFRESH-STATUS.md). Safe multi-worker coordination and abandoned-worker recovery stay open in issue #4. Market-open and hosted acceptance gates remain open.

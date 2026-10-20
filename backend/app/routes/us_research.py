@@ -9,6 +9,8 @@ import json
 import re
 
 import threading
+import sqlite3
+from datetime import datetime, timezone
 
 from pathlib import Path
 
@@ -27,6 +29,7 @@ from app.config import settings
 from app.us_auth import require_us_user
 
 from app.services.us_research import run
+from app.services import swing_repository as repository
 from app.services.us_publication import validate as publication_order
 
 router = APIRouter(prefix='/api/us/research', tags=['US research'])
@@ -35,7 +38,17 @@ DEFAULT_SYMBOLS = 'AAPL,MSFT,NVDA,AMZN,META,GOOGL,AVGO,TSLA,AMD,ORCL,CRM,PLTR,JP
 
 _lock = threading.Lock()
 
-_jobs: dict[str, dict] = {}
+def job_database():
+    return settings.DATA_DIR / 'us-refresh-jobs.sqlite3'
+
+
+def persist_job(data: dict):
+    saved = {**data, 'updated_at': datetime.now(timezone.utc).isoformat()}
+    repository.save_job(saved, database_path=job_database(), updated_at=saved['updated_at'])
+
+
+STORAGE_ERRORS = (OSError, sqlite3.Error, ValueError, TypeError, KeyError)
+
 
 def directory():
 
@@ -111,30 +124,23 @@ class RefreshRequest(BaseModel):
 
     feed: Literal['sip','iex'] = 'sip'
 
-async def refresh_job(job_id: str, payload: RefreshRequest):
-
-    job = _jobs[job_id]
-
-    job['state'] = 'running'
-
+async def refresh_job(job_data: dict, payload: RefreshRequest):
+    data = {**job_data, 'state': 'running'}
     try:
-
-        package = await run(SimpleNamespace(symbols=payload.symbols, benchmark=payload.benchmark, feed=payload.feed, output=str(directory())))
-
-        job['state'] = 'completed'
-
-        job['package_id'] = package['id']
-
-    except Exception:
-
-        job['state'] = 'failed'
-
-        # Provider response bodies and credentials must never enter the job API.
-
-        job['error'] = 'Research refresh failed; saved research remains available'
-
+        # Do not fetch or publish if durable running status cannot be recorded.
+        persist_job(data)
+        try:
+            package = await run(SimpleNamespace(symbols=payload.symbols, benchmark=payload.benchmark,
+                                                feed=payload.feed, output=str(directory())))
+            data.update(state='completed', package_id=package['id'])
+        except Exception:
+            data.update(state='failed', error='Research refresh failed; saved research remains available')
+        persist_job(data)
+    except STORAGE_ERRORS:
+        # Last durable state is retained. A failed status write cannot certify failure
+        # or completion of publication; never replace it with an invented result.
+        pass
     finally:
-
         _lock.release()
 
 @router.post('/refresh')
@@ -155,21 +161,14 @@ def refresh(payload: RefreshRequest, tasks: BackgroundTasks, user: dict = Depend
 
         raise HTTPException(409, 'A US research refresh is already running in this worker')
 
-    if len(_jobs) >= 100:
-
-        for key in list(_jobs):
-
-            if _jobs[key]['state'] in {'completed','failed'}:
-
-                del _jobs[key]
-
-                break
-
     job_id = str(uuid4())
-
-    _jobs[job_id] = {'id':job_id, 'owner':user['id'], 'state':'queued'}
-
-    tasks.add_task(refresh_job, job_id, payload.model_copy(update={'symbols':','.join(symbols)}))
+    data = {'id': job_id, 'owner': user['id'], 'state': 'queued'}
+    try:
+        persist_job(data)
+    except STORAGE_ERRORS:
+        _lock.release()
+        raise HTTPException(503, 'Refresh status storage is temporarily unavailable') from None
+    tasks.add_task(refresh_job, data, payload.model_copy(update={'symbols':','.join(symbols)}))
 
     return {'success': True, 'job':{'id':job_id,'state':'queued'}}
 
@@ -177,13 +176,14 @@ def refresh(payload: RefreshRequest, tasks: BackgroundTasks, user: dict = Depend
 
 def job(job_id: str, user: dict = Depends(require_us_user)):
 
-    data = _jobs.get(job_id)
-
-    if not data or data['owner'] != user['id']:
-
-        raise HTTPException(404, 'Refresh job not found; a server restart clears job progress')
-
-    return {'success': True, 'job':{k:v for k,v in data.items() if k != 'owner'}}
+    try:
+        data = repository.get_job(job_id, user['id'], database_path=job_database(), stale_after=None)
+    except STORAGE_ERRORS:
+        raise HTTPException(503, 'Refresh status storage is temporarily unavailable') from None
+    if not data:
+        raise HTTPException(404, 'Refresh job not found')
+    # A timestamp is evidence of the last write, not a heartbeat or a worker lease.
+    return {'success': True, 'job': {k: v for k, v in data.items() if k != 'owner'}}
 
 @router.get('/live')
 async def live_quotes(symbols: str = 'AAPL,NVDA,SPY', feed: Literal['iex','sip'] = 'iex', user: dict = Depends(require_us_user)):
