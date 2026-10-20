@@ -4,6 +4,8 @@ from app.us_main import app
 def test_us_entrypoint_mounts_only_us_routes_and_health():
     paths=set(app.openapi()['paths'])
     assert '/api/us/research/packages' in paths
+    assert '/api/us/plans' in paths
+    assert '/api/us/plans/{plan_id}' in paths
     assert '/api/health' in paths
     assert '/api/scanner/research/package' not in paths
     assert not any(path.startswith('/api/options') for path in paths)

@@ -6,6 +6,7 @@ import json
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from app.config import settings
@@ -20,9 +21,10 @@ def now_iso() -> str:
 
 
 @contextmanager
-def database():
-    settings.DATA_DIR.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(settings.DATA_DIR / "swing_research.sqlite3", timeout=15)
+def database(database_path: Path | None = None):
+    target = database_path if database_path is not None else settings.DATA_DIR / "swing_research.sqlite3"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(target, timeout=15)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.executescript("""
@@ -131,22 +133,24 @@ def get_job(job_id: str, owner: str) -> dict | None:
         return job
 
 
-def list_plans(owner: str) -> list[dict]:
-    with database() as conn:
+def list_plans(owner: str, *, database_path: Path | None = None) -> list[dict]:
+    with database(database_path) as conn:
         rows = conn.execute("""SELECT p.payload FROM conditional_plans p
             JOIN (SELECT id, MAX(revision) revision FROM conditional_plans WHERE owner=? GROUP BY id) latest
             ON p.id=latest.id AND p.revision=latest.revision WHERE p.owner=? ORDER BY p.updated_at DESC""", (owner, owner))
         return [json.loads(row[0]) for row in rows]
 
 
-def get_plan(owner: str, plan_id: str, revision: int) -> dict | None:
-    with database() as conn:
+def get_plan(owner: str, plan_id: str, revision: int, *, database_path: Path | None = None) -> dict | None:
+    with database(database_path) as conn:
         row = conn.execute("SELECT payload FROM conditional_plans WHERE owner=? AND id=? AND revision=?", (owner, plan_id, revision)).fetchone()
         return json.loads(row[0]) if row else None
 
 
-def save_plan(owner: str, plan_id: str, expected_revision: int, payload: dict) -> dict:
-    with database() as conn:
+def save_plan(owner: str, plan_id: str, expected_revision: int, payload: dict, *,
+              database_path: Path | None = None, updated_at: str | None = None,
+              immutable_fields: tuple[str, ...] = ("setup_id",)) -> dict:
+    with database(database_path) as conn:
         conn.execute("BEGIN IMMEDIATE")
         existing = conn.execute("SELECT owner, MAX(revision) revision FROM conditional_plans WHERE id=? GROUP BY owner", (plan_id,)).fetchone()
         if existing and existing["owner"] != owner:
@@ -156,9 +160,9 @@ def save_plan(owner: str, plan_id: str, expected_revision: int, payload: dict) -
             raise ValueError("Plan changed; reload before saving another revision")
         if existing:
             previous = json.loads(conn.execute("SELECT payload FROM conditional_plans WHERE id=? AND revision=?", (plan_id, revision)).fetchone()[0])
-            if previous.get("setup_id") != payload.get("setup_id"):
+            if any(previous.get(key) != payload.get(key) for key in immutable_fields):
                 raise ValueError("A different thesis requires a new plan")
-        saved = {**payload, "id": plan_id, "revision": revision + 1, "updated_at": now_iso()}
+        saved = {**payload, "id": plan_id, "revision": revision + 1, "updated_at": updated_at or now_iso()}
         conn.execute("INSERT INTO conditional_plans VALUES (?, ?, ?, ?, ?)",
                      (plan_id, revision + 1, owner, saved["updated_at"], json.dumps(saved)))
         return saved
