@@ -51,7 +51,7 @@ Copy-Item .env.example .env.local
 npm run dev -- --webpack --hostname 127.0.0.1 --port 3108
 ```
 
-Open `http://localhost:3108/us` (use `localhost` for the existing frontend development access handling).
+Open `http://localhost:3108/us`. The frontend now requires a US beta account even on localhost; configure the separate US Supabase public URL/key in the ignored frontend environment. The loopback backend harness remains an explicit test identity override and must never be hosted.
 
 A fresh clone has no market-data packages. Use the terminal's universe refresh, or run from `backend/`:
 
@@ -80,7 +80,7 @@ npm run build -- --webpack
 
 Use `uvicorn app.us_main:app` from `backend/` for the US API, not the inherited `app.main` entry point. Configure authentication, a separate Supabase project, durable storage and the frontend's server-only `ALPHA_API_PROXY_URL` before hosting. The US entry point mounts only research routes and health; it does not start Kite/Arrow connections, Indian market schedulers or payment services.
 
-The US API uses its own strict bearer-token verifier; Host/Origin and admin headers cannot grant access. Local identity overrides exist only in the explicit preview harness. US frontend onboarding still needs its own access-flow implementation before release; do not treat the localhost preview as production-ready onboarding. The inherited full requirements.txt is retained for legacy-code audits, not the US runtime.
+The US API uses its own strict bearer-token verifier; Host/Origin and admin headers cannot grant access. Local identity overrides exist only in the explicit preview harness. The US frontend uses `/us/login`, skips inherited Indian subscription checks, and rejects anonymous sessions without a hostname bypass. Legacy auth URLs redirect there. Private-beta accounts and recovery are administrator-managed; self-service signup/recovery and real hosted account-lifecycle acceptance remain open before public release. The inherited full requirements.txt is retained for legacy-code audits, not the US runtime.
 
 ## Known product limits
 

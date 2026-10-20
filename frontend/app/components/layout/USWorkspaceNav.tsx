@@ -3,10 +3,26 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { Globe2, Search, Sun, Moon } from "lucide-react";
+import { useAuth } from "../../contexts/AuthContext";
 import { useTheme } from "../../lib/theme";
 import "./us-workspace.css";
 
 export function USWorkspaceNav() {
+  const { signOut } = useAuth();
+  const [signingOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState(false);
+  async function leave() {
+    setSigningOut(true);
+    setSignOutError(false);
+    try {
+      await signOut();
+      router.replace("/us/login");
+    } catch {
+      setSignOutError(true);
+    } finally {
+      setSigningOut(false);
+    }
+  }
   const pathname = usePathname();
   const router = useRouter();
   const { isDark, toggleTheme } = useTheme();
@@ -83,6 +99,8 @@ export function USWorkspaceNav() {
           </button>
         </form>
         <div className="us-workspace-tools">
+          <button type="button" disabled={signingOut} onClick={() => void leave()}>{signingOut ? "Signing out…" : "Sign out"}</button>
+          {signOutError && <span role="alert">Sign-out failed. Retry.</span>}
           <span title="America/New_York; adjusts for daylight saving">
             New York <strong>{clock || "— ET"}</strong>
           </span>

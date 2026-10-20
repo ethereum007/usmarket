@@ -6,9 +6,10 @@ import { USWorkspaceNav } from "./USWorkspaceNav";
 import { WorkspaceNav } from "./WorkspaceNav";
 import { TickerStrip } from "./TickerStrip";
 import { ProtectedRoute } from "../auth/ProtectedRoute";
+import { USAccessGuard } from "../auth/USAccessGuard";
 import { PremiumFeedHeartbeat } from "../data/PremiumFeedHeartbeat";
 
-const AUTH_PAGES = ["/login", "/signup", "/forgot-password", "/reset-password"];
+const AUTH_PAGES = ["/us/login","/login", "/signup", "/forgot-password", "/reset-password"];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -20,9 +21,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return <>{children}</>;
   }
 
+  const AccessGuard = isUSResearch ? USAccessGuard : ProtectedRoute;
+
   // All other pages get top nav + ticker + auth protection
   return (
-    <ProtectedRoute>
+    <AccessGuard>
       <div className="app-viewport workspace-shell">
         <a href="#workspace-content" className="skip-link">Skip to content</a>
         {!isUSResearch && <PremiumFeedHeartbeat />}
@@ -34,6 +37,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <main id="workspace-content" tabIndex={-1} className="app-main-scroll workspace-content">{children}</main>
         </div>
       </div>
-    </ProtectedRoute>
+    </AccessGuard>
   );
 }

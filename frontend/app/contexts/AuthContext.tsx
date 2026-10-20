@@ -59,7 +59,7 @@ const AuthContext = createContext<AuthContextValue>({
   refreshSubscription: async () => {},
 });
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({ children, checkSubscription = true }: { children: ReactNode; checkSubscription?: boolean }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
@@ -68,6 +68,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
 
   const fetchSubscription = useCallback(async () => {
+    if (!checkSubscription) {
+      setSubscriptionLoading(false);
+      return;
+    }
     setSubscriptionLoading(true);
     setSubscriptionError(null);
     try {
@@ -91,7 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setSubscriptionLoading(false);
     }
-  }, []);
+  }, [checkSubscription]);
 
   useEffect(() => {
     if (!supabase) {
@@ -238,7 +242,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function handleSignOut() {
     if (!supabase) return;
-    await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
+    setSession(null);
+    setUser(null);
     primeAuthAccessToken(null);
     setSubscription(null);
     setSubscriptionError(null);

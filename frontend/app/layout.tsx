@@ -53,7 +53,7 @@ export default function RootLayout({
       </head>
       <body className="h-full bg-background text-foreground">
         <ThemeProvider>
-          <AuthProvider>
+          <AuthProvider checkSubscription={false}>
             <AppShell>{children}</AppShell>
           </AuthProvider>
         </ThemeProvider>
