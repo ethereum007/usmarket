@@ -64,3 +64,10 @@ Open issue #4 gates:
 ## Read-only revision review
 
 Opening saved evidence now includes bounded older/newer revision navigation for that exact plan. Each requested revision reuses the existing owner-authenticated revision API and original-package/setup verification. Out-of-range or mismatched revisions are rejected. The history panel displays saved trigger/stop, expiry, state, notes and exit policy with ET write time; it never writes, replaces the current draft or opens a different thesis. Failed/late reads preserve the displayed revision; panel keys and cleanup isolate plan/revision changes. This reviews thesis history only, not triggers, fills, returns or forward outcomes. Real browser and hosted lifecycle acceptance remain open.
+
+
+## USD sizing preview
+
+The authenticated POST /api/us/plans/sizing-preview endpoint reuses the exact Decimal whole-share risk/allocation calculation used by save. It accepts only direction and the five numeric sizing inputs; it reads no research or plans and writes no revisions. Directional stop checks, finite/range validation and JavaScript-safe share quantity limits apply. Zero capacity is clearly labelled and does not imply a viable fill. Newly saved revisions retain the authoritative sizing breakdown; older revisions are not rewritten.
+
+The editor offers an explicit preview showing whole shares, hypothetical notional, stop-distance risk and both USD budgets. Input changes clear the preview and invalidate late responses; unmount cleanup prevents old-source results entering another editor. Save always recalculates. This neither verifies source price/execution feasibility nor models gaps, fees, liquidity, borrow, portfolio exposure or realized P&L. Hosted/browser acceptance remains open.

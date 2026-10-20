@@ -56,3 +56,12 @@ export async function loadUSPlanRevision(plan: USPlan, revision: number) {
   }
   return result.plan;
 }
+
+
+export type USSizing = { quantity: number; state: string; risk_budget_usd: number; allocation_budget_usd: number;
+  risk_per_share_usd: number; planning_notional_usd: number; stop_risk_usd: number };
+export function previewUSPlanSizing(direction: "BULL" | "BEAR", fields: FormData) {
+  return postAPI<{ sizing: USSizing }>(`${ROOT}/sizing-preview`, {
+    direction, ...Object.fromEntries(["trigger", "stop", "capital", "risk_pct", "allocation_cap_pct"].map(key => [key, Number(fields.get(key))])),
+  });
+}

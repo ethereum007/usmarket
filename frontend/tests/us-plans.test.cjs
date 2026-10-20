@@ -49,14 +49,14 @@ for (const badSetup of [{ ...setup, source_snapshot_id: 'wrong' }, { ...setup, s
   const lib = compile('lib/us-plans.ts', { './api': { fetchAPI: async url => url.includes('/research/') ? { package: { ...data, setups: [badSetup] } } : { plan } } });
   await assert.rejects(lib.loadUSPlan(plan), /could not be verified/);
 });
-function editorFixture(save, existing = null) {
+function editorFixture(save, existing = null, preview = async () => ({ sizing: { quantity: 20 } })) {
   const updates = [], saved = [], effects = [];
   let uuids = 0;
   const react = { ...React, useState: value => [value, next => updates.push(next)], useRef: value => ({ current: value }), useEffect: effect => effects.push(effect) };
   const lib = compile('us/plans.tsx', {
     react, 'next/dynamic': { default: () => () => null },
     '../lib/theme': { useTheme: () => ({ theme: 'dark' }) },
-    '../lib/us-plans': { saveUSPlan: save }, '../lib/us-research': { usd: value => `$${value}` },
+    '../lib/us-plans': { saveUSPlan: save, previewUSPlanSizing: preview }, '../lib/us-research': { usd: value => `$${value}` },
   }, { FormData: class { constructor() { return fields(); } }, crypto: { randomUUID: () => `new-${++uuids}` } });
   const element = lib.USPlanEditor({ data, setup, existing, onSaved: item => saved.push(item) });
   const cleanups = effects.map(fn => fn());
@@ -123,4 +123,29 @@ test('history refuses a rebound historical thesis',async()=>{
   const old={...plan,revision:1,setup_version:'changed'};
   const lib=compile('lib/us-plans.ts',{'./api':{fetchAPI:async url=>url.includes('/research/')?{package:data}:{plan:old}}});
   await assert.rejects(()=>lib.loadUSPlanRevision(plan,1),/evidence|thesis/);
+});
+
+
+test('sizing preview sends only direction and numeric sizing fields',async()=>{
+  let sent;const lib=compile('lib/us-plans.ts',{'./api':{postAPI:async(url,body)=>{sent={url,body};return {sizing:{quantity:20}};}}});
+  await lib.previewUSPlanSizing('BULL',fields());
+  assert.equal(sent.url,'/api/us/plans/sizing-preview');
+  assert.deepEqual(Object.keys(sent.body).sort(),['allocation_cap_pct','capital','direction','risk_pct','stop','trigger']);
+  assert.equal(sent.body.trigger,100);assert.equal(sent.body.direction,'BULL');
+});
+function previewButton(element){let found;function walk(node){if(!node||typeof node!=='object')return;if(node.type==='button'&&node.props.type==='button')found=node;React.Children.forEach(node.props?.children,walk);}walk(element);return found;}
+test('preview shows server sizing without saving a revision',async()=>{
+  let saves=0;const fixture=editorFixture(async()=>{saves++;return {plan};},null,async()=>({sizing:{quantity:20}}));
+  previewButton(fixture.element).props.onClick({currentTarget:{form:{}}});await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(saves,0);assert.ok(fixture.updates.some(value=>value?.quantity===20));
+});
+test('changing inputs invalidates an in-flight sizing response',async()=>{
+  let resolve;const fixture=editorFixture(async()=>({plan}),null,()=>new Promise(done=>resolve=done));
+  previewButton(fixture.element).props.onClick({currentTarget:{form:{}}});fixture.element.props.onChange();resolve({sizing:{quantity:20}});
+  await new Promise(done=>setImmediate(done));assert.equal(fixture.updates.some(value=>value?.quantity===20),false);
+});
+test('closing editor invalidates an in-flight sizing response',async()=>{
+  let resolve;const fixture=editorFixture(async()=>({plan}),null,()=>new Promise(done=>resolve=done));
+  previewButton(fixture.element).props.onClick({currentTarget:{form:{}}});fixture.cleanups.forEach(fn=>fn?.());resolve({sizing:{quantity:20}});
+  await new Promise(done=>setImmediate(done));assert.equal(fixture.updates.some(value=>value?.quantity===20),false);
 });

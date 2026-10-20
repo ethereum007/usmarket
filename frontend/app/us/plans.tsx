@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import { useTheme } from "../lib/theme";
 import PlanHistory from "./plan-history";
 import type { ResearchSetup } from "../lib/swing-research";
-import { listUSPlans, loadUSPlan, saveUSPlan, type USPlan } from "../lib/us-plans";
+import { listUSPlans, loadUSPlan, saveUSPlan, previewUSPlanSizing, type USSizing, type USPlan } from "../lib/us-plans";
 import { usd, type USPackage } from "../lib/us-research";
 
 type Review = Awaited<ReturnType<typeof loadUSPlan>>;
@@ -95,12 +95,16 @@ export default function USPlans({ data, setup }: { data: USPackage | null; setup
 export function USPlanEditor({ data, setup, existing, onSaved }: { data: USPackage; setup: ResearchSetup; existing: USPlan | null; onSaved: (plan: USPlan) => void }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [sizing, setSizing] = useState<USSizing | null>(null);
+  const [previewing, setPreviewing] = useState(false);
+  const [sizingError, setSizingError] = useState("");
+  const previewVersion = useRef(0);
   const pending = useRef(false);
   const planId = useRef(existing?.id || "");
   const active = useRef(true);
   useEffect(() => {
     active.current = true;
-    return () => { active.current = false; };
+    return () => { active.current = false; previewVersion.current++; };
   }, []);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -120,7 +124,20 @@ export function USPlanEditor({ data, setup, existing, onSaved }: { data: USPacka
       setSaving(false);
     }
   }
-  return <form onSubmit={submit} aria-label="US conditional plan" className="space-y-4 border-t border-card-border pt-5">
+  async function preview(form: HTMLFormElement | null) {
+    if (!form) return;
+    const version = ++previewVersion.current;
+    setPreviewing(true);setSizingError("");setSizing(null);
+    try {
+      const result = await previewUSPlanSizing(setup.signal, new FormData(form));
+      if (active.current && version === previewVersion.current) setSizing(result.sizing);
+    } catch {
+      if (active.current && version === previewVersion.current) setSizingError("Sizing could not be confirmed. Check inputs and retry; no plan was saved by this preview.");
+    } finally {
+      if (active.current && version === previewVersion.current) setPreviewing(false);
+    }
+  }
+  return <form onChange={() => { previewVersion.current++; setSizing(null); setSizingError(""); setPreviewing(false); }} onSubmit={submit} aria-label="US conditional plan" className="space-y-4 border-t border-card-border pt-5">
     <h3>{existing ? `Revise ${setup.symbol} plan · revision ${existing.revision}` : `Create ${setup.symbol} conditional plan`}</h3>
     <p className="text-xs text-text-secondary">Source session {data.session} · {setup.signal} · USD · Package {data.id.slice(0, 12)} · Setup {setup.setup_version.slice(0, 12)}</p>
     <fieldset disabled={saving} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"><legend className="sr-only">Plan parameters in US dollars</legend>
@@ -136,6 +153,14 @@ export function USPlanEditor({ data, setup, existing, onSaved }: { data: USPacka
       <label className="text-sm sm:col-span-2">Conditional exit policy<textarea className={input} required name="exit_policy" minLength={5} maxLength={1000} defaultValue={existing?.exit_policy} /></label>
       <label className="text-sm sm:col-span-2">Private plan notes<textarea className={input} name="notes" maxLength={10000} defaultValue={existing?.notes} /></label>
     </fieldset>
+    <button type="button" className="workspace-button" disabled={saving || previewing} onClick={event => void preview(event.currentTarget.form)}>{previewing ? "Checking sizing…" : "Preview USD sizing"}</button>
+    {sizingError && <p role="alert">{sizingError}</p>}
+    {sizing && <div role="status" className="text-sm">
+      <p>{sizing.quantity} whole shares · Planning notional {usd(sizing.planning_notional_usd)} · Stop-distance risk {usd(sizing.stop_risk_usd)}</p>
+      <p>Risk budget {usd(sizing.risk_budget_usd)} · Allocation cap {usd(sizing.allocation_budget_usd)} · Stop distance per share {usd(sizing.risk_per_share_usd)}</p>
+      {sizing.state === "zero_capacity" && <p>No whole shares fit these limits. This sizing has zero capacity.</p>}
+      <p>Hypothetical sizing only. Saving recalculates these values; gaps, fees, liquidity and short borrow are not modeled.</p>
+    </div>}
     <p className="text-xs text-text-secondary">Earnings and catalysts unknown. Gaps, liquidity, fees and short-sale constraints unverified. Saving does not arm alerts or place orders.</p>
     {error && <p role="alert">Save not confirmed: {error}. Your draft remains here. For conflicts or timeouts, reload the saved-plan list and reopen its latest revision before retrying; reopening replaces unsaved edits.</p>}
     <button className="workspace-button workspace-button-primary" disabled={saving || data.state !== "final"} type="submit">{saving ? "Saving…" : "Save private plan revision"}</button>

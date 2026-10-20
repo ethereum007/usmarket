@@ -179,3 +179,45 @@ def test_plan_endpoints_require_real_auth_even_on_localhost():
     assert client.get("/api/us/plans", headers=headers).status_code == 401
     assert client.get("/api/us/plans/" + str(uuid4()) + "?revision=1", headers=headers).status_code == 401
     assert client.post("/api/us/plans/" + str(uuid4()), json={}, headers=headers).status_code == 401
+
+
+@pytest.mark.parametrize('direction,trigger,stop,quantity', [('BULL',100,95,20),('BEAR',100,105,20),('BULL',0.3,0.2,1000)])
+def test_sizing_preview_matches_saved_policy_without_writing(fixture,direction,trigger,stop,quantity):
+    a,_,payload,_,_,root=fixture
+    values={key:payload[key] for key in ['trigger','stop','capital','risk_pct','allocation_cap_pct']}
+    values.update(direction=direction,trigger=trigger,stop=stop)
+    result=a.post('/api/us/plans/sizing-preview',json=values)
+    assert result.status_code==200,result.text
+    sizing=result.json()['sizing']
+    assert sizing['quantity']==quantity
+    assert sizing['stop_risk_usd']<=sizing['risk_budget_usd']
+    assert sizing['planning_notional_usd']<=sizing['allocation_budget_usd']
+    assert sizing['filled'] is False and sizing['execution_readiness']=='PLANNING_ONLY'
+    assert a.get('/api/us/plans').json()['plans']==[]
+
+
+def test_preview_zero_capacity_and_invalid_direction_stop(fixture):
+    a,_,payload,*_=fixture
+    values={key:payload[key] for key in ['trigger','stop','capital','risk_pct','allocation_cap_pct']}
+    result=a.post('/api/us/plans/sizing-preview',json={**values,'direction':'BULL','capital':1})
+    assert result.json()['sizing']['state']=='zero_capacity'
+    assert a.post('/api/us/plans/sizing-preview',json={**values,'direction':'BULL','stop':100}).status_code==422
+    assert a.post('/api/us/plans/sizing-preview',json={**values,'direction':'BULL','owner':'forged'}).status_code==422
+
+
+def test_saved_revision_contains_same_authoritative_preview(fixture):
+    a,_,payload,*_=fixture
+    values={key:payload[key] for key in ['trigger','stop','capital','risk_pct','allocation_cap_pct']}
+    expected=a.post('/api/us/plans/sizing-preview',json={**values,'direction':'BULL'}).json()['sizing']
+    saved=a.post('/api/us/plans/'+str(uuid4()),json=payload).json()['plan']
+    assert saved['sizing']==expected and saved['quantity']==expected['quantity']
+
+
+def test_preview_requires_auth_and_rejects_unsafe_integer_precision(fixture):
+    a,_,payload,*_=fixture
+    values={key:payload[key] for key in ['trigger','stop','capital','risk_pct','allocation_cap_pct']}
+    from app.us_main import app as hosted
+    assert TestClient(hosted).post('/api/us/plans/sizing-preview',json={**values,'direction':'BULL'}).status_code==401
+    response=a.post('/api/us/plans/sizing-preview',json={**values,'direction':'BEAR','trigger':0.0001,
+        'stop':0.00010000000000000002,'capital':1000000000000,'risk_pct':5,'allocation_cap_pct':100})
+    assert response.status_code==422 and 'precision' in response.text
