@@ -59,3 +59,8 @@ Real plan/job database backup tooling and offline restore rehearsal steps are no
 A confirmed browser session now waits for GET /api/us/research/access before mounting research panels. The endpoint reuses the same strict provider/invitation dependency as data routes and returns no user ID, email or invitation list. Failed, malformed or wrong-market responses keep panels unmounted with generic retry/sign-out feedback. Account IDs key the check panel; cleanup ignores late responses. Recovery and unauthenticated navigation retain priority.
 
 This is UX gating only. Every backend request still checks the current token and configured invitations independently. A prior UI grant does not override server-side revocation. The local preview endpoint uses its explicit test dependency override, never hostname trust. Tests use mocked transport/provider identities; real hosted invitation and recovery acceptance remain open.
+
+
+## Private HTTP cache policy
+
+The hosted API sets `Cache-Control: private, no-store`, legacy no-cache headers and `Vary: Authorization` on `/api/us` responses, including handled authentication, validation and missing-route errors. Existing Vary dimensions are preserved. Compliant HTTP caches must not store these private responses across account changes. This does not erase downloaded content or replace per-request ownership checks. Hosting/proxy acceptance must verify these headers reach the browser without an overriding CDN cache rule; source tests do not establish that evidence.
