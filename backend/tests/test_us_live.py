@@ -132,3 +132,90 @@ def test_large_finite_prices_do_not_overflow_spread_midpoint():
     row=quote_diagnostic('AAPL',quote(bp=1e308,ap=1.7e308),{},NOW)
     assert row['spread_bps']==pytest.approx(5185.185185)
     assert row['wide_spread'] is True
+
+
+@pytest.fixture
+def live_cache(monkeypatch):
+    from app.services import us_live
+    monkeypatch.setattr(us_live,'_CACHE',{})
+    monkeypatch.setattr(us_live,'_INFLIGHT',{})
+    return us_live
+
+
+def test_identical_concurrent_observations_share_one_provider_request(live_cache,monkeypatch):
+    service=live_cache;calls=[]
+    async def run():
+        entered,release=asyncio.Event(),asyncio.Event()
+        async def provider(symbols,feed):
+            calls.append((symbols,feed));entered.set();await release.wait()
+            return {'state':'connected','feed':feed,'received_at':'original-source-observation'}
+        monkeypatch.setattr(service,'snapshot',provider)
+        requests=[asyncio.create_task(service.cached_snapshot(['SPY','AAPL','AAPL'],'iex')) for _ in range(20)]
+        await entered.wait();release.set()
+        results=await asyncio.gather(*requests)
+        assert all(row['received_at']=='original-source-observation' for row in results)
+        assert not service._INFLIGHT
+        cached=await service.cached_snapshot(['AAPL','SPY'],'iex')
+        assert cached['received_at']=='original-source-observation'
+    asyncio.run(run())
+    assert calls==[(['AAPL','SPY'],'iex')]
+
+
+def test_feed_identity_and_denial_are_never_shared_across_feeds(live_cache,monkeypatch):
+    calls=[]
+    async def provider(symbols,feed):
+        calls.append(feed)
+        return {'state':'denied' if feed=='sip' else 'connected','feed':feed}
+    monkeypatch.setattr(live_cache,'snapshot',provider)
+    async def run():
+        iex,sip=await asyncio.gather(live_cache.cached_snapshot(['AAPL'],'iex'),live_cache.cached_snapshot(['AAPL'],'sip'))
+        assert iex['state']=='connected' and sip['state']=='denied'
+        assert iex['feed']=='iex' and sip['feed']=='sip'
+    asyncio.run(run());assert sorted(calls)==['iex','sip']
+
+
+def test_cancelled_waiter_does_not_cancel_shared_provider_work(live_cache,monkeypatch):
+    async def run():
+        entered,release=asyncio.Event(),asyncio.Event()
+        async def provider(symbols,feed):
+            entered.set();await release.wait();return {'state':'connected','feed':feed}
+        monkeypatch.setattr(live_cache,'snapshot',provider)
+        first=asyncio.create_task(live_cache.cached_snapshot(['AAPL'],'iex'))
+        await entered.wait()
+        second=asyncio.create_task(live_cache.cached_snapshot(['AAPL'],'iex'))
+        await asyncio.sleep(0)
+        first.cancel()
+        with pytest.raises(asyncio.CancelledError):await first
+        assert not second.cancelled()
+        release.set();assert (await second)['state']=='connected'
+        assert not live_cache._INFLIGHT
+    asyncio.run(run())
+
+
+def test_distinct_inflight_requests_are_bounded_and_recover(live_cache,monkeypatch):
+    async def run():
+        entered,release=asyncio.Event(),asyncio.Event()
+        async def provider(symbols,feed):
+            entered.set();await release.wait();return {'state':'connected','feed':feed}
+        monkeypatch.setattr(live_cache,'snapshot',provider)
+        monkeypatch.setattr(live_cache,'_MAX_INFLIGHT',1)
+        first=asyncio.create_task(live_cache.cached_snapshot(['AAPL'],'iex'));await entered.wait()
+        refused=await live_cache.cached_snapshot(['MSFT'],'iex')
+        assert refused['state']=='unavailable' and 'busy' in refused['error']
+        release.set();await first
+        assert (await live_cache.cached_snapshot(['MSFT'],'iex'))['state']=='connected'
+    asyncio.run(run())
+
+
+def test_provider_failure_is_sanitized_and_expired_cache_can_recover(live_cache,monkeypatch):
+    from unittest.mock import AsyncMock
+    monkeypatch.setattr(live_cache,'snapshot',AsyncMock(side_effect=RuntimeError('private provider body')))
+    async def run():
+        failed=await live_cache.cached_snapshot(['AAPL'],'iex')
+        assert failed['state']=='unavailable' and 'private' not in str(failed)
+        assert not live_cache._INFLIGHT
+        key=(('AAPL',),'iex')
+        live_cache._CACHE[key]=(live_cache.time.monotonic()-4,failed)
+        monkeypatch.setattr(live_cache,'snapshot',AsyncMock(return_value={'state':'connected','feed':'iex'}))
+        assert (await live_cache.cached_snapshot(['AAPL'],'iex'))['state']=='connected'
+    asyncio.run(run())

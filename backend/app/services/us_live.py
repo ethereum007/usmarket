@@ -10,6 +10,8 @@ import httpx
 from dotenv import load_dotenv
 
 _CACHE: dict[tuple, tuple[float, dict]] = {}
+_INFLIGHT: dict[tuple, asyncio.Task] = {}
+_MAX_INFLIGHT = 8
 
 
 def number(value):
@@ -116,12 +118,28 @@ async def snapshot(symbols: list[str], feed: str = 'iex', client=None):
 
 
 async def cached_snapshot(symbols, feed):
-    key = (tuple(symbols),feed)
+    key = (tuple(sorted(set(symbols))),feed)
     entry = _CACHE.get(key)
     if entry and time.monotonic() - entry[0] < 3:
         return entry[1]
-    data = await snapshot(symbols,feed)
-    if len(_CACHE) >= 64:
-        _CACHE.pop(next(iter(_CACHE)))
-    _CACHE[key] = (time.monotonic(), data)
-    return data
+    task = _INFLIGHT.get(key)
+    if task is None:
+        if len(_INFLIGHT) >= _MAX_INFLIGHT:
+            return {'state':'unavailable','feed':feed,'error':'Live diagnostics are busy; retry shortly', 'research_only':True}
+        async def produce():
+            try:
+                try:
+                    data = await snapshot(list(key[0]),feed)
+                except Exception:
+                    data = {'state':'unavailable','feed':feed,'error':'Live provider observation unavailable', 'research_only':True}
+                if len(_CACHE) >= 64:
+                    _CACHE.pop(next(iter(_CACHE)))
+                _CACHE[key] = (time.monotonic(), data)
+                return data
+            finally:
+                if _INFLIGHT.get(key) is asyncio.current_task():
+                    _INFLIGHT.pop(key, None)
+        task = asyncio.create_task(produce())
+        _INFLIGHT[key] = task
+    # A disconnected requester must not cancel the shared observation for others.
+    return await asyncio.shield(task)
