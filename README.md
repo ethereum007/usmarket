@@ -12,6 +12,7 @@ The default frontend route redirects to `/us`. Its navigation, search, benchmark
 
 ## Working features
 
+- Immutable publication serialized across cooperating processes on one retained volume, with monotonic last-final pointers; see [publication contract](docs/US-PUBLICATION.md).
 - Completed-session, split-adjusted research packages; SPY/QQQ relative strength and breadth for an explicit custom universe.
 - Searchable research queue; daily/weekly source charts; detector-specific thesis levels.
 - Current provider asset observations and setup identity binding; unresolved/inactive assets make refreshes partial. Historical aliases and corporate actions remain unverified. See [instrument contract](docs/US-INSTRUMENT-CONTRACT.md).
@@ -69,7 +70,7 @@ Recent consolidated SIP data requires the corresponding provider entitlement. Su
 From `backend/`:
 
 ```powershell
-python -m pytest tests/test_us_auth.py tests/test_us_main.py tests/test_us_research.py tests/test_us_live.py tests/test_us_research_routes.py tests/test_us_plans.py tests/test_us_sessions.py tests/test_us_instruments.py tests/test_swing_detector.py tests/test_swing_early_momentum.py tests/test_swing_acceleration.py tests/test_swing_institutional_setups.py -q
+python -m pytest tests/test_us_auth.py tests/test_us_main.py tests/test_us_research.py tests/test_us_live.py tests/test_us_research_routes.py tests/test_us_plans.py tests/test_us_sessions.py tests/test_us_instruments.py tests/test_us_publication.py tests/test_swing_detector.py tests/test_swing_early_momentum.py tests/test_swing_acceleration.py tests/test_swing_institutional_setups.py -q
 ```
 
 From `frontend/`:

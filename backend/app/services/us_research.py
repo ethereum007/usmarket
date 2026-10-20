@@ -130,23 +130,8 @@ def research_package(symbols, raw, calendar, now, feed='sip', benchmark='SPY'):
 
 
 def save_package(package: dict, folder: Path):
-    folder = Path(folder)
-    folder.mkdir(parents=True, exist_ok=True)
-    target = folder / (package['id'] + '.json')
-    if target.exists():
-        # Repeated source content retains the original immutable publication metadata.
-        package = json.loads(target.read_text(encoding='utf-8'))
-    else:
-        temporary = target.with_suffix('.tmp')
-        temporary.write_text(json.dumps(package, allow_nan=False), encoding='utf-8')
-        temporary.replace(target)
-    # A partial attempt never overwrites the last-final pointer.
-    if package['state'] == 'final':
-        pointer = folder / (package['universe'] + '-latest-final.json')
-        temp = pointer.with_suffix('.tmp')
-        temp.write_text(json.dumps({'id':package['id'], 'session':package['session']}), encoding='utf-8')
-        temp.replace(pointer)
-    return target, package
+    from app.services.us_publication import publish
+    return publish(package, folder)
 
 
 async def run(args):

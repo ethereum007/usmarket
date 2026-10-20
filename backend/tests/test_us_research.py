@@ -56,11 +56,11 @@ def test_pagination_keeps_other_symbols():
 def test_immutable_publication_and_partial_preserves_final(tmp_path):
     import json
     from app.services.us_research import save_package
-    original={'id':'a'*64,'universe':'us-test','session':'2026-07-01','state':'final','computed_at':'first'}
+    original={'id':'a'*64,'universe':'us-test','session':'2026-07-01','state':'final','computed_at':'2026-07-02T00:00:00+00:00'}
     path,saved=save_package(original,tmp_path)
-    _,repeat=save_package({**original,'computed_at':'second'},tmp_path)
-    assert repeat['computed_at']=='first'
-    assert json.loads(path.read_text())['computed_at']=='first'
+    _,repeat=save_package({**original,'computed_at':'2026-07-02T01:00:00+00:00'},tmp_path)
+    assert repeat['computed_at']=='2026-07-02T00:00:00+00:00'
+    assert json.loads(path.read_text())['computed_at']=='2026-07-02T00:00:00+00:00'
     save_package({**original,'id':'b'*64,'state':'partial'},tmp_path)
     assert json.loads((tmp_path/'us-test-latest-final.json').read_text())['id']=='a'*64
 
