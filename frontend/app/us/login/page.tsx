@@ -1,20 +1,21 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../contexts/AuthContext";
 import { supabase } from "../../lib/supabase";
 
 export default function USLoginPage() {
-  const { user, loading, signIn, signOut } = useAuth();
+  const { user, loading, signIn, signOut, recoverySession } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
-    if (!loading && user && !user.is_anonymous) router.replace("/us");
-  }, [loading, user, router]);
+    if (!loading && user && !user.is_anonymous) router.replace(recoverySession ? "/us/recover" : "/us");
+  }, [loading, user, recoverySession, router]);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy) return;
@@ -40,7 +41,8 @@ export default function USLoginPage() {
         {error && <p role="alert">{error}</p>}
         <button className="workspace-button workspace-button-primary" disabled={!supabase || loading || busy} type="submit">{busy ? "Signing in…" : "Sign in"}</button>
       </form>
-      <p className="text-sm text-text-secondary">Account creation and password recovery are managed by your beta administrator during private testing.</p>
+      <Link href="/us/recover" className="text-sm underline">Forgot your password?</Link>
+      <p className="text-sm text-text-secondary">Account creation is managed by your beta administrator during private testing.</p>
       <p className="text-xs text-text-secondary">Research software. Scores are uncalibrated; a setup does not establish a trading edge.</p>
     </main>
   );

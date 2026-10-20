@@ -9,7 +9,7 @@ import { ProtectedRoute } from "../auth/ProtectedRoute";
 import { USAccessGuard } from "../auth/USAccessGuard";
 import { PremiumFeedHeartbeat } from "../data/PremiumFeedHeartbeat";
 
-const AUTH_PAGES = ["/us/login","/login", "/signup", "/forgot-password", "/reset-password"];
+const AUTH_PAGES = ["/us/login", "/us/recover","/login", "/signup", "/forgot-password", "/reset-password"];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();

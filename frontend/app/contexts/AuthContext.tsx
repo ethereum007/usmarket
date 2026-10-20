@@ -8,7 +8,7 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
-import { supabase } from "../lib/supabase";
+import { supabase, isRecoverySession } from "../lib/supabase";
 import { fetchAPI, primeAuthAccessToken } from "../lib/api";
 import type { User, Session } from "@supabase/supabase-js";
 
@@ -28,6 +28,7 @@ interface SignUpResult {
 }
 
 interface AuthContextValue {
+  recoverySession: boolean;
   user: User | null;
   session: Session | null;
   loading: boolean;
@@ -44,6 +45,7 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue>({
+  recoverySession: false,
   user: null,
   session: null,
   loading: true,
@@ -60,6 +62,7 @@ const AuthContext = createContext<AuthContextValue>({
 });
 
 export function AuthProvider({ children, checkSubscription = true }: { children: ReactNode; checkSubscription?: boolean }) {
+  const [recoverySession, setRecoverySession] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
@@ -110,6 +113,7 @@ export function AuthProvider({ children, checkSubscription = true }: { children:
 
     const finishSignedOut = () => {
       primeAuthAccessToken(null);
+      setRecoverySession(false);
       setSession(null);
       setUser(null);
       setSubscription(null);
@@ -140,6 +144,7 @@ export function AuthProvider({ children, checkSubscription = true }: { children:
         primeAuthAccessToken(initialSession?.access_token ?? null);
         setSession(initialSession);
         setUser(initialSession?.user ?? null);
+        setRecoverySession(Boolean(initialSession && isRecoverySession()));
         setLoading(false);
         if (initialSession?.access_token) {
           void fetchSubscription();
@@ -169,6 +174,7 @@ export function AuthProvider({ children, checkSubscription = true }: { children:
       primeAuthAccessToken(s?.access_token ?? null);
       setSession(s);
       setUser(s?.user ?? null);
+      setRecoverySession(Boolean(s && isRecoverySession()));
       setLoading(false);
       if (s?.access_token) {
         void fetchSubscription();
@@ -244,6 +250,7 @@ export function AuthProvider({ children, checkSubscription = true }: { children:
     if (!supabase) return;
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
+    setRecoverySession(false);
     setSession(null);
     setUser(null);
     primeAuthAccessToken(null);
@@ -265,6 +272,7 @@ export function AuthProvider({ children, checkSubscription = true }: { children:
   return (
     <AuthContext.Provider
       value={{
+        recoverySession,
         user,
         session,
         loading,

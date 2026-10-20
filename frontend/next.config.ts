@@ -18,7 +18,8 @@ const nextConfig: NextConfig = {
     const legacyPages = ["admin", "alpha-login", "analysis", "feedback", "fno", "guide", "heatmap", "latest-updates", "options", "pulse", "radar-trade", "rrg", "runner", "sectors", "settings", "snapshots", "stocks", "subscription", "swing", "trade-ideas"];
     return [
       { source: "/", destination: "/us", permanent: false },
-      ...["login", "signup", "forgot-password", "reset-password"].map(page => ({ source: `/${page}/:path*`, destination: "/us/login", permanent: false })),
+      ...["login", "signup"].map(page => ({ source: `/${page}/:path*`, destination: "/us/login", permanent: false })),
+      ...["forgot-password", "reset-password"].map(page => ({ source: `/${page}/:path*`, destination: "/us/recover", permanent: false })),
       ...legacyPages.map(page => ({ source: `/${page}/:path*`, destination: "/us", permanent: false })),
     ];
   },

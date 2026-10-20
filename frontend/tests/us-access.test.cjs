@@ -56,7 +56,7 @@ async function providerFixture(checkSubscription, logoutError = null) {
   const effects = [], tierRequests = [], tokens = [];
   const context = { exports: {}, window: { setTimeout, clearTimeout }, require(name) {
     if (name === 'react') return { ...React, useEffect: fn => effects.push(fn), useCallback: fn => fn, useState: initial => [initial, () => {}] };
-    if (name.endsWith('/supabase')) return { supabase: { auth: {
+    if (name.endsWith('/supabase')) return { isRecoverySession: () => false, supabase: { auth: {
       getSession: async () => ({ data: { session: { access_token: 'test-token', user: { id: 'owner' } } } }),
       onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }),
       signOut: async () => ({ error: logoutError }),
@@ -84,13 +84,13 @@ test('failed sign-out is reported instead of silently claiming success', async (
   await assert.rejects(fixture.value.signOut(), /offline/);
   assert.deepEqual(fixture.tokens, ['test-token']);
 });
-test('inherited auth URLs redirect exclusively to US sign-in', async () => {
+test('inherited auth URLs redirect exclusively to US auth screens', async () => {
   const context = { exports: {}, __dirname: path.join(__dirname, '..'), process: { env: {} } };
   const source = fs.readFileSync(path.join(__dirname, '../next.config.ts'), 'utf8');
   vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, context);
   const redirects = await context.exports.default.redirects();
   for (const route of ['login', 'signup', 'forgot-password', 'reset-password']) {
-    assert.equal(redirects.find(item => item.source === `/${route}/:path*`).destination, '/us/login');
+    assert.equal(redirects.find(item => item.source === `/${route}/:path*`).destination, ['forgot-password', 'reset-password'].includes(route) ? '/us/recover' : '/us/login');
   }
   assert.equal(redirects.some(item => item.source.startsWith('/us/')), false);
 });
