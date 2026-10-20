@@ -90,7 +90,7 @@ def breadth(stock_features: dict[str, dict], requested: int) -> dict:
             "down4_on_volume": sum(f["return1"] <= -4 and f["rvol20"] >= 1.5 for f in volume) if volume else None}
 
 
-def build_package(universe: str, symbols: list[str], histories: dict[str, list[dict]], benchmark: list[dict], failures: dict | None = None, *, market: str = "NSE", benchmark_name: str = BENCHMARK, sector_map: dict | None = None) -> dict:
+def build_package(universe: str, symbols: list[str], histories: dict[str, list[dict]], benchmark: list[dict], failures: dict | None = None, *, market: str = "NSE", benchmark_name: str = BENCHMARK, sector_map: dict | None = None, setup_exclusions: dict[str, str] | None = None) -> dict:
     sector_map = SECTOR_MAP if sector_map is None else sector_map
     if not benchmark:
         raise ValueError(f"Completed {benchmark_name} history is required; no package published")
@@ -103,7 +103,7 @@ def build_package(universe: str, symbols: list[str], histories: dict[str, list[d
     setups = []
     benchmark_df = pd.DataFrame(benchmark)
     for symbol, f in stock_features.items():
-        if not f["available"] or f["sessions"] < 35:
+        if not f["available"] or f["sessions"] < 35 or symbol in (setup_exclusions or {}):
             continue
         rows = [bar for bar in histories[symbol] if bar["date"] <= session]
         for signal in scan_swing_spectrum(pd.DataFrame(rows), symbol, benchmark_df=benchmark_df):
@@ -142,7 +142,7 @@ def build_package(universe: str, symbols: list[str], histories: dict[str, list[d
             "symbols": symbols, "missing_symbols": missing, "refresh_failures": failures or {},
             "breadth": breadth(stock_features, len(symbols)), "features": stock_features,
             "groups": groups, "industry_taxonomy": "unavailable", "unclassified_symbols": [s for s in symbols if s not in sector_map],
-            "setups": setups, "benchmark": benchmark_name,
+            "setups": setups, "benchmark": benchmark_name, "setup_exclusions": setup_exclusions or {},
             "source_bars": histories, "benchmark_bars": benchmark,
             "methodology": {"ema": "Recursive EMA seeded by first available close; minimum period bars; calendar gaps excluded",
                             "relative_strength": f"Stock session return minus {benchmark_name} return in percentage points; not a percentile",

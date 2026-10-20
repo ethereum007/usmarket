@@ -40,6 +40,9 @@ def test_catalog_and_real_package_contract(client):
     saved=c.get('/api/us/research/packages/'+p['id']).json()['package']
     assert saved['features']['AAPL']['close']==11
     assert saved['source_bars']['AAPL'][0]['volume']==100
+    assert saved['session_calendar']['version']=='us-provider-sessions-v1'
+    assert saved['session_calendar']['sessions'][0]['date']=='2026-07-01'
+    assert saved['history_gaps']=={}
 
 
 def test_refresh_rejects_invalid_universe_and_foreign_jobs(client):

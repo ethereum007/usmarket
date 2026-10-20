@@ -13,16 +13,13 @@ import httpx
 from dotenv import load_dotenv
 from app.services.swing_research import build_package
 from app.services.swing_repository import identity
+from app.services.us_sessions import completed_calendar, missing_sessions, VERSION as SESSION_VERSION, FINALIZATION_MINUTES
 
 NY = ZoneInfo('America/New_York')
 
 
 def completed_sessions(calendar: list[dict], now: datetime) -> list[str]:
-    if now.tzinfo is None:
-        raise ValueError('Timezone-aware clock required')
-    return sorted({row['date'] for row in calendar
-                   if datetime.fromisoformat(row['date'] + 'T' + row['close']).replace(tzinfo=NY)
-                   + timedelta(minutes=30) <= now})
+    return [row['date'] for row in completed_calendar(calendar, now)]
 
 
 def normalize_bars(raw: list[dict], sessions: list[str]) -> list[dict]:
@@ -90,27 +87,42 @@ class AlpacaHistory:
 
 
 def research_package(symbols, raw, calendar, now, feed='sip', benchmark='SPY'):
-    sessions = completed_sessions(calendar, now)
+    calendar_evidence = completed_calendar(calendar, now)
+    sessions = [row['date'] for row in calendar_evidence]
     if not sessions:
         raise ValueError('No completed provider sessions')
     histories = {s: normalize_bars(raw.get(s, []), sessions) for s in [benchmark, *symbols]}
     bench = histories.pop(benchmark)
     if not bench or bench[-1]['date'] != sessions[-1]:
         raise ValueError('Benchmark missing latest completed session')
+    if [bar["date"] for bar in bench] != sessions:
+        raise ValueError('Benchmark history has missing provider sessions; research was not published')
+    history_gaps = {symbol: gaps for symbol, bars in histories.items()
+                    if (gaps := missing_sessions(bars, sessions))}
     package = build_package('us-custom-' + identity(sorted(symbols))[:12], symbols, histories, bench,
-                            market='US', benchmark_name=benchmark, sector_map={})
+                            market='US', benchmark_name=benchmark, sector_map={},
+                            setup_exclusions={symbol: 'History has missing provider sessions' for symbol in history_gaps})
     package.update(currency='USD', timezone='America/New_York', provider='alpaca', feed=feed,
-                   adjustment_basis='split', version='us-swing-eod-v1', earnings_status='unavailable',
+                   adjustment_basis='split', version='us-swing-eod-v2', earnings_status='unavailable',
                    calendar_basis='Alpaca market calendar; close plus 30 minute finalization buffer',
                    membership_basis='Explicit current custom list; not historical index membership',
                    research_only=True, expected_session=sessions[-1])
-    package['source_manifest_id'] = identity({'market':'US','feed':feed,'adjustment':'split','calendar':calendar, 'snapshot':package['source_snapshot_id']})
+    session_record = {'version': SESSION_VERSION, 'timezone': 'America/New_York',
+                      'finalization_buffer_minutes': FINALIZATION_MINUTES, 'sessions': calendar_evidence}
+    package['session_calendar'] = {**session_record, 'id': identity(session_record)}
+    package['history_gaps'] = history_gaps
+    if history_gaps:
+        package['state'] = 'partial'
+    package['source_manifest_id'] = identity({'market':'US','feed':feed,'adjustment':'split',
+                                             'calendar':package['session_calendar']['id'], 'snapshot':package['source_snapshot_id']})
     for setup in package['setups']:
         setup['setup_version'] = identity([setup['setup_version'], package['source_manifest_id']])
     package['warnings'] = ['US detector thresholds are not calibrated', 'Earnings events and industry classification unavailable',
                            'Daily provider aggregates: regular-session-only volume is not certified']
     if feed == 'iex':
         package['warnings'].append('Single-exchange IEX coverage; volume is not consolidated US volume')
+    if history_gaps:
+        package['warnings'].append('Missing provider sessions in stock history; affected setups withheld and publication is partial')
     package['universe'] += '-' + benchmark.lower() + '-' + feed
     package['id'] = identity({k:v for k,v in package.items() if k != 'computed_at'})
     return package

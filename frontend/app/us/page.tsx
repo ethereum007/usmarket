@@ -626,8 +626,7 @@ function USResearchContent() {
                   </>
                 ) : (
                   <p>
-                    No active detector thesis in this saved session. You can
-                    still inspect price history and keep research notes.
+                    {data.history_gaps?.[symbol]?.length ? `Setup evaluation withheld: ${data.history_gaps[symbol].length} provider sessions are missing in this stock history. Refresh the source history before relying on a setup.` : "No active detector thesis in this saved session. You can still inspect price history and keep research notes."}
                   </p>
                 )}
               </div>
@@ -669,6 +668,7 @@ function USResearchContent() {
                 ))}
               </ul>
               <p>Package: {data.id}</p>
+              <p>{data.session_calendar ? `Calendar ${data.session_calendar.version} · ${data.session_calendar.sessions.length} completed provider sessions · ${data.session_calendar.finalization_buffer_minutes}-minute finalization buffer · ${data.session_calendar.timezone}` : "Legacy package: versioned provider calendar evidence was not recorded."}</p>
               <p>
                 Computed: {data.computed_at}. Weekly bars aggregate observed
                 sessions; the latest week may be incomplete.

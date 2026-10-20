@@ -19,6 +19,8 @@ export type USPackage = ResearchPackage & {
   feed: string;
   computed_at: string;
   warnings: string[];
+  history_gaps?: Record<string, string[]>;
+  session_calendar?: { id: string; version: string; timezone: string; finalization_buffer_minutes: number; sessions: { date: string; close: string; close_at: string; finalized_at: string }[] };
   features: Record<string, USFeature>;
   benchmark_bars: ResearchPackage["source_bars"][string];
 };
