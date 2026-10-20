@@ -76,4 +76,4 @@ async def require_us_user(request: Request) -> dict:
     parts = authorization.split()
     if len(parts) != 2 or parts[0].lower() != 'bearer' or len(parts[1]) > 8192:
         raise unauthorized()
-    return await verify_us_token(parts[1])
+    return {**(await verify_us_token(parts[1])), '_access_token': parts[1]}

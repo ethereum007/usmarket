@@ -2,6 +2,7 @@
 from datetime import date, datetime, timezone
 from decimal import Decimal
 import sqlite3
+import os
 from typing import Callable, Literal
 from uuid import UUID
 
@@ -65,8 +66,14 @@ class PlanRequest(SizingFields):
     state: Literal["draft", "planned", "cancelled", "invalidated", "expired"] = "draft"
 
 
-def store(operation: Callable, *args, **kwargs):
+def store(operation: Callable, *args, access_token=None, **kwargs):
     """Dedicated US file; never silently fall back to the inherited database."""
+    mode = os.environ.get('US_PLAN_STORE', 'sqlite')
+    if mode == 'supabase':
+        from app.services.us_remote_plans import execute
+        return execute(operation, args, access_token)
+    if mode != 'sqlite':
+        raise HTTPException(503, 'US plan storage is not configured')
     try:
         return operation(*args, database_path=settings.DATA_DIR / "us-plans.sqlite3", **kwargs)
     except PermissionError:
@@ -79,12 +86,12 @@ def store(operation: Callable, *args, **kwargs):
 
 @router.get("")
 def plans(user: dict = Depends(require_us_user)):
-    return {"success": True, "plans": store(repo.list_plans, user["id"])}
+    return {"success": True, "plans": store(repo.list_plans, user["id"], access_token=user.get("_access_token"))}
 
 
 @router.get("/export")
 def export_plans(user: dict = Depends(require_us_user)):
-    revisions = store(repo.export_plan_revisions, user["id"])
+    revisions = store(repo.export_plan_revisions, user["id"], access_token=user.get("_access_token"))
     return JSONResponse({
         'schema_version': 1, 'market': 'US', 'currency': 'USD',
         'exported_at': datetime.now(timezone.utc).isoformat(),
@@ -96,7 +103,7 @@ def export_plans(user: dict = Depends(require_us_user)):
 
 @router.get("/{plan_id}")
 def revision(plan_id: UUID, revision: int = Query(..., ge=1), user: dict = Depends(require_us_user)):
-    saved = store(repo.get_plan, user["id"], str(plan_id), revision)
+    saved = store(repo.get_plan, user["id"], str(plan_id), revision, access_token=user.get("_access_token"))
     if saved is None:
         raise HTTPException(404, "Plan revision not found")
     return {"success": True, "plan": saved}
@@ -138,7 +145,7 @@ def save(plan_id: UUID, payload: PlanRequest, user: dict = Depends(require_us_us
     )
     saved = store(
         repo.save_plan, user["id"], str(plan_id), payload.expected_revision, values,
-        updated_at=datetime.now(timezone.utc).isoformat(),
+        access_token=user.get("_access_token"), updated_at=datetime.now(timezone.utc).isoformat(),
         immutable_fields=("setup_id", "package_id", "setup_version", "source_snapshot_id", "symbol", "direction", "provider_asset_id"),
     )
     return {"success": True, "plan": saved}

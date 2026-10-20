@@ -259,3 +259,40 @@ def test_export_requires_authentication():
     app.include_router(api.router)
     response = TestClient(app).get('/api/us/plans/export')
     assert response.status_code == 401
+
+
+
+def test_remote_plans_use_verified_token_without_owner_selector(fixture, monkeypatch):
+    import httpx
+    from app.services import us_remote_plans as remote
+    from types import SimpleNamespace
+    a, *_ = fixture
+    monkeypatch.setenv('US_PLAN_STORE', 'supabase')
+    monkeypatch.setattr(remote, 'settings', SimpleNamespace(SUPABASE_URL='https://us.example', SUPABASE_ANON_KEY='public-test'))
+    requests = []
+    transport = httpx.MockTransport(lambda request: (requests.append(request) or httpx.Response(200, json=[])))
+    original = httpx.Client
+    with patch.object(remote.httpx, 'Client', lambda **kwargs: original(transport=transport, **kwargs)):
+        # Dependency fixture omits token: fail closed, no local fallback.
+        assert a.get('/api/us/plans').status_code == 503
+        assert requests == []
+        assert remote.execute(repo.list_plans, ('forged-owner',), 'verified-token') == []
+    assert requests[0].headers['authorization'] == 'Bearer verified-token'
+    assert json.loads(requests[0].content) == {'action': 'list'}
+    assert 'forged-owner' not in requests[0].content.decode()
+
+
+@pytest.mark.parametrize('status,body,expected', [(409, {'code':'23505'},409),
+    (400, {'code':'40001'},409), (500, {'private':'secret'},503), (200, {'wrong':'shape'},503)])
+def test_remote_storage_conflicts_and_failures_are_sanitized(status,body,expected,monkeypatch):
+    import httpx
+    from app.services import us_remote_plans as remote
+    from types import SimpleNamespace
+    monkeypatch.setattr(remote, 'settings', SimpleNamespace(SUPABASE_URL='https://us.example', SUPABASE_ANON_KEY='public-test'))
+    transport = httpx.MockTransport(lambda request: httpx.Response(status, json=body))
+    original = httpx.Client
+    with patch.object(remote.httpx, 'Client', lambda **kwargs: original(transport=transport, **kwargs)):
+        with pytest.raises(Exception) as error:
+            remote.execute(repo.list_plans, ('owner-a',), 'verified-token')
+    assert error.value.status_code == expected
+    assert 'secret' not in str(error.value) and 'verified-token' not in str(error.value)
