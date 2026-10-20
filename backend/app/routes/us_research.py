@@ -87,6 +87,11 @@ def read_package(package_id: str):
     return data
 
 
+@router.get('/access')
+def access(user: dict = Depends(require_us_user)):
+    return {'success': True, 'allowed': True, 'market': 'US', 'private_mvp': True}
+
+
 @router.get('/packages')
 def packages(user: dict = Depends(require_us_user)):
     rows = []

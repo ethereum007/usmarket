@@ -52,3 +52,10 @@ The command emits only named booleans, probe status and unverified gates, never 
 Presence checks do not certify public-key type, credential correctness, separate-project identity, SEC contact-policy compliance or invitation provisioning. A successful probe does not prove a persistent disk is mounted or backups are scheduled. Explicitly unverified gates remain in the report even when configuration_ready is true. No public readiness endpoint is added; this is an operator CLI, not a deployment approval. Execute real hosted acceptance separately.
 
 Real plan/job database backup tooling and offline restore rehearsal steps are now in docs/US-BACKUPS.md. No actual runtime backups were taken by the source implementation or tests.
+
+
+## Workspace invitation check
+
+A confirmed browser session now waits for GET /api/us/research/access before mounting research panels. The endpoint reuses the same strict provider/invitation dependency as data routes and returns no user ID, email or invitation list. Failed, malformed or wrong-market responses keep panels unmounted with generic retry/sign-out feedback. Account IDs key the check panel; cleanup ignores late responses. Recovery and unauthenticated navigation retain priority.
+
+This is UX gating only. Every backend request still checks the current token and configured invitations independently. A prior UI grant does not override server-side revocation. The local preview endpoint uses its explicit test dependency override, never hostname trust. Tests use mocked transport/provider identities; real hosted invitation and recovery acceptance remain open.

@@ -12,6 +12,7 @@ function load(file, auth, configured = true) {
     if (name === 'react') return { ...React, useEffect: fn => effects.push(fn) };
     if (name === 'next/navigation') return { useRouter: () => ({ replace: url => redirects.push(url) }) };
     if (name.endsWith('us-signup')) return { US_SIGNUP_ENABLED: false };
+    if (name.endsWith('/lib/api')) return { fetchAPI: async () => ({ allowed: true, market: 'US', private_mvp: true }) };
     if (name.endsWith('AuthContext')) return { useAuth: () => auth };
     if (name.endsWith('supabase')) return { supabase: configured ? {} : null };
     return require(name);
@@ -25,7 +26,7 @@ for (const [label, user, loading, visible, redirected] of [
   ['initializing', null, true, false, false],
   ['unconfirmed account', { id: 'owner', is_anonymous: false }, false, false, true],
   ['anonymous session', { is_anonymous: true }, false, false, true],
-  ['signed in', { id: 'owner', is_anonymous: false, email_confirmed_at: '2026-01-01T00:00:00Z' }, false, true, false],
+  ['signed in awaiting invitation', { id: 'owner', is_anonymous: false, email_confirmed_at: '2026-01-01T00:00:00Z' }, false, false, false],
 ]) test(`US guard: ${label}`, () => {
   const fixture = load('components/auth/USAccessGuard.tsx', { user, loading });
   const html = renderToStaticMarkup(React.createElement(fixture.component, null, 'PRIVATE_RESEARCH'));

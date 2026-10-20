@@ -119,3 +119,13 @@ def test_invitation_revocation_applies_to_next_request_without_token_reissue():
             assert client.get('/private',headers={'Authorization':'Bearer test-session'}).status_code==200
         with patch.dict(us_auth.os.environ,{'US_INVITED_USER_IDS':'22222222-2222-4222-8222-222222222222'}):
             assert client.get('/private',headers={'Authorization':'Bearer test-session'}).status_code==403
+
+
+def test_access_probe_uses_same_auth_boundary_and_discloses_no_identity():
+    client=TestClient(hosted_app)
+    assert client.get('/api/us/research/access',headers={'Host':'localhost','X-Invited-User':'forged'}).status_code==401
+    with patch.object(us_auth,'verify_us_token',AsyncMock(return_value={'id':'private-owner','email':'private@example.com'})):
+        result=client.get('/api/us/research/access',headers={'Authorization':'Bearer test-session'})
+    assert result.status_code==200
+    assert result.json()=={'success':True,'allowed':True,'market':'US','private_mvp':True}
+    assert 'private-owner' not in result.text and 'private@example.com' not in result.text
