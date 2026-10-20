@@ -26,6 +26,7 @@ import "./us.css";
 import LiveFeed from "./live-feed";
 import USPlans from "./plans";
 import USFilings from "./filings";
+import RefreshHistory from "./refresh-history";
 import { useAuth } from "../contexts/AuthContext";
 const Chart = dynamic(
   () =>
@@ -741,6 +742,7 @@ function USResearchContent() {
           </p>
         )}
       </section>
+      {user?.id && <RefreshHistory key={user.id} revision={`${job?.id || ""}:${job?.state || ""}`} onOpen={setPackageId} />}
     </div>
   );
 }

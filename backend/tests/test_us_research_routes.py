@@ -232,3 +232,32 @@ def test_job_can_be_read_in_separate_python_process(client):
     script="from pathlib import Path; import sys,json; from app.services.swing_repository import get_job; print(json.dumps(get_job('persisted','owner',database_path=Path(sys.argv[1]),stale_after=None)))"
     result=subprocess.run([sys.executable,'-c',script,str(api.job_database())],capture_output=True,text=True,check=True)
     assert json.loads(result.stdout)['package_id']=='f'*64
+
+
+def test_recent_jobs_only_returns_owner_latest_twenty_in_order(client):
+    c,_=client
+    for index in range(25):
+        api.repository.save_job({'id':f'job-{index:02}','owner':'owner','state':'completed','internal':'hidden'},
+            database_path=api.job_database(),updated_at=f'2026-10-20T10:{index:02}:00+00:00')
+    api.persist_job({'id':'foreign','owner':'other','state':'running'})
+    result=c.get('/api/us/research/jobs')
+    assert result.status_code==200
+    rows=result.json()['jobs']
+    assert len(rows)==20 and rows[0]['id']=='job-24' and rows[-1]['id']=='job-05'
+    assert 'owner' not in result.text and 'hidden' not in result.text and 'foreign' not in result.text
+
+
+def test_recent_jobs_empty_and_storage_error_are_distinct(client):
+    c,_=client
+    assert c.get('/api/us/research/jobs').json()['jobs']==[]
+    with patch.object(api.repository,'list_jobs',side_effect=OSError('private path')):
+        result=c.get('/api/us/research/jobs')
+    assert result.status_code==503 and 'private path' not in result.text
+
+
+def test_recent_job_history_requires_auth():
+    from fastapi import HTTPException
+    app=FastAPI();app.include_router(api.router)
+    def reject():raise HTTPException(401,'Unauthenticated')
+    app.dependency_overrides[require_us_user]=reject
+    assert TestClient(app).get('/api/us/research/jobs').status_code==401

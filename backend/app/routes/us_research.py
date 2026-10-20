@@ -172,6 +172,16 @@ def refresh(payload: RefreshRequest, tasks: BackgroundTasks, user: dict = Depend
 
     return {'success': True, 'job':{'id':job_id,'state':'queued'}}
 
+@router.get('/jobs')
+def recent_jobs(user: dict = Depends(require_us_user)):
+    try:
+        rows = repository.list_jobs(user['id'], database_path=job_database(), limit=20)
+        jobs = [{k: v for k, v in row.items() if k in {'id', 'state', 'updated_at', 'package_id', 'error'}} for row in rows]
+    except STORAGE_ERRORS:
+        raise HTTPException(503, 'Refresh status storage is temporarily unavailable') from None
+    return {'success': True, 'jobs': jobs}
+
+
 @router.get('/jobs/{job_id}')
 
 def job(job_id: str, user: dict = Depends(require_us_user)):

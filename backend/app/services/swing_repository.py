@@ -133,6 +133,14 @@ def get_job(job_id: str, owner: str, *, database_path: Path | None = None, stale
         return job
 
 
+def list_jobs(owner: str, *, database_path: Path | None = None, limit: int = 20) -> list[dict]:
+    if not 1 <= limit <= 100:
+        raise ValueError("Job history limit must be 1–100")
+    with database(database_path) as conn:
+        rows = conn.execute("SELECT payload FROM research_jobs WHERE owner=? ORDER BY updated_at DESC, id DESC LIMIT ?", (owner, limit))
+        return [json.loads(row[0]) for row in rows]
+
+
 def list_plans(owner: str, *, database_path: Path | None = None) -> list[dict]:
     with database(database_path) as conn:
         rows = conn.execute("""SELECT p.payload FROM conditional_plans p
