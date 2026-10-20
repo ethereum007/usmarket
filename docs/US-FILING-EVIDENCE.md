@@ -24,3 +24,10 @@ Mocked tests cover CIK mismatch/ambiguity, unsafe links, acceptance time vs fili
 Still required in #6: licensed/verified forthcoming earnings timing, issuer release ingestion, fiscal-period and restatement reconciliation, materiality/evidence review workflow, immutable event revisions/known-as-of history, plan exposure bound to verified events and real provider/browser acceptance. Plan event risk remains unknown. This on-demand evidence does not mutate completed research packages or clear an existing plan's event risk.
 
 Official references: [SEC data APIs](https://www.sec.gov/search-filings/edgar-application-programming-interfaces), [accessing EDGAR data and ticker associations](https://www.sec.gov/search-filings/edgar-search-assistance/accessing-edgar-data), [developer resources and aggregate request limits](https://www.sec.gov/about/developer-resources).
+
+
+## Filing review controls
+
+The stock evidence panel now distinguishes acceptance timestamp (ET), filing date and report date. Date-only source values are displayed literally to avoid shifting them across timezones. Unknown report dates remain unknown; report dates do not establish fiscal quarter/year or earnings-event timing.
+
+Client filters narrow the existing returned recent records to results-item reports or periodic reports (including amendments); they do not fetch older documents or a forthcoming calendar. Displayed/returned counts, partial-evidence warnings and separate empty-filter feedback prevent a filtered empty list from becoming an assertion of no events. Existing SEC-only source validation and amendment disclosures remain. This is evidence navigation for the weekend MVP, not verified earnings coverage; actual provider/browser acceptance remains open.
