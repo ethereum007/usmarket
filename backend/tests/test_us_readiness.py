@@ -58,3 +58,27 @@ def test_cli_exit_code_matches_report_without_extra_output(configured,exit_code,
         assert ready.main()==exit_code
     report.assert_called_once_with(False)
     assert json.loads(capsys.readouterr().out)=={'configuration_ready':configured}
+
+
+@pytest.mark.parametrize('extra',[
+    {'US_PLAN_STORE':'private-secret-invalid'},
+    {'US_RESEARCH_STORE':'private-secret-invalid'},
+    {'US_JOB_STORE':'private-secret-invalid'},
+    {'US_JOB_STORE':'supabase','US_RESEARCH_STORE':'local'},
+])
+def test_invalid_or_inconsistent_remote_storage_cannot_pass_preflight(tmp_path,extra):
+    with patch.dict(ready.os.environ,{**environment(tmp_path),**extra},clear=True):
+        result=ready.report()
+    assert not result['configuration_ready'] and not result['all_storage_remote']
+    assert 'private-secret-invalid' not in json.dumps(result)
+
+
+def test_remote_configuration_does_not_claim_migrations_or_hosted_acceptance(tmp_path):
+    values={**environment(tmp_path),'US_PLAN_STORE':'supabase','US_RESEARCH_STORE':'supabase','US_JOB_STORE':'supabase'}
+    with patch.dict(ready.os.environ,values,clear=True),patch.object(ready,'storage_probe') as probe:
+        result=ready.report()
+    assert result['configuration_ready'] and result['all_storage_remote']
+    assert result['storage_probe']=='not_run'
+    probe.assert_not_called()
+    assert 'supabase_migrations_and_real_account_isolation' in result['unverified']
+    assert 'remote_worker_coordination_and_crash_recovery' in result['unverified']

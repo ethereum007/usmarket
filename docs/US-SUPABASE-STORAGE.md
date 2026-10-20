@@ -30,3 +30,8 @@ The SQL and transport have not been activated or tested on the real database. Al
 ## Disposable PostgreSQL CI
 
 The backend CI job now provisions PostgreSQL 17 with a disposable test-only database, applies the actual migration files and runs tests/test_us_postgres.py using psycopg. A minimal auth.users/auth.uid fixture models JWT identity via transaction-local settings; these tests do not use real Supabase users, credentials or the hosted project. The harness refuses database names other than usmarket_contract_test. It verifies SQL permissions, null/anonymous denial, owner isolation, immutable research replay, first-save concurrency, revision/source conflicts and job transitions requiring owner research. This adds real PostgreSQL semantics to HTTP mocks, but does not certify Supabase gateway behavior, configured invitations or hosted persistence. Locally the suite skips when US_TEST_POSTGRES_DSN is absent; do not point it at a production database.
+
+
+## Operator mode validation
+
+The readiness CLI now rejects unknown US_PLAN_STORE, US_RESEARCH_STORE and US_JOB_STORE modes, and remote jobs paired with local research. all_storage_remote reports only that all three configuration selectors use Supabase, never that migrations were applied or durable retention was demonstrated. The optional local SQLite probe still tests only its temporary files. Real Supabase migrations/account isolation and remote worker crash coordination remain explicit unverified gates. Invalid environment values are never echoed. PostgreSQL CI success does not certify the hosted Supabase gateway or project configuration.

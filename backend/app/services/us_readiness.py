@@ -49,7 +49,13 @@ def report(check_storage=False):
         invitations = False
     folder = Path(os.environ.get('DATA_DIR', ''))
     absolute = bool(os.environ.get('DATA_DIR')) and folder.is_absolute()
+    plan_mode = os.environ.get('US_PLAN_STORE', 'sqlite')
+    research_mode = os.environ.get('US_RESEARCH_STORE', 'local')
+    job_mode = os.environ.get('US_JOB_STORE', 'local')
+    modes_valid = plan_mode in {'sqlite','supabase'} and research_mode in {'local','supabase'} and job_mode in {'local','supabase'}
     checks = {
+        'storage_modes_valid': modes_valid,
+        'job_research_storage_consistent': job_mode != 'supabase' or research_mode == 'supabase',
         'supabase_https_origin': https_origin(os.environ.get('SUPABASE_URL', '')),
         'supabase_public_key_present': bool(os.environ.get('SUPABASE_ANON_KEY', '').strip()),
         'invited_user_ids_valid': invitations,
@@ -62,8 +68,10 @@ def report(check_storage=False):
         probe = 'passed' if absolute and storage_probe(folder) else 'failed'
     return {'configuration_ready': all(checks.values()) and probe != 'failed',
             'checks': checks, 'storage_probe': probe,
+            'all_storage_remote': modes_valid and plan_mode == research_mode == job_mode == 'supabase',
             'unverified': ['real_invited_sign_in_and_revocation', 'provider_access_and_audience_display_rights',
                            'persistent_volume_retention_after_restart', 'production_backups_and_restore',
+                           'supabase_migrations_and_real_account_isolation', 'remote_worker_coordination_and_crash_recovery',
                            'aggregate_provider_rate_limits', 'private_frontend_proxy_and_browser_journey'],
             'scope': 'Local configuration and optional temporary SQLite probe only; not deployment approval'}
 
