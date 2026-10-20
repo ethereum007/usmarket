@@ -2,7 +2,7 @@ from fastapi.testclient import TestClient
 from app.us_main import app
 
 def test_us_entrypoint_mounts_only_us_routes_and_health():
-    paths={route.path for route in app.routes}
+    paths=set(app.openapi()['paths'])
     assert '/api/us/research/packages' in paths
     assert '/api/health' in paths
     assert '/api/scanner/research/package' not in paths
