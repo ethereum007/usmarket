@@ -36,3 +36,17 @@ Vercel connector is available; its project listing has no USMarket project. No f
 All protected US routes continue to verify the bearer token with Supabase and require confirmed email. They now additionally require the provider user UUID in server-only US_INVITED_USER_IDS. Empty, malformed or oversized configuration denies access (503); a verified uninvited identity receives 403. No request header, hostname or frontend signup switch can grant invitation. Identity membership is checked on each request; running workers must receive configuration updates consistently for revocation. No response exposes the list. The loopback preview's explicit test dependency override remains development-only.
 
 This is application access control, not a substitute for Vercel protection, provider signup policy, invite provisioning or data-display permission. No real users were invited. Existing valid tokens do not override removal from the configured invitation list. Tests use synthetic provider users; actual hosted invitation/revocation acceptance remains unchecked.
+
+
+## Operator preflight
+
+Run from backend in the intended hosted runtime with its actual environment already loaded:
+
+```powershell
+python -m app.services.us_readiness
+python -m app.services.us_readiness --check-storage
+```
+
+The command emits only named booleans, probe status and unverified gates, never environment values, user IDs, paths, tokens or provider response text. Nonzero exit means missing/invalid checked configuration or a failed requested probe. It requires an explicit absolute DATA_DIR. The optional probe creates a temporary sibling database in that directory using the imported repository schema, writes a synthetic row, performs SQLite online backup/integrity/read checks, and cleans up normally without touching real plans/research/refresh locks. Interrupted cleanup can leave a private temporary probe directory for operator review. No network requests or real provider data are used.
+
+Presence checks do not certify public-key type, credential correctness, separate-project identity, SEC contact-policy compliance or invitation provisioning. A successful probe does not prove a persistent disk is mounted or backups are scheduled. Explicitly unverified gates remain in the report even when configuration_ready is true. No public readiness endpoint is added; this is an operator CLI, not a deployment approval. Execute real hosted acceptance separately.

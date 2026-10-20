@@ -18,6 +18,14 @@ def unauthorized():
     return HTTPException(401, 'Sign in to the US workspace', headers={'WWW-Authenticate':'Bearer'})
 
 
+def configured_invites() -> set[str]:
+    raw = os.getenv('US_INVITED_USER_IDS', '')
+    members = [value.strip() for value in raw.split(',') if value.strip()]
+    if not 1 <= len(members) <= 500 or len(raw) > 20000:
+        raise ValueError('Private invitation configuration is invalid')
+    return {str(UUID(value)) for value in members}
+
+
 async def verify_us_token(token: str) -> dict:
     origin = settings.SUPABASE_URL.rstrip('/')
     public_key = settings.SUPABASE_ANON_KEY
@@ -54,11 +62,7 @@ async def verify_us_token(token: str) -> dict:
     # Private MVP access follows stable provider user IDs, not request headers,
     # email aliases or frontend signup settings. Missing configuration denies all.
     try:
-        raw = os.getenv('US_INVITED_USER_IDS', '')
-        members = [value.strip() for value in raw.split(',') if value.strip()]
-        if not 1 <= len(members) <= 500 or len(raw) > 20000:
-            raise ValueError()
-        invited = {str(UUID(value)) for value in members}
+        invited = configured_invites()
         identity = str(UUID(user['id']))
     except (ValueError, TypeError, AttributeError):
         raise HTTPException(503, 'Private US access is not configured') from None

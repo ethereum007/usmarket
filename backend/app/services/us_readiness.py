@@ -1,0 +1,81 @@
+"""Secret-free operator preflight; never claims hosted acceptance or data rights."""
+import argparse
+from contextlib import closing
+import json
+import os
+from pathlib import Path
+import sqlite3
+import tempfile
+from urllib.parse import urlsplit
+
+from app.us_auth import configured_invites
+from app.services.swing_repository import database
+
+
+def https_origin(value):
+    try:
+        parts = urlsplit(value)
+        parts.port  # Validate optional port syntax without printing the origin.
+        return bool(parts.scheme == 'https' and parts.hostname and not parts.username
+                    and not parts.password and parts.path in {'', '/'} and not parts.query and not parts.fragment)
+    except ValueError:
+        return False
+
+
+def storage_probe(folder: Path) -> bool:
+    # A temporary sibling database tests this directory without modifying saved
+    # research, plan databases or the live refresh reservation. No market data.
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix='.us-readiness-', dir=folder) as temporary:
+            source, backup = Path(temporary)/'probe.sqlite3', Path(temporary)/'backup.sqlite3'
+            with database(source) as connection:
+                connection.execute("INSERT INTO research_jobs VALUES (?,?,?,?)", ('probe','probe','probe','{}'))
+            with closing(sqlite3.connect(source)) as connection, closing(sqlite3.connect(backup)) as destination:
+                connection.backup(destination)
+            with closing(sqlite3.connect(backup)) as restored:
+                if restored.execute('PRAGMA integrity_check').fetchone()[0] != 'ok':
+                    return False
+                return restored.execute('SELECT owner FROM research_jobs WHERE id=?', ('probe',)).fetchone() == ('probe',)
+    except (OSError, sqlite3.Error):
+        return False
+
+
+def report(check_storage=False):
+    try:
+        configured_invites()
+        invitations = True
+    except (ValueError, TypeError, AttributeError):
+        invitations = False
+    folder = Path(os.environ.get('DATA_DIR', ''))
+    absolute = bool(os.environ.get('DATA_DIR')) and folder.is_absolute()
+    checks = {
+        'supabase_https_origin': https_origin(os.environ.get('SUPABASE_URL', '')),
+        'supabase_public_key_present': bool(os.environ.get('SUPABASE_ANON_KEY', '').strip()),
+        'invited_user_ids_valid': invitations,
+        'alpaca_credentials_present': all(os.environ.get(key, '').strip() for key in ('ALPACA_API_KEY','ALPACA_SECRET_KEY')),
+        'sec_operator_contact_present': bool(os.environ.get('SEC_USER_AGENT', '').strip()),
+        'absolute_data_directory': absolute,
+    }
+    probe = 'not_run'
+    if check_storage:
+        probe = 'passed' if absolute and storage_probe(folder) else 'failed'
+    return {'configuration_ready': all(checks.values()) and probe != 'failed',
+            'checks': checks, 'storage_probe': probe,
+            'unverified': ['real_invited_sign_in_and_revocation', 'provider_access_and_audience_display_rights',
+                           'persistent_volume_retention_after_restart', 'production_backups_and_restore',
+                           'aggregate_provider_rate_limits', 'private_frontend_proxy_and_browser_journey'],
+            'scope': 'Local configuration and optional temporary SQLite probe only; not deployment approval'}
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--check-storage', action='store_true', help='Create temporary probe databases inside DATA_DIR; never modify research/plans')
+    args = parser.parse_args()
+    result = report(args.check_storage)
+    print(json.dumps(result, sort_keys=True))
+    return 0 if result['configuration_ready'] else 1
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
