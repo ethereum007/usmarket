@@ -1,5 +1,7 @@
 """Durable status observations; this is not a distributed worker lease."""
 import os
+import re
+from datetime import datetime, timezone
 import httpx
 from fastapi import HTTPException
 from app.config import settings
@@ -13,6 +15,30 @@ def enabled():
     if mode == 'supabase' and os.environ.get('US_RESEARCH_STORE') != 'supabase':
         raise HTTPException(503, 'Remote jobs require remote research storage')
     return mode == 'supabase'
+
+
+def public_observation(row, expected_id=None):
+    if not isinstance(row, dict) or not isinstance(row.get('id'), str) or not row['id']:
+        raise ValueError('Invalid job identity')
+    if expected_id is not None and row['id'] != expected_id:
+        raise ValueError('Mismatched job identity')
+    if row.get('state') not in {'queued','running','completed','failed'}:
+        raise ValueError('Invalid job state')
+    result = {key:row[key] for key in ('id','state','updated_at') if key in row}
+    if 'updated_at' in row:
+        if not isinstance(row['updated_at'], str):
+            raise ValueError('Invalid observation time')
+        observed = datetime.fromisoformat(row['updated_at'].replace('Z', '+00:00'))
+        if observed.utcoffset() is None:
+            raise ValueError('Unzoned observation time')
+        result['updated_at'] = observed.astimezone(timezone.utc).isoformat()
+    if row['state'] == 'completed':
+        if not isinstance(row.get('package_id'), str) or not re.fullmatch('[a-f0-9]{64}', row['package_id']):
+            raise ValueError('Invalid package identity')
+        result['package_id'] = row['package_id']
+    if row['state'] == 'failed':
+        result['error'] = 'Research refresh failed; saved research remains available'
+    return result
 
 
 def execute(action, token, job_id=None, payload=None):
@@ -37,6 +63,8 @@ def execute(action, token, job_id=None, payload=None):
             valid = isinstance(result,dict) or (action=='get' and result is None)
         if not valid:
             raise ValueError()
-        return result
+        if action == 'list':
+            return [public_observation(row) for row in result]
+        return None if result is None else public_observation(result, job_id)
     except (httpx.HTTPError, ValueError, TypeError):
         raise HTTPException(503, 'Refresh status storage is temporarily unavailable') from None

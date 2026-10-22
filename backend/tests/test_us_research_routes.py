@@ -454,3 +454,31 @@ def test_remote_jobs_require_remote_research_and_reject_unknown_modes(monkeypatc
         monkeypatch.setenv('US_RESEARCH_STORE','local')
         with pytest.raises(HTTPException) as error:api.remote_jobs.enabled()
         assert error.value.status_code==503
+
+
+@pytest.mark.parametrize('row',[
+    {'id':'other','state':'running'},
+    {'id':'one','state':'invented'},
+    {'id':'one','state':'running','updated_at':'private-provider-value'},
+    {'id':'one','state':'running','updated_at':'2026-10-22T10:00:00'},
+    {'id':'one','state':'completed','package_id':'not-a-package'},
+])
+def test_remote_job_read_rejects_wrong_identity_or_unverifiable_completion(row,monkeypatch):
+    import httpx
+    from types import SimpleNamespace
+    from fastapi import HTTPException
+    from app.services import us_remote_jobs as remote
+    monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://us.example',SUPABASE_ANON_KEY='public-test'))
+    original=httpx.Client
+    transport=httpx.MockTransport(lambda request:httpx.Response(200,json=row))
+    with patch.object(remote.httpx,'Client',lambda **kwargs:original(transport=transport,**kwargs)):
+        with pytest.raises(HTTPException) as error:remote.execute('get','token','one')
+    assert error.value.status_code==503
+
+
+def test_remote_observation_drops_unapproved_fields_and_sanitizes_error():
+    from app.services.us_remote_jobs import public_observation
+    result=public_observation({'id':'one','state':'failed','owner':'private-owner',
+        '_access_token':'private-token','error':'private provider body','package_id':'a'*64},'one')
+    assert result=={'id':'one','state':'failed','error':'Research refresh failed; saved research remains available'}
+    assert 'private' not in json.dumps(result)

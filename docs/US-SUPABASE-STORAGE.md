@@ -35,3 +35,6 @@ The backend CI job now provisions PostgreSQL 17 with a disposable test-only data
 ## Operator mode validation
 
 The readiness CLI now rejects unknown US_PLAN_STORE, US_RESEARCH_STORE and US_JOB_STORE modes, and remote jobs paired with local research. all_storage_remote reports only that all three configuration selectors use Supabase, never that migrations were applied or durable retention was demonstrated. The optional local SQLite probe still tests only its temporary files. Real Supabase migrations/account isolation and remote worker crash coordination remain explicit unverified gates. Invalid environment values are never echoed. PostgreSQL CI success does not certify the hosted Supabase gateway or project configuration.
+
+
+Remote job responses are also checked at the transport boundary: single observations must match the requested job ID, states must be recognized, and completed observations must include a valid source-package identity. Only status fields are returned; unknown keys and arbitrary provider error text are discarded. Invalid observations produce a sanitized storage-unavailable error rather than invented completion or a local fallback.
