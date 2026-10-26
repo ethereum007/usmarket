@@ -82,3 +82,33 @@ def test_remote_configuration_does_not_claim_migrations_or_hosted_acceptance(tmp
     probe.assert_not_called()
     assert 'supabase_migrations_and_real_account_isolation' in result['unverified']
     assert 'remote_worker_coordination_and_crash_recovery' in result['unverified']
+
+
+@pytest.mark.parametrize('check_storage',[False,True])
+def test_fully_remote_configuration_needs_no_local_directory_and_never_probes_disk(tmp_path,check_storage):
+    values={**environment(tmp_path),'US_PLAN_STORE':'supabase','US_RESEARCH_STORE':'supabase','US_JOB_STORE':'supabase'}
+    values.pop('DATA_DIR')
+    with patch.dict(ready.os.environ,values,clear=True),patch.object(ready,'storage_probe') as probe:
+        result=ready.report(check_storage)
+    assert result['configuration_ready'] and result['all_storage_remote']
+    assert result['data_directory_required'] is False and result['absolute_data_directory'] is False
+    assert result['checks']['data_directory_requirement_satisfied'] is True
+    assert result['storage_probe']==('not_applicable_remote' if check_storage else 'not_run')
+    probe.assert_not_called()
+    assert 'supabase_migrations_and_real_account_isolation' in result['unverified']
+    assert 'production_backups_and_restore' in result['unverified']
+
+
+@pytest.mark.parametrize('modes',[
+    {'US_PLAN_STORE':'sqlite','US_RESEARCH_STORE':'supabase','US_JOB_STORE':'supabase'},
+    {'US_PLAN_STORE':'supabase','US_RESEARCH_STORE':'local','US_JOB_STORE':'local'},
+    {'US_PLAN_STORE':'supabase','US_RESEARCH_STORE':'supabase','US_JOB_STORE':'local'},
+])
+def test_any_local_repository_still_requires_an_absolute_directory(tmp_path,modes):
+    values={**environment(tmp_path),**modes};values.pop('DATA_DIR')
+    with patch.dict(ready.os.environ,values,clear=True),patch.object(ready,'storage_probe') as probe:
+        result=ready.report(True)
+    assert not result['configuration_ready'] and result['data_directory_required']
+    assert not result['checks']['data_directory_requirement_satisfied']
+    assert result['storage_probe']=='failed'
+    probe.assert_not_called()

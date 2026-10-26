@@ -53,6 +53,7 @@ def report(check_storage=False):
     research_mode = os.environ.get('US_RESEARCH_STORE', 'local')
     job_mode = os.environ.get('US_JOB_STORE', 'local')
     modes_valid = plan_mode in {'sqlite','supabase'} and research_mode in {'local','supabase'} and job_mode in {'local','supabase'}
+    all_remote = modes_valid and plan_mode == research_mode == job_mode == 'supabase'
     checks = {
         'storage_modes_valid': modes_valid,
         'job_research_storage_consistent': job_mode != 'supabase' or research_mode == 'supabase',
@@ -61,14 +62,16 @@ def report(check_storage=False):
         'invited_user_ids_valid': invitations,
         'alpaca_credentials_present': all(os.environ.get(key, '').strip() for key in ('ALPACA_API_KEY','ALPACA_SECRET_KEY')),
         'sec_operator_contact_present': bool(os.environ.get('SEC_USER_AGENT', '').strip()),
-        'absolute_data_directory': absolute,
+        'data_directory_requirement_satisfied': all_remote or absolute,
     }
     probe = 'not_run'
     if check_storage:
-        probe = 'passed' if absolute and storage_probe(folder) else 'failed'
+        probe = 'not_applicable_remote' if all_remote else ('passed' if absolute and storage_probe(folder) else 'failed')
     return {'configuration_ready': all(checks.values()) and probe != 'failed',
             'checks': checks, 'storage_probe': probe,
-            'all_storage_remote': modes_valid and plan_mode == research_mode == job_mode == 'supabase',
+            'all_storage_remote': all_remote,
+            'data_directory_required': not all_remote,
+            'absolute_data_directory': absolute,
             'unverified': ['real_invited_sign_in_and_revocation', 'provider_access_and_audience_display_rights',
                            'persistent_volume_retention_after_restart', 'production_backups_and_restore',
                            'supabase_migrations_and_real_account_isolation', 'remote_worker_coordination_and_crash_recovery',
@@ -78,7 +81,7 @@ def report(check_storage=False):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--check-storage', action='store_true', help='Create temporary probe databases inside DATA_DIR; never modify research/plans')
+    parser.add_argument('--check-storage', action='store_true', help='Probe local storage in DATA_DIR; fully remote storage is reported as not applicable, never remotely verified')
     args = parser.parse_args()
     result = report(args.check_storage)
     print(json.dumps(result, sort_keys=True))
