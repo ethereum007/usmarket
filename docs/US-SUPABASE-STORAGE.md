@@ -115,3 +115,8 @@ See SUPABASE-ACTIVATION-REVIEW.md for the ordered six-file source review, normal
 ## Complete plan acknowledgement comparison
 
 Remote save acknowledgement now compares every submitted persisted plan field, not just immutable source identities. Changed notes, trigger/stop, capital, state, quantity, nested sizing or unexpected persisted fields fail with sanitized unconfirmed-save feedback. Server-managed owner/id/revision/updated_at are handled separately; exact replays may retain the original server timestamp. Equivalent JSON int/float numbers are accepted, but booleans cannot substitute for numeric values. Reads still apply identity/revision/US/USD checks without pretending to know an unsent request. Source migrations and their review fingerprint are unchanged; hosted flags and acceptance remain pending.
+
+
+## API-to-PostgreSQL plan journey in CI
+
+The disposable PostgreSQL suite now sends FastAPI plan requests through the real remote adapters and a synthetic PostgREST wire shim that invokes the actual migrated RPCs. It exercises source-package read/validation, server USD sizing, save confirmation, exact lost-response replay, revision append, old-revision reopening, list/export, and second-account read/write denial even when that account has its own source copy. Requests carry synthetic account tokens and no owner selector; no real provider or Supabase account is used. This closes a source integration gap between HTTP mocks and standalone SQL tests. It does not certify actual PostgREST/Supabase gateway behavior, hosted sign-in, browser operation or restart retention. No migration/flag is activated.
