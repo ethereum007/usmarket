@@ -117,3 +117,69 @@ def test_boolean_ohlcv_never_becomes_numeric_evidence(field,value):
 def test_real_numeric_zero_volume_remains_valid_evidence():
     row={'t':'2026-07-01T04:00:00Z','o':1,'h':1,'l':1,'c':1,'v':0}
     assert normalize_bars([row],['2026-07-01'])[0]['volume']==0
+
+
+@pytest.mark.parametrize('status',[429,502,503,504])
+def test_history_retries_transient_get_without_changing_feed_or_params(status):
+    import asyncio
+    from unittest.mock import AsyncMock,patch
+    requests=[]
+    def handler(request):
+        requests.append(request)
+        return httpx.Response(status,headers={'Retry-After':'1'}) if len(requests)==1 else httpx.Response(200,json={'bars':{}})
+    async def exercise():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            return await AlpacaHistory(client,'sip').get('https://data.alpaca.markets/v2/stocks/bars',{'feed':'sip','page_token':'exact-page'})
+    with patch('app.services.us_research.asyncio.sleep',new_callable=AsyncMock) as sleep:
+        assert asyncio.run(exercise())=={'bars':{}}
+        sleep.assert_awaited_once_with(1.0)
+    assert len(requests)==2 and requests[0].url==requests[1].url
+    assert requests[1].url.params['feed']=='sip'
+
+
+@pytest.mark.parametrize('status',[400,401,403,404])
+def test_history_never_retries_denied_or_invalid_requests(status):
+    import asyncio
+    from unittest.mock import AsyncMock,patch
+    requests=[]
+    def handler(request):requests.append(request);return httpx.Response(status,json={'private':'provider body'})
+    async def exercise():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            await AlpacaHistory(client).get('https://data.alpaca.markets/v2/stocks/bars',{'feed':'sip'})
+    with patch('app.services.us_research.asyncio.sleep',new_callable=AsyncMock) as sleep:
+        with pytest.raises(RuntimeError) as error:asyncio.run(exercise())
+        sleep.assert_not_awaited()
+    assert len(requests)==1 and 'private' not in str(error.value)
+
+
+@pytest.mark.parametrize('retry_after',['60','invalid','NaN','-1'])
+def test_history_does_not_retry_before_long_or_unknown_provider_cooldown(retry_after):
+    import asyncio
+    from unittest.mock import AsyncMock,patch
+    requests=[]
+    def handler(request):requests.append(request);return httpx.Response(429,headers={'Retry-After':retry_after})
+    async def exercise():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            await AlpacaHistory(client).get('https://data.alpaca.markets/v2/stocks/bars',{})
+    with patch('app.services.us_research.asyncio.sleep',new_callable=AsyncMock) as sleep:
+        with pytest.raises(RuntimeError):asyncio.run(exercise())
+        sleep.assert_not_awaited()
+    assert len(requests)==1
+
+
+@pytest.mark.parametrize('transport_failure',[False,True])
+def test_history_retry_exhaustion_is_bounded_and_sanitized(transport_failure):
+    import asyncio
+    from unittest.mock import AsyncMock,patch
+    requests=[]
+    def handler(request):
+        requests.append(request)
+        if transport_failure:raise httpx.ReadTimeout('private transport detail',request=request)
+        return httpx.Response(503,json={'private':'provider body'})
+    async def exercise():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            await AlpacaHistory(client).get('https://data.alpaca.markets/v2/stocks/bars',{})
+    with patch('app.services.us_research.asyncio.sleep',new_callable=AsyncMock) as sleep:
+        with pytest.raises(RuntimeError) as error:asyncio.run(exercise())
+        assert sleep.await_count==2
+    assert len(requests)==3 and 'private' not in str(error.value)

@@ -41,3 +41,8 @@ The workspace locks submission synchronously before the refresh POST returns and
 ## Completion source identity in observation
 
 Workspace polling now requires a valid lowercase 64-hex package ID on completed observations before accepting completion. Missing/malformed identity keeps the previous recorded observation unchanged and shows status-unavailable feedback; it never reloads unrelated catalog evidence as the new result. Verified completion retains its exact package ID. This is a response-consistency check, not proof of worker liveness or hosted durability. Backend ownership and exact package reads remain authoritative; hosted/browser acceptance remains open.
+
+
+## Bounded historical provider retries
+
+Historical calendar/bar GETs now allow at most three attempts for transport failures and HTTP 429/502/503/504, with short exponential backoff. Numeric Retry-After values up to five seconds are respected; longer, negative, nonfinite or unrecognized cooldowns stop rather than retry early. Access/invalid-request errors are not retried. The exact endpoint, query, pagination token and selected feed remain unchanged; there is no SIP-to-IEX downgrade or new provider data invented. Exhaustion fails publication with sanitized feedback. Instrument lookup and other providers retain their existing behavior. Mocked transport fixtures verify limits/cooldowns/denials; this is not aggregate multi-host rate limiting or actual market-open recovery evidence.

@@ -57,10 +57,30 @@ class AlpacaHistory:
         self.client, self.feed = client, feed
 
     async def get(self, url, params):
-        response = await self.client.get(url, params=params)
-        if response.status_code != 200:
-            raise RuntimeError(f'Alpaca HTTP {response.status_code}; research was not published')
-        return response.json()
+        # Idempotent GET only. Bounded attempts never change the selected feed.
+        for attempt in range(3):
+            try:
+                response = await self.client.get(url, params=params)
+            except httpx.TransportError:
+                if attempt == 2:
+                    raise RuntimeError('Historical provider transport unavailable; research was not published') from None
+                await asyncio.sleep(0.25 * (2 ** attempt))
+                continue
+            if response.status_code == 200:
+                return response.json()
+            if response.status_code not in {429, 502, 503, 504} or attempt == 2:
+                raise RuntimeError(f'Alpaca HTTP {response.status_code}; research was not published')
+            delay = 0.25 * (2 ** attempt)
+            retry_after = response.headers.get('retry-after')
+            if retry_after is not None:
+                try:
+                    requested_delay = float(retry_after)
+                except ValueError:
+                    raise RuntimeError('Historical provider cooldown requires a later retry; research was not published') from None
+                if not math.isfinite(requested_delay) or not 0 <= requested_delay <= 5:
+                    raise RuntimeError('Historical provider cooldown requires a later retry; research was not published')
+                delay = max(delay, requested_delay)
+            await asyncio.sleep(delay)
 
     async def load(self, symbols: list[str], start: str, end: str):
         calendar = await self.get('https://paper-api.alpaca.markets/v2/calendar', {'start':start, 'end':end})
