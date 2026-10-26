@@ -326,3 +326,39 @@ def test_verified_plan_retains_notes_but_strips_identity_transport_fields():
     row={'id':key,'revision':2,'market':'US','currency':'USD','notes':'My thesis',
         'owner':'private-owner','_access_token':'private-token'}
     assert verified_plan(row,key,2)=={k:v for k,v in row.items() if k not in {'owner','_access_token'}}
+
+
+@pytest.mark.parametrize('change',[
+    {'notes':'Changed private notes'}, {'trigger':200}, {'stop':50}, {'capital':20000},
+    {'quantity':True}, {'state':'cancelled'}, {'sizing':{'quantity':2,'risk_budget_usd':100}},
+    {'unexpected_saved_field':'unrequested'},
+])
+def test_remote_save_acknowledgement_matches_all_plan_content(monkeypatch,change):
+    import httpx
+    from types import SimpleNamespace
+    from fastapi import HTTPException
+    from app.services import us_remote_plans as remote
+    key='11111111-1111-4111-8111-111111111111'
+    values={'market':'US','currency':'USD','setup_id':'setup','package_id':'a'*64,
+            'notes':'Original private notes','trigger':100.0,'stop':90.0,'capital':10000.0,
+            'quantity':1,'state':'draft','sizing':{'quantity':1,'risk_budget_usd':100}}
+    row={**values,'id':key,'revision':1,'updated_at':'2026-10-26T00:00:00Z',**change}
+    monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://us.example',SUPABASE_ANON_KEY='public-test'))
+    original=httpx.Client
+    transport=httpx.MockTransport(lambda request:httpx.Response(200,json=row))
+    with patch.object(remote.httpx,'Client',lambda **kwargs:original(transport=transport,**kwargs)):
+        with pytest.raises(HTTPException) as error:remote.execute(repo.save_plan,('owner',key,0,values),'token')
+    assert error.value.status_code==503
+    assert 'private notes' not in str(error.value) and 'unrequested' not in str(error.value)
+
+
+def test_remote_save_accepts_original_timestamp_and_equivalent_json_numbers():
+    from app.services.us_remote_plans import verified_plan
+    key='11111111-1111-4111-8111-111111111111'
+    values={'market':'US','currency':'USD','quantity':1,'trigger':100.0,'filled':False,
+            'sizing':{'risk_budget_usd':100.0},'notes':'Exact retained thesis'}
+    row={**values,'id':key,'revision':2,'trigger':100,'sizing':{'risk_budget_usd':100},
+         'updated_at':'2026-10-20T00:00:00Z','owner':'private-owner','_access_token':'private-token'}
+    result=verified_plan(row,key,2,values)
+    assert result['updated_at']=='2026-10-20T00:00:00Z'
+    assert result['notes']==values['notes'] and 'owner' not in result and '_access_token' not in result

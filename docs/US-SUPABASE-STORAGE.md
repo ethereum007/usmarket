@@ -110,3 +110,8 @@ The un-applied research RPC migration now projects its latest-120 catalog to ten
 ## Current activation review bundle
 
 See SUPABASE-ACTIVATION-REVIEW.md for the ordered six-file source review, normalized hashes and bundle fingerprint. The read-only us_migration_review CLI does not inspect hosted state or apply SQL. CI rejects inventory changes or a stale review fingerprint, so source changes must update the concrete review before activation. Pending approval remains separate from source work and is not permission to create access grants or enable flags.
+
+
+## Complete plan acknowledgement comparison
+
+Remote save acknowledgement now compares every submitted persisted plan field, not just immutable source identities. Changed notes, trigger/stop, capital, state, quantity, nested sizing or unexpected persisted fields fail with sanitized unconfirmed-save feedback. Server-managed owner/id/revision/updated_at are handled separately; exact replays may retain the original server timestamp. Equivalent JSON int/float numbers are accepted, but booleans cannot substitute for numeric values. Reads still apply identity/revision/US/USD checks without pretending to know an unsent request. Source migrations and their review fingerprint are unchanged; hosted flags and acceptance remain pending.

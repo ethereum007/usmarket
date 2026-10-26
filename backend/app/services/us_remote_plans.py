@@ -6,6 +6,19 @@ from app.config import settings
 from app.services.us_readiness import https_origin
 
 
+def same_value(left, right):
+    # JSON numbers can round-trip as int/float; booleans are never numbers.
+    if isinstance(left, bool) or isinstance(right, bool):
+        return type(left) is type(right) and left == right
+    if isinstance(left, dict) or isinstance(right, dict):
+        return (isinstance(left, dict) and isinstance(right, dict) and left.keys() == right.keys()
+                and all(same_value(left[key], right[key]) for key in left))
+    if isinstance(left, list) or isinstance(right, list):
+        return (isinstance(left, list) and isinstance(right, list) and len(left) == len(right)
+                and all(same_value(a, b) for a, b in zip(left, right)))
+    return left == right
+
+
 def verified_plan(row, plan_id=None, revision=None, source=None):
     if not isinstance(row, dict) or not isinstance(row.get('id'), str):
         raise ValueError('Invalid plan identity')
@@ -20,9 +33,11 @@ def verified_plan(row, plan_id=None, revision=None, source=None):
     if row.get('market') != 'US' or row.get('currency') != 'USD':
         raise ValueError('Invalid plan market')
     if source is not None:
-        for key in ('setup_id','package_id','setup_version','source_snapshot_id','symbol','direction','provider_asset_id'):
-            if row.get(key) != source.get(key):
-                raise ValueError('Mismatched saved source identity')
+        metadata = {'owner','_access_token','id','revision','updated_at'}
+        actual = {key:value for key,value in row.items() if key not in metadata}
+        expected = {key:value for key,value in source.items() if key not in metadata}
+        if not same_value(actual, expected):
+            raise ValueError('Mismatched saved plan content')
     return {key:value for key,value in row.items() if key not in {'owner','_access_token'}}
 
 
