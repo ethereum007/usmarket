@@ -155,9 +155,12 @@ async def run(args):
         calendar, raw = await AlpacaHistory(client, args.feed).load([args.benchmark, *eligible], start, end)
     package = research_package(symbols, raw, calendar, now, args.feed, args.benchmark)
     package = bind_instruments(package, instruments)
-    target, package = save_package(package, Path(args.output))
-    print(json.dumps({'path':str(target.resolve()), 'state':package['state'], 'session':package['session'],
-                      'available':package['breadth']['available'], 'requested':len(symbols), 'setups':len(package['setups'])}))
+    # Remote API callers own publication/acknowledgement. Do not make remote
+    # durability depend on a second ephemeral filesystem publication.
+    if getattr(args, 'publish_local', True):
+        target, package = save_package(package, Path(args.output))
+        print(json.dumps({'path':str(target.resolve()), 'state':package['state'], 'session':package['session'],
+                          'available':package['breadth']['available'], 'requested':len(symbols), 'setups':len(package['setups'])}))
     return package
 
 

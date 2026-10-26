@@ -78,3 +78,30 @@ def test_benchmark_explanations_use_the_actual_package_input():
     assert 'SPY RS 20D +0.0 pp' in reasons
     assert 'SPY RS 60D +0.0 pp' in reasons
     assert not any('Nifty' in reason for reason in reasons)
+
+
+@pytest.mark.parametrize('local',[False,True])
+def test_generation_publication_mode_keeps_remote_off_local_filesystem(monkeypatch,tmp_path,local,capsys):
+    import asyncio
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock,patch
+    from app.services import us_research as research
+    monkeypatch.setenv('ALPACA_API_KEY','synthetic-test-key')
+    monkeypatch.setenv('ALPACA_SECRET_KEY','synthetic-test-secret')
+    args=SimpleNamespace(symbols='AAPL',benchmark='SPY',feed='sip',output=str(tmp_path))
+    if not local:args.publish_local=False
+    instruments={'records':{'SPY':{'resolution':'resolved'},'AAPL':{'resolution':'resolved'}}}
+    package={'id':'a'*64,'state':'partial','session':'2026-10-23','breadth':{'available':1},'setups':[]}
+    with patch.object(research,'load_dotenv'), \
+         patch.object(research,'load_instruments',AsyncMock(return_value=instruments)), \
+         patch.object(research.AlpacaHistory,'load',AsyncMock(return_value=([],{}))), \
+         patch.object(research,'research_package',return_value=package), \
+         patch.object(research,'bind_instruments',return_value=package), \
+         patch.object(research,'save_package',side_effect=(lambda *args:(tmp_path/'synthetic.json',package)) if local else OSError('disk unavailable')) as publish:
+        result=asyncio.run(research.run(args))
+    assert result==package
+    if local:publish.assert_called_once()
+    else:
+        publish.assert_not_called()
+        assert capsys.readouterr().out==''
+        assert list(tmp_path.iterdir())==[]

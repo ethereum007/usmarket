@@ -643,3 +643,17 @@ def test_interruption_transport_requires_terminal_acknowledgement(monkeypatch,st
         else:assert remote.execute('interrupt','token','one')['state']==state
     assert requests[0].url.path=='/rest/v1/rpc/us_job_interrupt'
     assert json.loads(requests[0].content)=={'job_id':'one'}
+
+
+@pytest.mark.parametrize('remote',[False,True])
+def test_refresh_selects_exactly_one_research_publication_destination(client,monkeypatch,remote):
+    from unittest.mock import AsyncMock
+    c,_=client
+    monkeypatch.setenv('US_RESEARCH_STORE','supabase' if remote else 'local')
+    package={'id':'a'*64}
+    with patch.object(api,'run',AsyncMock(return_value=package)) as generate, \
+         patch.object(api.remote_research,'execute',return_value=package) as publish:
+        response=c.post('/api/us/research/refresh',json={'symbols':'AAPL'})
+    assert response.status_code==200
+    assert generate.call_args.args[0].publish_local is (not remote)
+    assert publish.call_count==int(remote)

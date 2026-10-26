@@ -158,7 +158,8 @@ async def refresh_job(job_data: dict, payload: RefreshRequest, lock: RefreshLock
         await asyncio.to_thread(persist_job, data, access_token)
         try:
             package = await run(SimpleNamespace(symbols=payload.symbols, benchmark=payload.benchmark,
-                                                feed=payload.feed, output=str(directory())))
+                                                feed=payload.feed, output=str(directory()),
+                                                publish_local=not remote_research.enabled()))
             if remote_jobs.enabled():
                 # Atomic remote publication/completion; do not issue a second terminal write.
                 await asyncio.to_thread(remote_jobs.execute, 'publish', access_token, data['id'], package)
