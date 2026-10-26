@@ -52,8 +52,10 @@ let sessionLoaded = false;
 let sessionLoadPromise: Promise<void> | null = null;
 let sessionRefreshPromise: Promise<string | null> | null = null;
 let authListenerReady = false;
+let authVersion = 0;
 
 export function primeAuthAccessToken(accessToken: string | null): void {
+  authVersion++;
   cachedAccessToken = accessToken;
   sessionLoaded = Boolean(accessToken);
 }
@@ -90,21 +92,39 @@ async function authHeaders(): Promise<Record<string, string>> {
 
 async function fetchWithAuthRetry(path: string, init: RequestInit): Promise<Response> {
   const response = await fetchWithTimeout(path, init);
-  if (!(await isExpiredAppSession(response))) return response;
+  if (!(await isExpiredAppSession(path, response))) return response;
+
+  const usRequest = path.startsWith("/api/us/");
+  const originalSubject = usRequest ? tokenSubject(new Headers(init.headers).get("Authorization")?.replace(/^Bearer /i, "") || null) : null;
+  if (usRequest && (!originalSubject || originalSubject !== tokenSubject(cachedAccessToken))) return response;
 
   const accessToken = await refreshAccessToken();
-  if (!accessToken) return response;
+  if (!accessToken || (usRequest && originalSubject !== tokenSubject(accessToken))) return response;
 
   const headers = new Headers(init.headers);
   headers.set("Authorization", `Bearer ${accessToken}`);
   return fetchWithTimeout(path, { ...init, headers });
 }
 
-async function isExpiredAppSession(response: Response): Promise<boolean> {
+// Unverified JWT subject is used only to prevent cross-account replay, never to grant access.
+function tokenSubject(token: string | null): string | null {
+  try {
+    if (!token || token.length > 8192 || token.split(".").length !== 3) return null;
+    const encoded = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    const subject = JSON.parse(atob(encoded)).sub;
+    return typeof subject === "string" && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(subject) ? subject.toLowerCase() : null;
+  } catch { return null; }
+}
+
+async function isExpiredAppSession(path: string, response: Response): Promise<boolean> {
   if (response.status !== 401 || !supabase) return false;
   try {
     const payload = await response.clone().json();
     const detail = String(payload?.detail || payload?.message || "").toLowerCase();
+    if (path.startsWith("/api/us/")) {
+      return response.headers.get("www-authenticate")?.toLowerCase() === "bearer" &&
+        detail === "sign in to the us workspace";
+    }
     return (
       detail.includes("invalid or expired token") ||
       detail.includes("missing or malformed authorization")
@@ -116,6 +136,7 @@ async function isExpiredAppSession(response: Response): Promise<boolean> {
 
 async function refreshAccessToken(): Promise<string | null> {
   if (!supabase) return null;
+  const startedVersion = authVersion;
   sessionRefreshPromise ??= withTimeout(
     supabase.auth.refreshSession(),
     AUTH_SESSION_TIMEOUT_MS,
@@ -123,13 +144,19 @@ async function refreshAccessToken(): Promise<string | null> {
   )
     .then(({ data, error }) => {
       if (error) throw error;
-      cachedAccessToken = data.session?.access_token ?? null;
+      const nextToken = data.session?.access_token ?? null;
+      // Auth events may switch accounts/sign out while refresh is in flight.
+      // The refresh event itself is safe only when it installed this exact token.
+      if (authVersion !== startedVersion && cachedAccessToken !== nextToken) return null;
+      cachedAccessToken = nextToken;
       sessionLoaded = Boolean(cachedAccessToken);
       return cachedAccessToken;
     })
     .catch(() => {
-      cachedAccessToken = null;
-      sessionLoaded = false;
+      if (authVersion === startedVersion) {
+        cachedAccessToken = null;
+        sessionLoaded = false;
+      }
       return null;
     })
     .finally(() => {
