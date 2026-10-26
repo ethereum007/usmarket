@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState, Suspense } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from "react";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import {
@@ -23,6 +23,7 @@ import {
   signed,
 } from "../lib/us-research";
 import { readNotes, writeNotes, type BrowserNotes as Notes } from "../lib/us-browser-notes";
+import { currentCatalog, defaultCatalogPackage } from "../lib/us-catalog";
 import "./us.css";
 import LiveFeed from "./live-feed";
 import USPlans from "./plans";
@@ -83,22 +84,16 @@ function USResearchContent() {
     setOnlySaved(requestedView === "shortlist");
   }, [requestedView]);
 
+  const catalogRequest = useRef(0);
   const loadCatalog = useCallback(async (selectNewest = false) => {
-    const result = await fetchAPI<{
-      packages: USSummary[];
-      default_symbols: string;
-      unavailable_packages?: number;
-    }>(`${ROOT}/packages`);
+    const version = ++catalogRequest.current;
+    const result = await currentCatalog(() => version === catalogRequest.current);
+    if (!result) return;
     setPackages(result.packages);
     setCatalogUnavailable(result.unavailable_packages || 0);
     setDraftSymbols((previous) => previous || result.default_symbols);
     {
-      const chosen =
-        result.packages.find(
-          (p) => p.state === "final" && p.symbols.length >= 20,
-        ) ||
-        result.packages.find((p) => p.state === "final") ||
-        result.packages[0];
+      const chosen = defaultCatalogPackage(result.packages);
       setPackageId((previous) =>
         selectNewest || !previous ? chosen?.id || "" : previous,
       );
@@ -112,6 +107,7 @@ function USResearchContent() {
       .finally(() => active && setLoading(false));
     return () => {
       active = false;
+      catalogRequest.current++;
     };
   }, [loadCatalog]);
   useEffect(() => {

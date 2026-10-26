@@ -17,3 +17,10 @@ The existing 120-entry response limit remains. No immutable packages, pointers o
 Synthetic API tests cover timezone-offset/session ordering, malformed JSON and non-object content, invalid timestamps/sessions/universes/symbol lists/benchmark/feed/currency/state, sanitized disk errors, correct omission counts and pointer exclusion. Plan fixtures now include valid source metadata, and ownership/revision/partial-source checks still run.
 
 Shared hosted store, durable catalog indexing/pagination at large scale, production restore/recovery, provider/instrument/corporate-action validation and real browser/account acceptance remain open. No runtime data or credentials were read/changed or committed for this increment. This is schema/read-path verification, not a new claim of data-provider or strategy correctness.
+
+
+## Workspace freshness and overlapping reads
+
+The default selection now uses the first final package in the backend's session/computation/identity order, rather than preferring an older package merely because its universe has at least 20 symbols. Newer partial evidence still does not silently replace an available final default; explicit browsing remains available. If no final exists, the newest catalog entry is selected. Existing explicit selection is retained unless selecting newest was requested.
+
+Catalog reloads carry a request generation. A late earlier result or error is ignored after a newer reload or account-workspace cleanup, preventing stale catalog/default-symbol/selection updates. This does not certify data freshness outside the recorded timestamps or make partial evidence final. Tests cover old broad vs new final, partial/final separation, empty catalogs and overlapping/abandoned reads. Hosted browser acceptance remains open.
