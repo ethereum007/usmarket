@@ -64,6 +64,7 @@ async function authHeaders(): Promise<Record<string, string>> {
   if (typeof window === "undefined" || !supabase) return {};
 
   ensureAuthListener();
+  const startedVersion = authVersion;
 
   if (!sessionLoaded) {
     sessionLoadPromise ??= withTimeout(
@@ -72,10 +73,12 @@ async function authHeaders(): Promise<Record<string, string>> {
       "Auth session lookup timed out",
     )
       .then(({ data: { session } }) => {
+        if (authVersion !== startedVersion) return;
         cachedAccessToken = session?.access_token ?? null;
         sessionLoaded = true;
       })
       .catch(() => {
+        if (authVersion !== startedVersion) return;
         cachedAccessToken = null;
         // A transient Web Lock or storage delay must not permanently cache an
         // unauthenticated state for every API request in this browser tab.
@@ -86,11 +89,21 @@ async function authHeaders(): Promise<Record<string, string>> {
       });
     await sessionLoadPromise;
   }
+  if (authVersion !== startedVersion) {
+    throw new Error("Account changed while preparing the request. Review the current account before retrying.");
+  }
 
   return cachedAccessToken ? { Authorization: `Bearer ${cachedAccessToken}` } : {};
 }
 
 async function fetchWithAuthRetry(path: string, init: RequestInit): Promise<Response> {
+  // Recheck after the caller awaited headers: an auth event can run in that gap.
+  if (path.startsWith("/api/us/")) {
+    const preparedToken = new Headers(init.headers).get("Authorization")?.replace(/^Bearer /i, "") || null;
+    if (preparedToken !== cachedAccessToken && (!tokenSubject(preparedToken) || tokenSubject(preparedToken) !== tokenSubject(cachedAccessToken))) {
+      throw new Error("Account changed while preparing the request. Review the current account before retrying.");
+    }
+  }
   const response = await fetchWithTimeout(path, init);
   if (!(await isExpiredAppSession(path, response))) return response;
 

@@ -8,10 +8,10 @@ const A = '11111111-1111-4111-8111-111111111111';
 const B = '22222222-2222-4222-8222-222222222222';
 const token = (sub, version = 'old') => `header.${Buffer.from(JSON.stringify({ sub })).toString('base64url')}.${version}`;
 const denied = () => new Response(JSON.stringify({ detail:'Sign in to the US workspace' }), { status:401, headers:{ 'WWW-Authenticate':'Bearer' } });
-function fixture({ initial = token(A), refresh = async () => ({ data:{ session:{ access_token:token(A,'new') } } }), response = denied, retryResponse = () => new Response(JSON.stringify({ success:true })) } = {}) {
+function fixture({ initial = token(A), refresh = async () => ({ data:{ session:{ access_token:token(A,'new') } } }), lookup = async () => ({ data:{ session:null } }), response = denied, retryResponse = () => new Response(JSON.stringify({ success:true })) } = {}) {
   const calls = [];
   let refreshed = 0, listener;
-  const auth = { onAuthStateChange: callback => { listener = callback; }, refreshSession: async () => { refreshed++; return refresh(); } };
+  const auth = { getSession:lookup, onAuthStateChange: callback => { listener = callback; }, refreshSession: async () => { refreshed++; return refresh(); } };
   const context = { exports:{}, window:{ location:{ protocol:'https:', host:'localhost' } }, process:{ env:{} },
     Headers, Response, AbortController, setTimeout, clearTimeout, atob,
     fetch: async (url, init) => { calls.push({ url, init }); return calls.length === 1 ? response() : retryResponse(); },
@@ -114,4 +114,58 @@ test('transport failure is not automatically replayed',async () => {
   await assert.rejects(f.api.postAPI('/api/us/plans/id',{}),/network failure/);
   assert.equal(f.refreshed(),0);
   assert.equal(f.calls.length,1);
+});
+
+for (const fails of [false,true]) for (const next of [null,token(B)]) test(`late initial session ${fails ? 'failure' : 'success'} cannot replace changed account ${next ? 'B' : 'signed-out'}`,async () => {
+  let resolve,reject;
+  const f = fixture({ initial:null, lookup:() => new Promise((done,fail) => { resolve=done;reject=fail; }),
+                      response:() => new Response(JSON.stringify({ success:true })) });
+  const request = f.api.postAPI('/api/us/plans/id',{ notes:'Draft prepared before account change' });
+  while (!resolve) await new Promise(done => setImmediate(done));
+  f.event(next);
+  if (fails) reject(new Error('Synthetic lookup failed'));
+  else resolve({ data:{ session:{ access_token:token(A) } } });
+  await assert.rejects(request,/Account changed/);
+  assert.equal(f.calls.length,0);
+  assert.equal(f.refreshed(),0);
+  if (next) {
+    await f.api.fetchAPI('/api/us/research/access');
+    assert.equal(new Headers(f.calls[0].init.headers).get('Authorization'),`Bearer ${next}`);
+  }
+});
+test('concurrent initial requests share one lookup and both stop after account change',async () => {
+  let resolve,lookups=0;
+  const f = fixture({ initial:null, lookup:() => { lookups++; return new Promise(done => { resolve=done; }); } });
+  const first = f.api.fetchAPI('/api/us/research/packages');
+  const second = f.api.postAPI('/api/us/plans/id',{ notes:'Private draft' });
+  while (!resolve) await new Promise(done => setImmediate(done));
+  f.event(token(B));
+  resolve({ data:{ session:{ access_token:token(A) } } });
+  const results = await Promise.allSettled([first,second]);
+  assert.equal(lookups,1);
+  for (const result of results) { assert.equal(result.status,'rejected'); assert.match(result.reason.message,/Account changed/); }
+  assert.equal(f.calls.length,0);
+});
+test('unchanged initial session lookup sends the original account token',async () => {
+  const f = fixture({ initial:null, lookup:async () => ({ data:{ session:{ access_token:token(A) } } }),
+                      response:() => new Response(JSON.stringify({ success:true })) });
+  await f.api.postAPI('/api/us/plans/id',{ expected_revision:0 });
+  assert.equal(f.calls.length,1);
+  assert.equal(new Headers(f.calls[0].init.headers).get('Authorization'),`Bearer ${token(A)}`);
+});
+
+for (const next of [null,token(B)]) test('account change after headers are prepared still prevents the first network request',async () => {
+  const f = fixture();
+  const request = f.api.postAPI('/api/us/plans/id',{ notes:'Private A draft' });
+  f.event(next);
+  await assert.rejects(request,/Account changed/);
+  assert.equal(f.calls.length,0);
+});
+test('same-account token rotation after header preparation does not rebind the request',async () => {
+  const f = fixture({ response:() => new Response(JSON.stringify({ success:true })) });
+  const request = f.api.postAPI('/api/us/plans/id',{ notes:'Private A draft' });
+  f.event(token(A,'rotated'));
+  await request;
+  assert.equal(f.calls.length,1);
+  assert.equal(new Headers(f.calls[0].init.headers).get('Authorization'),`Bearer ${token(A)}`);
 });
