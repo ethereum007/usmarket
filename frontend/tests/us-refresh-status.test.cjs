@@ -20,7 +20,7 @@ test('transport failure preserves recorded outcome and sanitizes details',async(
   assert.doesNotMatch(fixture.errors[0],/private/);
 });
 for(const state of ['completed','failed','interrupted'])test(`server ${state} remains the recorded outcome`,async()=>{
-  const fixture=load(async()=>({job:{id:'one',state}}));fixture.start({id:'one',state:'running'});await fixture.timers[0]();
+  const fixture=load(async()=>({job:{id:'one',state,...(state==='completed'?{package_id:'a'.repeat(64)}:{})}}));fixture.start({id:'one',state:'running'});await fixture.timers[0]();
   assert.equal(fixture.statuses[0].state,state);assert.equal(fixture.errors.length,0);
 });
 test('late responses after cleanup cannot affect another account',async()=>{
@@ -30,7 +30,7 @@ test('late responses after cleanup cannot affect another account',async()=>{
   assert.equal(fixture.statuses.length,0);assert.equal(fixture.errors.length,0);assert.deepEqual(fixture.cleared,[1]);
 });
 test('a fresh observation can recover after a failed status check',async()=>{
-  let count=0;const fixture=load(async()=>{if(!count++)throw new Error('offline');return {job:{id:'one',state:'completed'}};});
+  let count=0;const fixture=load(async()=>{if(!count++)throw new Error('offline');return {job:{id:'one',state:'completed',package_id:'a'.repeat(64)}};});
   const job={id:'one',state:'running'};fixture.start(job);await fixture.timers[0]();fixture.start(job);await fixture.timers[1]();
   assert.equal(fixture.statuses[0].state,'completed');assert.equal(fixture.requests.length,2);
 });
@@ -62,4 +62,18 @@ for(const jobs of [null,[{id:'one',state:'invented'}],[{id:'one',state:'running'
     [{id:'same',state:'running'},{id:'same',state:'completed'}]])test('malformed or ambiguous history does not select a guessed worker '+JSON.stringify(jobs),async()=>{
   const fixture=load(async()=>({jobs}));await assert.rejects(fixture.restore());
   assert.equal(fixture.statuses.length,0);assert.equal(fixture.timers.length,0);
+});
+
+
+for(const package_id of [undefined,null,'not-a-package','../old','A'.repeat(64),true])test('completed observation requires exact package identity '+String(package_id),async()=>{
+  const fixture=load(async()=>({job:{id:'one',state:'completed',package_id}}));
+  fixture.start({id:'one',state:'running'});await fixture.timers[0]();
+  assert.equal(fixture.statuses.length,0);assert.equal(fixture.errors.length,1);
+  assert.match(fixture.errors[0],/last recorded outcome is unchanged/);
+});
+test('verified completion preserves its exact package instead of choosing catalog evidence',async()=>{
+  const id='b'.repeat(64);
+  const fixture=load(async()=>({job:{id:'one',state:'completed',package_id:id}}));
+  fixture.start({id:'one',state:'running'});await fixture.timers[0]();
+  assert.equal(fixture.statuses[0].package_id,id);assert.equal(fixture.errors.length,0);
 });

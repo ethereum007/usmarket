@@ -13,6 +13,10 @@ export function observeRefresh(job: RefreshJob | null, onStatus: (job: RefreshJo
       if (result.job.id !== job.id || !["queued", "running", "completed", "failed", "interrupted"].includes(result.job.state)) {
         throw new Error("Unexpected refresh status");
       }
+      if (result.job.state === "completed" &&
+          (typeof result.job.package_id !== "string" || !/^[a-f0-9]{64}$/.test(result.job.package_id))) {
+        throw new Error("Completion has no exact source identity");
+      }
       if (active) onStatus(result.job);
     } catch {
       if (active) onUnavailable("Refresh status could not be checked. The last recorded outcome is unchanged. Check again or inspect saved research.");

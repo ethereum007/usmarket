@@ -36,3 +36,8 @@ An authenticated account workspace reads its owner-scoped recent job history on 
 ## Admission submission guard
 
 The workspace locks submission synchronously before the refresh POST returns and displays a submitting state, preventing rapid duplicate clicks before job acknowledgement. Only a canonical queued-job acknowledgement starts observation; unexpected fields are excluded. Account cleanup ignores late acknowledgements/errors and does not invent a job outcome. Timeout or malformed response is unconfirmed and asks the user to inspect history before an explicit retry. This UI guard is not server idempotency and cannot prove a timed-out request was not admitted. Durable remote admission remains authoritative; no automatic resubmission is added. Hosted browser acceptance remains open.
+
+
+## Completion source identity in observation
+
+Workspace polling now requires a valid lowercase 64-hex package ID on completed observations before accepting completion. Missing/malformed identity keeps the previous recorded observation unchanged and shows status-unavailable feedback; it never reloads unrelated catalog evidence as the new result. Verified completion retains its exact package ID. This is a response-consistency check, not proof of worker liveness or hosted durability. Backend ownership and exact package reads remain authoritative; hosted/browser acceptance remains open.
