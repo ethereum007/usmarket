@@ -554,3 +554,43 @@ def test_remote_job_save_requires_exact_transition_acknowledgement(monkeypatch,r
             remote.execute('save','private-token','one',{'id':'one',**requested})
     assert error.value.status_code==503
     assert 'private-token' not in str(error.value)
+
+
+def test_remote_refresh_uses_atomic_publication_without_second_terminal_write(client,monkeypatch):
+    from unittest.mock import AsyncMock
+    c,_=client
+    monkeypatch.setenv('US_JOB_STORE','supabase'); monkeypatch.setenv('US_RESEARCH_STORE','supabase')
+    package={'id':'a'*64}
+    with patch.object(api.remote_jobs,'execute',return_value={}) as jobs, \
+         patch.object(api.remote_research,'execute') as separate_publish, \
+         patch.object(api,'run',AsyncMock(return_value=package)):
+        response=c.post('/api/us/research/refresh',json={'symbols':'AAPL'})
+    assert response.status_code==200
+    calls=jobs.call_args_list
+    assert [call.args[0] for call in calls]==['save','save','publish']
+    assert calls[-1].args[2]==response.json()['job']['id']
+    assert calls[-1].args[3]==package
+    separate_publish.assert_not_called()
+
+
+@pytest.mark.parametrize('change',['none','package','job'])
+def test_atomic_publication_transport_validates_both_records(monkeypatch,change):
+    import httpx
+    from types import SimpleNamespace
+    from fastapi import HTTPException
+    from app.services import us_remote_jobs as remote
+    monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://us.example',SUPABASE_ANON_KEY='public-test'))
+    package={'id':'a'*64,'universe':'us-test','market':'US','currency':'USD','state':'final',
+             'session':'2026-10-23','computed_at':'2026-10-24T00:00:00Z'}
+    result={'package':dict(package),'job':{'id':'one','state':'completed','package_id':package['id']}}
+    if change=='package':result['package']['state']='partial'
+    if change=='job':result['job']['package_id']='b'*64
+    requests=[]; original=httpx.Client
+    transport=httpx.MockTransport(lambda request:(requests.append(request) or httpx.Response(200,json=result)))
+    with patch.object(remote.httpx,'Client',lambda **kwargs:original(transport=transport,**kwargs)):
+        if change=='none':assert remote.execute('publish','token','one',package)['state']=='completed'
+        else:
+            with pytest.raises(HTTPException) as error:remote.execute('publish','token','one',package)
+            assert error.value.status_code==503
+    assert requests[0].url.path=='/rest/v1/rpc/us_job_publish'
+    assert json.loads(requests[0].content)=={'job_id':'one','package_payload':package}

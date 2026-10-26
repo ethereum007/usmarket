@@ -6,6 +6,7 @@ import httpx
 from fastapi import HTTPException
 from app.config import settings
 from app.services.us_readiness import https_origin
+from app.services.us_publication import validate, content
 
 
 def enabled():
@@ -49,14 +50,30 @@ def execute(action, token, job_id=None, payload=None):
         body['job_id'] = job_id
     if payload is not None:
         body['job_payload'] = {k:v for k,v in payload.items() if k in {'id','state','package_id'}}
+    endpoint = 'us_job_store'
+    if action == 'publish':
+        endpoint = 'us_job_publish'
+        body = {'job_id':job_id, 'package_payload':payload}
     try:
+        if action == 'publish':
+            validate(payload)
         with httpx.Client(timeout=10, follow_redirects=False) as client:
-            response = client.post(settings.SUPABASE_URL.rstrip('/')+'/rest/v1/rpc/us_job_store',
+            response = client.post(settings.SUPABASE_URL.rstrip('/')+'/rest/v1/rpc/'+endpoint,
                 headers={'Authorization':'Bearer '+token,'apikey':settings.SUPABASE_ANON_KEY},json=body)
         if response.status_code == 409:
             raise HTTPException(409, 'Refresh status changed; check saved research before retrying')
         response.raise_for_status()
         result = response.json()
+        if action == 'publish':
+            if not isinstance(result,dict) or not isinstance(result.get('package'),dict):
+                raise ValueError('Unconfirmed publication')
+            validate(result['package'])
+            if content(result['package']) != content(payload):
+                raise ValueError('Unconfirmed research identity')
+            observation = public_observation(result.get('job'),job_id)
+            if observation['state'] != 'completed' or observation['package_id'] != payload['id']:
+                raise ValueError('Unconfirmed completion')
+            return observation
         if action == 'list':
             valid = isinstance(result,list) and len(result)<=20 and all(isinstance(row,dict) for row in result)
         else:

@@ -39,7 +39,7 @@ def rpc(pg, owner, name, body, role='authenticated'):
         from psycopg.types.json import Jsonb
         keys = list(body)
         assert set(keys) <= {'action','plan_id','wanted_revision','expected_revision','plan_payload','package_id','package_payload','job_id','job_payload'}
-        assert name in {'us_plan_store','us_research_store','us_job_store'}
+        assert name in {'us_plan_store','us_research_store','us_job_store','us_job_publish'}
         args = ','.join(key+' => %s' for key in keys)
         values = [Jsonb(value) if isinstance(value,dict) else value for value in body.values()]
         return conn.execute('select public.'+name+'('+args+')', values).fetchone()[0]
@@ -193,3 +193,44 @@ def test_concurrent_refresh_admission_is_owner_scoped_and_released_only_by_termi
     assert save(A,loser,'queued')['state']=='queued'
     save(A,loser,'running'); save(A,loser,'failed')
     save(B,foreign,'running'); save(B,foreign,'failed')
+
+
+def test_atomic_refresh_publication_and_replay(pg):
+    job=str(uuid4()); key=uuid4().hex*2
+    def state(value):return rpc(pg,A,'us_job_store',dict(action='save',job_id=job,job_payload={'id':job,'state':value}))
+    payload={'id':key,'market':'US','currency':'USD','state':'final','session':'2026-10-23','computed_at':'2026-10-24T00:00:00Z'}
+    body=dict(job_id=job,package_payload=payload)
+    for role in ['anon','authenticated']:
+        with pytest.raises(pg.Error):rpc(pg,None,'us_job_publish',body,role)
+    state('queued')
+    with pytest.raises(pg.Error):rpc(pg,A,'us_job_publish',body)
+    assert rpc(pg,A,'us_research_store',dict(action='get',package_id=key)) is None
+    state('running')
+    with pytest.raises(pg.Error):rpc(pg,B,'us_job_publish',body)
+    result=rpc(pg,A,'us_job_publish',body)
+    assert result['job']['state']=='completed' and result['job']['package_id']==key
+    assert rpc(pg,A,'us_research_store',dict(action='get',package_id=key))==payload
+    assert rpc(pg,A,'us_job_publish',body)==result
+    for changed in [{**payload,'state':'partial'},{**payload,'id':uuid4().hex*2}]:
+        with pytest.raises(pg.Error):rpc(pg,A,'us_job_publish',dict(job_id=job,package_payload=changed))
+    assert rpc(pg,A,'us_job_store',dict(action='get',job_id=job))==result['job']
+
+
+def test_atomic_publication_rolls_back_when_completion_fails(pg):
+    job=str(uuid4()); key=uuid4().hex*2
+    for state in ['queued','running']:
+        rpc(pg,A,'us_job_store',dict(action='save',job_id=job,job_payload={'id':job,'state':state}))
+    # Inject a database failure after package insertion but before status completion.
+    with pg.connect(DSN) as conn:
+        conn.execute("create function public.test_reject_completion() returns trigger language plpgsql as $$ begin raise exception 'Synthetic completion failure'; end $$")
+        conn.execute('create trigger test_reject_completion before update on public.us_refresh_jobs for each row execute function public.test_reject_completion()')
+    try:
+        payload={'id':key,'market':'US','currency':'USD','state':'partial'}
+        with pytest.raises(pg.Error):rpc(pg,A,'us_job_publish',dict(job_id=job,package_payload=payload))
+        assert rpc(pg,A,'us_research_store',dict(action='get',package_id=key)) is None
+        assert rpc(pg,A,'us_job_store',dict(action='get',job_id=job))['state']=='running'
+    finally:
+        with pg.connect(DSN) as conn:
+            conn.execute('drop trigger test_reject_completion on public.us_refresh_jobs')
+            conn.execute('drop function public.test_reject_completion()')
+    rpc(pg,A,'us_job_store',dict(action='save',job_id=job,job_payload={'id':job,'state':'failed'}))
