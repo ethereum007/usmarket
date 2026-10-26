@@ -183,3 +183,53 @@ def test_history_retry_exhaustion_is_bounded_and_sanitized(transport_failure):
         with pytest.raises(RuntimeError) as error:asyncio.run(exercise())
         assert sleep.await_count==2
     assert len(requests)==3 and 'private' not in str(error.value)
+
+
+@pytest.mark.parametrize('page',[None,[],{}, {'bars':None},{'bars':{'AAPL':{}}},{'bars':{'AAPL':['not-a-bar']}}])
+def test_malformed_history_page_never_looks_like_successful_end(page):
+    import asyncio
+    from unittest.mock import AsyncMock
+    history=AlpacaHistory(None)
+    history.get=AsyncMock(side_effect=[[{'date':'2020-01-02','close':'16:00'}],page])
+    with pytest.raises(ValueError,match='provider history'):
+        asyncio.run(history.load(['AAPL'],'2020-01-01','2020-01-03'))
+
+
+@pytest.mark.parametrize('token',[False,0,[],{},'x'*4097])
+def test_invalid_continuation_never_silently_truncates_history(token):
+    import asyncio
+    from unittest.mock import AsyncMock
+    history=AlpacaHistory(None)
+    history.get=AsyncMock(side_effect=[[{'date':'2020-01-02','close':'16:00'}],{'bars':{'AAPL':[]},'next_page_token':token}])
+    with pytest.raises(ValueError,match='pagination token') as error:
+        asyncio.run(history.load(['AAPL'],'2020-01-01','2020-01-03'))
+    assert len(str(error.value))<100
+
+
+@pytest.mark.parametrize('aggregate',[False,True])
+def test_history_row_accumulation_is_bounded(aggregate):
+    import asyncio
+    from unittest.mock import AsyncMock
+    history=AlpacaHistory(None)
+    page={'bars':{'AAPL':[bar('2020-01-02')]*(6000 if aggregate else 10001)},'next_page_token':'next'}
+    pages=[page,{**page,'next_page_token':None}] if aggregate else [page]
+    history.get=AsyncMock(side_effect=[[{'date':'2020-01-02','close':'16:00'}],*pages])
+    with pytest.raises(ValueError,match='bounded row limit'):
+        asyncio.run(history.load(['AAPL'],'2020-01-01','2020-01-03'))
+
+
+def test_valid_paginated_history_retains_exact_rows_and_query_identity():
+    import asyncio
+    from unittest.mock import AsyncMock
+    history=AlpacaHistory(None,'sip')
+    first=bar('2020-01-02');second=bar('2020-01-03')
+    calls=[]
+    async def get(url,params):
+        calls.append((url,dict(params)))
+        if url.endswith('calendar'):return [{'date':'2020-01-02','close':'16:00'},{'date':'2020-01-03','close':'16:00'}]
+        return {'bars':{'AAPL':[second if 'page_token' in params else first]},'next_page_token':None if 'page_token' in params else 'exact-next'}
+    history.get=get
+    _,rows=asyncio.run(history.load(['AAPL'],'2020-01-01','2020-01-04'))
+    assert rows['AAPL']==[first,second]
+    assert calls[-1][1]['page_token']=='exact-next'
+    assert calls[-1][1]['feed']=='sip' and calls[-1][1]['adjustment']=='split'

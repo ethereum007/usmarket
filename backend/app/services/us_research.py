@@ -95,16 +95,32 @@ class AlpacaHistory:
         params = dict(symbols=','.join(symbols), timeframe='1Day', start=start,
                       end=request_end, adjustment='split', feed=self.feed, limit=10000, sort='asc', asof=end)
         seen = set()
+        total_rows = 0
+        maximum_rows = max(10000, len(symbols) * len(sessions) * 2)
         for _ in range(1000):
             payload = await self.get('https://data.alpaca.markets/v2/stocks/bars', params)
-            for symbol, rows in payload.get('bars', {}).items():
+            if not isinstance(payload, dict) or not isinstance(payload.get('bars'), dict):
+                raise ValueError('Invalid provider history page')
+            page_rows = 0
+            for rows in payload['bars'].values():
+                if not isinstance(rows, list):
+                    raise ValueError('Invalid provider history rows')
+                page_rows += len(rows)
+            if page_rows > 10000 or total_rows + page_rows > maximum_rows:
+                raise ValueError('Provider history exceeds bounded row limit')
+            if any(not isinstance(row, dict) for rows in payload['bars'].values() for row in rows):
+                raise ValueError('Invalid provider history row')
+            token = payload.get('next_page_token')
+            if token is not None and (not isinstance(token, str) or len(token) > 4096):
+                raise ValueError('Invalid provider pagination token')
+            if token and token in seen:
+                raise ValueError('Repeated provider pagination token')
+            for symbol, rows in payload['bars'].items():
                 if symbol in result:
                     result[symbol].extend(rows)
-            token = payload.get('next_page_token')
-            if not token:
+            total_rows += page_rows
+            if token is None or token == '':
                 return calendar, result
-            if token in seen:
-                raise ValueError('Repeated provider pagination token')
             seen.add(token)
             params['page_token'] = token
         raise ValueError('History pagination exceeded bounded limit')

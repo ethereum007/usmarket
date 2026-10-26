@@ -46,3 +46,8 @@ Workspace polling now requires a valid lowercase 64-hex package ID on completed 
 ## Bounded historical provider retries
 
 Historical calendar/bar GETs now allow at most three attempts for transport failures and HTTP 429/502/503/504, with short exponential backoff. Numeric Retry-After values up to five seconds are respected; longer, negative, nonfinite or unrecognized cooldowns stop rather than retry early. Access/invalid-request errors are not retried. The exact endpoint, query, pagination token and selected feed remain unchanged; there is no SIP-to-IEX downgrade or new provider data invented. Exhaustion fails publication with sanitized feedback. Instrument lookup and other providers retain their existing behavior. Mocked transport fixtures verify limits/cooldowns/denials; this is not aggregate multi-host rate limiting or actual market-open recovery evidence.
+
+
+## Historical pagination boundary
+
+Historical bar pages must contain a bars mapping with lists of object rows. Continuation is only a string up to 4,096 characters or a terminal null/empty string; false/zero/list/object tokens cannot masquerade as successful completion. Repeated tokens remain rejected. Each page is limited to the requested 10,000 rows, and accumulation is capped at the larger of 10,000 or twice requested symbols times completed calendar sessions. Exceeding the cap fails rather than truncates/publishes. Valid rows, pagination tokens, feed and split-adjustment query remain unchanged. This bounds accumulation after decoding, not HTTP body size or total multi-user memory; hosted load/rate-limit acceptance remains open. Tests use synthetic pages only.
