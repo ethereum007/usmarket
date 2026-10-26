@@ -3,6 +3,7 @@ import os
 import httpx
 from fastapi import HTTPException
 from app.config import settings
+from app.services.us_json import same_value
 from app.services.us_readiness import https_origin
 from app.services.us_publication import validate, content
 
@@ -40,7 +41,7 @@ def execute(action, token, package_id=None, package_payload=None):
             if not isinstance(result, dict) or result.get('id') != package_id:
                 raise ValueError()
             validate(result)
-            if content(result) != content(package_payload):
+            if not same_value(content(result), content(package_payload)):
                 raise ValueError('Publication acknowledgement does not match immutable content')
         return result
     except (httpx.HTTPError, ValueError, TypeError):

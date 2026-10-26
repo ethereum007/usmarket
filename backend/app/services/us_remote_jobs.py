@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import httpx
 from fastapi import HTTPException
 from app.config import settings
+from app.services.us_json import same_value
 from app.services.us_readiness import https_origin
 from app.services.us_publication import validate, content
 
@@ -74,7 +75,7 @@ def execute(action, token, job_id=None, payload=None):
             if not isinstance(result,dict) or not isinstance(result.get('package'),dict):
                 raise ValueError('Unconfirmed publication')
             validate(result['package'])
-            if content(result['package']) != content(payload):
+            if not same_value(content(result['package']), content(payload)):
                 raise ValueError('Unconfirmed research identity')
             observation = public_observation(result.get('job'),job_id)
             if observation['state'] != 'completed' or observation['package_id'] != payload['id']:

@@ -680,3 +680,29 @@ def test_remote_coordination_never_opens_local_lock_or_job_storage(client,monkey
         assert result.status_code==200
         assert [call.args[0] for call in remote.call_args_list]==['save','save','publish']
         assert provider.call_args.args[0].publish_local is False
+
+
+@pytest.mark.parametrize('atomic',[False,True])
+@pytest.mark.parametrize('sent,acknowledged,accepted', [(0,False,False),(False,0,False),(1,True,False),(True,1,False),(100,100.0,True)])
+def test_research_acknowledgement_preserves_nested_boolean_numeric_types(monkeypatch,atomic,sent,acknowledged,accepted):
+    import httpx
+    from types import SimpleNamespace
+    from fastapi import HTTPException
+    from app.services import us_remote_jobs, us_remote_research
+    remote = us_remote_jobs if atomic else us_remote_research
+    monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://us.example',SUPABASE_ANON_KEY='public-test'))
+    package = {'id':'a'*64,'universe':'us-test','market':'US','currency':'USD','state':'final',
+               'session':'2026-10-23','computed_at':'2026-10-24T00:00:00Z',
+               'source_bars':{'AAPL':[{'volume':sent}]}}
+    acknowledgement = {**package,'source_bars':{'AAPL':[{'volume':acknowledged}]}}
+    result = {'package':acknowledgement,'job':{'id':'one','state':'completed','package_id':package['id']}} if atomic else acknowledgement
+    original = httpx.Client
+    transport = httpx.MockTransport(lambda request:httpx.Response(200,json=result))
+    with patch.object(remote.httpx,'Client',lambda **kwargs:original(transport=transport,**kwargs)):
+        if accepted:
+            remote.execute('publish','token','one' if atomic else package['id'],package)
+        else:
+            with pytest.raises(HTTPException) as error:
+                remote.execute('publish','token','one' if atomic else package['id'],package)
+            assert error.value.status_code == 503
+            assert 'token' not in error.value.detail and 'source_bars' not in error.value.detail

@@ -6,6 +6,7 @@ from pathlib import Path
 import re
 import tempfile
 
+from app.services.us_json import same_value
 from app.services.swing_repository import database
 
 
@@ -62,7 +63,7 @@ def publish(package: dict, folder: Path):
         if target.exists():
             saved = json.loads(target.read_text(encoding="utf-8"))
             validate(saved)
-            if content(saved) != content(package):
+            if not same_value(content(saved), content(package)):
                 raise ValueError("US publication identity conflicts with immutable saved content")
         else:
             saved = package

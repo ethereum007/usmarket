@@ -140,3 +140,21 @@ def test_invalid_publication_cannot_write_final_pointer(tmp_path, change):
     with pytest.raises(ValueError):
         save_package({**package(), **change}, tmp_path)
     assert not (tmp_path / "us-test-latest-final.json").exists()
+
+
+@pytest.mark.parametrize('original,changed', [(0,False), (False,0), (1,True), (True,1)])
+def test_boolean_numeric_collision_cannot_replay_immutable_nested_evidence(tmp_path, original, changed):
+    first = {**package(), 'source_bars':{'AAPL':[{'volume':original}]}}
+    path, _ = save_package(first,tmp_path)
+    before = path.read_bytes()
+    with pytest.raises(ValueError,match='immutable'):
+        save_package({**first,'source_bars':{'AAPL':[{'volume':changed}]}},tmp_path)
+    assert path.read_bytes() == before
+    assert pointer(tmp_path) == first['id']
+
+
+def test_equivalent_json_numbers_remain_valid_immutable_replay(tmp_path):
+    first = {**package(), 'source_bars':{'AAPL':[{'close':100,'volume':0}]}}
+    save_package(first,tmp_path)
+    _, replayed = save_package({**first,'source_bars':{'AAPL':[{'close':100.0,'volume':0.0}]}},tmp_path)
+    assert replayed == first

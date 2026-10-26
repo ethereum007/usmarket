@@ -4,19 +4,7 @@ from uuid import UUID
 from fastapi import HTTPException
 from app.config import settings
 from app.services.us_readiness import https_origin
-
-
-def same_value(left, right):
-    # JSON numbers can round-trip as int/float; booleans are never numbers.
-    if isinstance(left, bool) or isinstance(right, bool):
-        return type(left) is type(right) and left == right
-    if isinstance(left, dict) or isinstance(right, dict):
-        return (isinstance(left, dict) and isinstance(right, dict) and left.keys() == right.keys()
-                and all(same_value(left[key], right[key]) for key in left))
-    if isinstance(left, list) or isinstance(right, list):
-        return (isinstance(left, list) and isinstance(right, list) and len(left) == len(right)
-                and all(same_value(a, b) for a, b in zip(left, right)))
-    return left == right
+from app.services.us_json import same_value
 
 
 def verified_plan(row, plan_id=None, revision=None, source=None):
