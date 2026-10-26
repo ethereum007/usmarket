@@ -426,7 +426,7 @@ def test_remote_jobs_route_forwards_token_and_never_uses_local_history(client,mo
     c.app.dependency_overrides[require_us_user] = lambda: {'id':'owner','_access_token':'private-token'}
     with patch.object(api.remote_jobs,'execute',return_value=[]) as remote, patch.object(api.repository,'list_jobs') as local:
         result=c.get('/api/us/research/jobs')
-    assert result.json() == {'success':True,'jobs':[]}
+    assert result.json() == {'success':True,'jobs':[],'interruption_available':True}
     remote.assert_called_once_with('list','private-token')
     local.assert_not_called()
 
@@ -603,3 +603,43 @@ def test_remote_interrupted_observation_retains_unknown_and_drops_private_fields
     assert result['completion_unknown'] is True
     assert 'private' not in json.dumps(result)
     assert 'package_id' not in result
+
+
+@pytest.mark.parametrize('state',['interrupted','completed'])
+def test_interruption_endpoint_uses_verified_identity_and_preserves_race_result(client,monkeypatch,state):
+    c,_=client
+    monkeypatch.setenv('US_JOB_STORE','supabase');monkeypatch.setenv('US_RESEARCH_STORE','supabase')
+    c.app.dependency_overrides[require_us_user]=lambda:{'id':'owner','_access_token':'private-token'}
+    key='11111111-1111-4111-8111-111111111111'
+    row={'id':key,'state':state}
+    with patch.object(api.remote_jobs,'execute',return_value=row) as remote:
+        result=c.post('/api/us/research/jobs/'+key+'/interrupt',json={'owner':'foreign'})
+    assert result.json()['job']==row
+    remote.assert_called_once_with('interrupt','private-token',key)
+
+
+def test_local_interruption_is_disabled_and_bad_identity_never_calls_remote(client):
+    c,_=client
+    with patch.object(api.remote_jobs,'execute') as remote:
+        assert c.post('/api/us/research/jobs/not-valid/interrupt').status_code==422
+        assert c.post('/api/us/research/jobs/11111111-1111-4111-8111-111111111111/interrupt').status_code==409
+    remote.assert_not_called()
+
+
+@pytest.mark.parametrize('state',['interrupted','completed','running'])
+def test_interruption_transport_requires_terminal_acknowledgement(monkeypatch,state):
+    import httpx
+    from types import SimpleNamespace
+    from fastapi import HTTPException
+    from app.services import us_remote_jobs as remote
+    monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://us.example',SUPABASE_ANON_KEY='public-test'))
+    row={'id':'one','state':state,'package_id':'a'*64}
+    requests=[]; original=httpx.Client
+    transport=httpx.MockTransport(lambda request:(requests.append(request) or httpx.Response(200,json=row)))
+    with patch.object(remote.httpx,'Client',lambda **kwargs:original(transport=transport,**kwargs)):
+        if state=='running':
+            with pytest.raises(HTTPException) as error:remote.execute('interrupt','token','one')
+            assert error.value.status_code==503
+        else:assert remote.execute('interrupt','token','one')['state']==state
+    assert requests[0].url.path=='/rest/v1/rpc/us_job_interrupt'
+    assert json.loads(requests[0].content)=={'job_id':'one'}

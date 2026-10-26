@@ -57,6 +57,9 @@ def execute(action, token, job_id=None, payload=None):
     if action == 'publish':
         endpoint = 'us_job_publish'
         body = {'job_id':job_id, 'package_payload':payload}
+    if action == 'interrupt':
+        endpoint = 'us_job_interrupt'
+        body = {'job_id':job_id}
     try:
         if action == 'publish':
             validate(payload)
@@ -86,6 +89,8 @@ def execute(action, token, job_id=None, payload=None):
         if action == 'list':
             return [public_observation(row) for row in result]
         observation = None if result is None else public_observation(result, job_id)
+        if action == 'interrupt' and observation['state'] not in {'completed','failed','interrupted'}:
+            raise ValueError('Unconfirmed interruption')
         if action == 'save':
             if observation['state'] != payload['state']:
                 raise ValueError('Unconfirmed job transition')

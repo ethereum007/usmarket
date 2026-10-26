@@ -6,14 +6,14 @@ const vm = require('node:vm');
 const ts = require('typescript');
 const React = require('react');
 const { renderToStaticMarkup } = require('react-dom/server');
-function load(states, fetcher = async () => ({ jobs: [] })) {
+function load(states, fetcher = async () => ({ jobs: [] }), poster = async () => ({})) {
   const effects = [], updates = [], opened = [];
   let index = 0;
   const context = { exports: {}, require(name) {
     if (name === 'react') return { ...React, useState: initial => {
       const slot = index++; return [states[slot] ?? initial, value => updates.push([slot, value])];
-    }, useEffect: fn => effects.push(fn) };
-    if (name === '../lib/api') return { fetchAPI: fetcher };
+    }, useRef: initial => ({ current: initial }), useEffect: fn => effects.push(fn) };
+    if (name === '../lib/api') return { fetchAPI: fetcher, postAPI: poster };
     return require(name);
   }};
   vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(__dirname, '../app/us/refresh-history.tsx'), 'utf8'), {
@@ -82,4 +82,51 @@ test('interrupted history reports unknown completion without opening a guessed r
   assert.match(html,/Completion is unknown/);
   assert.doesNotMatch(html,/Open saved research/);
   assert.equal(buttons(fixture.element).length,1);
+});
+
+
+test('recovery is hidden without remote capability and needs explicit confirmation', () => {
+  const job={id:'one',state:'running'};
+  assert.doesNotMatch(renderToStaticMarkup(load([[job],false,'']).element),/Interrupt refresh/);
+  const fixture=load([[job],false,'',0,true]);
+  const action=buttons(fixture.element).find(button=>button.props.children==='Interrupt refresh');
+  action.props.onClick();
+  assert.ok(fixture.updates.some(([slot,value])=>slot===6 && value==='one'));
+});
+
+test('confirmed recovery submits only job identity and preserves completed race result', async () => {
+  const requests=[];
+  const fixture=load([[{id:'one',state:'running'}],false,'',0,true,'','one'],undefined,async(url,body)=>{
+    requests.push([url,body]);return {job:{id:'one',state:'completed',package_id:'a'.repeat(64)}};
+  });
+  const action=buttons(fixture.element).find(button=>button.props.children==='Confirm interruption');
+  await action.props.onClick();
+  assert.equal(requests.length,1);
+  assert.equal(requests[0][0],'/api/us/research/jobs/one/interrupt');
+  assert.equal(JSON.stringify(requests[0][1]),'{}');
+  const update=fixture.updates.find(([slot,value])=>slot===0 && typeof value==='function');
+  assert.equal(update[1]([{id:'one',state:'running'}])[0].state,'completed');
+});
+
+test('failed recovery gives no invented terminal state and sanitizes feedback', async () => {
+  const fixture=load([[{id:'one',state:'running'}],false,'',0,true,'','one'],undefined,async()=>{throw Error('private provider details');});
+  await buttons(fixture.element).find(button=>button.props.children==='Confirm interruption').props.onClick();
+  assert.equal(fixture.updates.some(([slot])=>slot===0),false);
+  const error=fixture.updates.find(([slot,value])=>slot===2 && value);
+  assert.match(error[1],/not confirmed/); assert.doesNotMatch(error[1],/private/);
+});
+
+
+test('duplicate recovery clicks send once and late account responses are ignored', async () => {
+  let resolve; let count=0;
+  const fixture=load([[{id:'one',state:'running'}],false,'',0,true,'','one'],async()=>({jobs:[]}),()=>{count++;return new Promise(done=>resolve=done);});
+  const cleanup=fixture.effects[0]();
+  await new Promise(done=>setImmediate(done));
+  const action=buttons(fixture.element).find(button=>button.props.children==='Confirm interruption');
+  const first=action.props.onClick();
+  await action.props.onClick();
+  assert.equal(count,1);
+  cleanup();const before=fixture.updates.length;
+  resolve({job:{id:'one',state:'interrupted'}});await first;
+  assert.equal(fixture.updates.length,before);
 });

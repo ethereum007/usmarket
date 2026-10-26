@@ -223,7 +223,21 @@ def recent_jobs(user: dict = Depends(require_us_user)):
         jobs = [{k: v for k, v in row.items() if k in {'id', 'state', 'updated_at', 'package_id', 'error', 'completion_unknown'}} for row in rows]
     except STORAGE_ERRORS:
         raise HTTPException(503, 'Refresh status storage is temporarily unavailable') from None
-    return {'success': True, 'jobs': jobs}
+    return {'success': True, 'jobs': jobs, 'interruption_available': remote_jobs.enabled()}
+
+
+@router.post('/jobs/{job_id}/interrupt')
+def interrupt_job(job_id: str, user: dict = Depends(require_us_user)):
+    from uuid import UUID
+    try:
+        if str(UUID(job_id)) != job_id:
+            raise ValueError()
+    except ValueError:
+        raise HTTPException(422, 'Invalid refresh identity') from None
+    if not remote_jobs.enabled():
+        raise HTTPException(409, 'Explicit interruption requires remote refresh coordination')
+    observed = remote_jobs.execute('interrupt', user.get('_access_token'), job_id)
+    return {'success': True, 'job': observed}
 
 
 @router.get('/jobs/{job_id}')
