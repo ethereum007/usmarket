@@ -41,3 +41,6 @@ Remote job responses are also checked at the transport boundary: single observat
 
 
 Remote plan acknowledgements now require a canonical plan UUID, positive integer revision and US/USD metadata. Get/save responses must match the requested identity and revision; save acknowledgements must also match every immutable source identity sent by the API. Malformed or mismatched replies fail with sanitized storage-unavailable feedback, never confirmed-save feedback or a local fallback. Owner/token transport fields are excluded from returned plan records. This checks acknowledgement consistency; it does not establish hosted storage durability.
+
+
+Research publication acknowledgements now reuse the imported publication validator/content comparison: both ID and immutable payload must match before completion is recorded. Identical replay may retain the original computed_at and instrument observation time, consistent with local publication and the SQL RPC. Changed symbols, state, units or other immutable content, and invalid acknowledgement timestamps, produce sanitized unconfirmed-publication errors. These response checks do not certify actual Supabase gateway/hosted acceptance.

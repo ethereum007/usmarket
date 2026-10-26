@@ -482,3 +482,39 @@ def test_remote_observation_drops_unapproved_fields_and_sanitizes_error():
         '_access_token':'private-token','error':'private provider body','package_id':'a'*64},'one')
     assert result=={'id':'one','state':'failed','error':'Research refresh failed; saved research remains available'}
     assert 'private' not in json.dumps(result)
+
+
+@pytest.mark.parametrize('change',[
+    {'symbols':['MSFT']}, {'state':'partial'}, {'currency':'INR'},
+    {'computed_at':'no-observation-time'},
+])
+def test_remote_publication_rejects_same_id_with_changed_or_invalid_evidence(change,monkeypatch):
+    import httpx
+    from types import SimpleNamespace
+    from fastapi import HTTPException
+    from app.services import us_remote_research as remote
+    payload={'id':'a'*64,'universe':'us-test','market':'US','currency':'USD','state':'final',
+        'session':'2026-10-23','computed_at':'2026-10-24T00:00:00Z','symbols':['AAPL']}
+    monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://us.example',SUPABASE_ANON_KEY='public-test'))
+    original=httpx.Client
+    transport=httpx.MockTransport(lambda request:httpx.Response(200,json={**payload,**change}))
+    with patch.object(remote.httpx,'Client',lambda **kwargs:original(transport=transport,**kwargs)):
+        with pytest.raises(HTTPException) as error:remote.execute('publish','token',payload['id'],payload)
+    assert error.value.status_code==503
+    assert 'AAPL' not in str(error.value) and 'token' not in str(error.value)
+
+
+def test_remote_publication_accepts_identical_replay_with_original_observation(monkeypatch):
+    import httpx
+    from types import SimpleNamespace
+    from app.services import us_remote_research as remote
+    payload={'id':'a'*64,'universe':'us-test','market':'US','currency':'USD','state':'final',
+        'session':'2026-10-23','computed_at':'2026-10-24T01:00:00Z','symbols':['AAPL'],
+        'instrument_snapshot':{'observed_at':'2026-10-24T01:00:00Z','records':{'AAPL':'synthetic'}}}
+    earlier={**payload,'computed_at':'2026-10-24T00:00:00Z',
+        'instrument_snapshot':{'observed_at':'2026-10-24T00:00:00Z','records':{'AAPL':'synthetic'}}}
+    monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://us.example',SUPABASE_ANON_KEY='public-test'))
+    original=httpx.Client
+    transport=httpx.MockTransport(lambda request:httpx.Response(200,json=earlier))
+    with patch.object(remote.httpx,'Client',lambda **kwargs:original(transport=transport,**kwargs)):
+        assert remote.execute('publish','token',payload['id'],payload)==earlier

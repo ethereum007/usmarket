@@ -4,7 +4,7 @@ import httpx
 from fastapi import HTTPException
 from app.config import settings
 from app.services.us_readiness import https_origin
-from app.services.us_publication import validate
+from app.services.us_publication import validate, content
 
 
 def enabled():
@@ -36,8 +36,12 @@ def execute(action, token, package_id=None, package_payload=None):
                 raise ValueError()
         elif result is not None and not isinstance(result, dict):
             raise ValueError()
-        if action == 'publish' and (not isinstance(result, dict) or result.get('id') != package_id):
-            raise ValueError()
+        if action == 'publish':
+            if not isinstance(result, dict) or result.get('id') != package_id:
+                raise ValueError()
+            validate(result)
+            if content(result) != content(package_payload):
+                raise ValueError('Publication acknowledgement does not match immutable content')
         return result
     except (httpx.HTTPError, ValueError, TypeError):
         raise HTTPException(503, 'US remote research storage is unavailable; publication was not confirmed') from None
