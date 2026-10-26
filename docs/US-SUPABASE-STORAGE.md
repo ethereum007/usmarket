@@ -105,3 +105,8 @@ The operator preflight now requires an absolute DATA_DIR whenever any repository
 ## Bounded research catalog payload
 
 The un-applied research RPC migration now projects its latest-120 catalog to ten fields only: id, market, currency, universe, session, state, benchmark, feed, computed_at and symbols. It preserves existing owner filtering and session/time/id ordering without returning price bars, setups, instrument snapshots or unexpected payload fields. Exact get/publication still returns and preserves the full immutable package; this changes neither source identity nor partial/final semantics. Existing API summaries consume this same metadata contract, so no frontend API change is needed. PostgreSQL tests compare the exact projected fields, cross-owner exclusion and complete unchanged exact reads. The disposable restore verifier also compares projected owner reads after restore. Hosted migration/flags and actual bandwidth/load acceptance remain pending.
+
+
+## Current activation review bundle
+
+See SUPABASE-ACTIVATION-REVIEW.md for the ordered six-file source review, normalized hashes and bundle fingerprint. The read-only us_migration_review CLI does not inspect hosted state or apply SQL. CI rejects inventory changes or a stale review fingerprint, so source changes must update the concrete review before activation. Pending approval remains separate from source work and is not permission to create access grants or enable flags.
