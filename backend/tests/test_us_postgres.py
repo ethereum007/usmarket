@@ -23,6 +23,8 @@ def pg():
         conn.execute("create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$")
         conn.execute('grant usage on schema auth,public to authenticated,anon')
         conn.execute('insert into auth.users values (%s),(%s)', (A,B))
+        # Model a project whose existing defaults grant every new table to PUBLIC.
+        conn.execute('alter default privileges in schema public grant select,insert,update,delete on tables to public')
         for migration in sorted((Path(__file__).resolve().parents[2]/'supabase'/'migrations').glob('*.sql')):
             conn.execute(migration.read_text(encoding='utf-8-sig'))
     return psycopg
@@ -107,3 +109,26 @@ def test_job_transitions_require_published_owner_package_and_hide_other_owners(p
     assert save('completed',package_id=key)['package_id']==key
     assert rpc(pg,B,'us_job_store',dict(action='get',job_id=job)) is None
     with pytest.raises(pg.Error):save('failed')
+
+
+@pytest.mark.parametrize('table',['us_plan_revisions','us_research_packages','us_refresh_jobs'])
+@pytest.mark.parametrize('role',['authenticated','anon'])
+def test_no_direct_table_access_even_with_permissive_public_defaults(pg,table,role):
+    for statement in [f'select * from public.{table}',f'delete from public.{table}',
+                      f'update public.{table} set payload=payload']:
+        with pg.connect(DSN) as conn:
+            conn.execute('select set_config(%s,%s,true)',('request.jwt.claim.sub',A))
+            conn.execute('set local role '+role)
+            with pytest.raises(pg.Error) as error:conn.execute(statement)
+            assert error.value.sqlstate=='42501'
+
+
+def test_authenticated_client_cannot_append_revision_outside_rpc(pg):
+    from psycopg.types.json import Jsonb
+    with pg.connect(DSN) as conn:
+        conn.execute('select set_config(%s,%s,true)',('request.jwt.claim.sub',A))
+        conn.execute('set local role authenticated')
+        with pytest.raises(pg.Error) as error:
+            conn.execute('insert into public.us_plan_revisions(id,revision,owner,payload) values(%s,99,%s,%s)',
+                         (str(uuid4()),A,Jsonb({'notes':'Bypass expected revision'})))
+        assert error.value.sqlstate=='42501'

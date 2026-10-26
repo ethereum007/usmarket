@@ -44,3 +44,8 @@ Remote plan acknowledgements now require a canonical plan UUID, positive integer
 
 
 Research publication acknowledgements now reuse the imported publication validator/content comparison: both ID and immutable payload must match before completion is recorded. Identical replay may retain the original computed_at and instrument observation time, consistent with local publication and the SQL RPC. Changed symbols, state, units or other immutable content, and invalid acknowledgement timestamps, produce sanitized unconfirmed-publication errors. These response checks do not certify actual Supabase gateway/hosted acceptance.
+
+
+## Inherited PUBLIC grants
+
+All storage tables now revoke direct access from PostgreSQL PUBLIC as well as anon/authenticated. This prevents an inherited PUBLIC grant from reopening direct inserts that bypass the RPC revision/identity checks. Real PostgreSQL CI deliberately grants permissive default table privileges before applying the migrations, then verifies direct select/update/delete are denied for both client roles on all three tables and authenticated direct plan insertion is denied. Restricted RPCs remain available under their explicit grants. The migrations are still un-applied to the hosted project; this does not authorize activation.

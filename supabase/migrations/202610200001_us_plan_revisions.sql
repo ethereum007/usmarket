@@ -6,7 +6,7 @@ create table if not exists public.us_plan_revisions (
   primary key (id, revision)
 );
 alter table public.us_plan_revisions enable row level security;
-revoke all on public.us_plan_revisions from anon, authenticated;
+revoke all on public.us_plan_revisions from public, anon, authenticated;
 -- Table access is private; only the owner-filtered RPC below can append.
 create policy us_plan_owner_read on public.us_plan_revisions for select to authenticated using (owner = auth.uid());
 create policy us_plan_owner_insert on public.us_plan_revisions for insert to authenticated with check (owner = auth.uid());

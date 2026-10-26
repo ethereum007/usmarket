@@ -4,7 +4,7 @@ create table public.us_research_packages (
   payload jsonb not null, primary key(owner, id)
 );
 alter table public.us_research_packages enable row level security;
-revoke all on public.us_research_packages from anon, authenticated;
+revoke all on public.us_research_packages from public, anon, authenticated;
 create or replace function public.us_research_store(action text, package_id text default null,
   package_payload jsonb default null) returns jsonb
 language plpgsql security definer set search_path = '' as $$

@@ -4,7 +4,7 @@ create table public.us_refresh_jobs (
   primary key(owner,id)
 );
 alter table public.us_refresh_jobs enable row level security;
-revoke all on public.us_refresh_jobs from anon, authenticated;
+revoke all on public.us_refresh_jobs from public, anon, authenticated;
 create or replace function public.us_job_store(action text, job_id uuid default null,
  job_payload jsonb default null) returns jsonb
 language plpgsql security definer set search_path = '' as $$
