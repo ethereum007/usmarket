@@ -352,7 +352,10 @@ def test_api_remote_plan_journey_uses_real_sql_and_preserves_account_boundaries(
         requests.append(request)
         owner={'Bearer synthetic-account-a':A,'Bearer synthetic-account-b':B}[request.headers['authorization']]
         name=request.url.path.rsplit('/',1)[-1]
-        try:return httpx.Response(200,json=rpc(pg,owner,name,json.loads(request.content)))
+        try:
+            result=rpc(pg,owner,name,json.loads(request.content))
+            # httpx json=None constructs an empty body, not JSON null.
+            return httpx.Response(200,content=json.dumps(result),headers={'content-type':'application/json'})
         except pg.Error as error:
             return httpx.Response(409 if error.sqlstate in {'PT409','23505'} else 400,json={'code':error.sqlstate})
     original=httpx.Client
