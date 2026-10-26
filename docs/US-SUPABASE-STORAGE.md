@@ -120,3 +120,8 @@ Remote save acknowledgement now compares every submitted persisted plan field, n
 ## API-to-PostgreSQL plan journey in CI
 
 The disposable PostgreSQL suite now sends FastAPI plan requests through the real remote adapters and a synthetic PostgREST wire shim that invokes the actual migrated RPCs. It exercises source-package read/validation, server USD sizing, save confirmation, exact lost-response replay, revision append, old-revision reopening, list/export, and second-account read/write denial even when that account has its own source copy. Requests carry synthetic account tokens and no owner selector; no real provider or Supabase account is used. This closes a source integration gap between HTTP mocks and standalone SQL tests. It does not certify actual PostgREST/Supabase gateway behavior, hosted sign-in, browser operation or restart retention. No migration/flag is activated.
+
+
+## API-to-PostgreSQL refresh journey in CI
+
+The source integration suite also drives refresh admission, running persistence, mocked provider generation, atomic publication/completion, catalog/exact read and foreign-account denial through FastAPI/remote adapters into real PostgreSQL. A second case interrupts the running job during simulated generation and verifies that late atomic publication cannot store its package or overwrite the interrupted/unknown outcome. The fully remote path creates no local files/SQLite lock and does not persist synthetic tokens. Provider work and the HTTP gateway remain synthetic; real Supabase authentication/PostgREST, live data rights, hosted concurrency and restart acceptance remain open. No hosted flag or migration is activated.

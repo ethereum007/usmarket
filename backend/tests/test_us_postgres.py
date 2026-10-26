@@ -387,3 +387,69 @@ def test_api_remote_plan_journey_uses_real_sql_and_preserves_account_boundaries(
         assert [row['revision'] for row in revisions]==[1,2]
         assert revisions[0]==saved and revisions[1]['notes']==changed['notes']
     assert requests and all('owner' not in json.loads(request.content) for request in requests)
+
+
+@pytest.mark.parametrize('interrupt_during_generation',[False,True])
+def test_api_remote_refresh_journey_and_interruption_use_real_sql(pg,monkeypatch,tmp_path,interrupt_during_generation):
+    import httpx
+    from dataclasses import replace
+    from types import SimpleNamespace
+    from unittest.mock import patch
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from app.routes import us_research as api
+    from app.services import us_remote_jobs,us_remote_research
+    from app.us_auth import require_us_user
+    key=uuid4().hex*2
+    package={'id':key,'market':'US','currency':'USD','state':'partial','universe':'us-refresh-contract',
+             'session':'2026-10-23','computed_at':'2026-10-24T00:00:00Z','symbols':['AAPL'],
+             'benchmark':'SPY','feed':'sip','setups':[]}
+    identity={'id':A,'_access_token':'synthetic-account-a'}
+    app=FastAPI();app.include_router(api.router)
+    app.dependency_overrides[require_us_user]=lambda:identity
+    client=TestClient(app)
+    monkeypatch.setenv('US_JOB_STORE','supabase');monkeypatch.setenv('US_RESEARCH_STORE','supabase')
+    monkeypatch.setattr(api,'settings',replace(api.settings,DATA_DIR=tmp_path))
+    config=SimpleNamespace(SUPABASE_URL='https://us.example',SUPABASE_ANON_KEY='public-test')
+    monkeypatch.setattr(us_remote_jobs,'settings',config);monkeypatch.setattr(us_remote_research,'settings',config)
+    requests=[];generated=[]
+    def gateway(request):
+        requests.append(request)
+        owner={'Bearer synthetic-account-a':A,'Bearer synthetic-account-b':B}[request.headers['authorization']]
+        name=request.url.path.rsplit('/',1)[-1]
+        try:
+            result=rpc(pg,owner,name,json.loads(request.content))
+            return httpx.Response(200,content=json.dumps(result),headers={'content-type':'application/json'})
+        except pg.Error as error:
+            return httpx.Response(409 if error.sqlstate in {'PT409','23505'} else 400,json={'code':error.sqlstate})
+    async def generate(args):
+        generated.append(args)
+        assert args.publish_local is False
+        active=[row for row in rpc(pg,A,'us_job_store',dict(action='list')) if row['state']=='running']
+        assert len(active)==1
+        if interrupt_during_generation:
+            rpc(pg,A,'us_job_interrupt',dict(job_id=active[0]['id']))
+        return package
+    original=httpx.Client
+    with patch.object(us_remote_jobs.httpx,'Client',lambda **kwargs:original(transport=httpx.MockTransport(gateway),**kwargs)), \
+         patch.object(api,'run',generate), \
+         patch.object(api,'acquire_refresh_lock',side_effect=OSError('No local storage allowed')) as local:
+        response=client.post('/api/us/research/refresh',json={'symbols':'AAPL'})
+        assert response.status_code==200
+        job=response.json()['job']['id']
+        recorded=client.get('/api/us/research/jobs/'+job).json()['job']
+        if interrupt_during_generation:
+            assert recorded['state']=='interrupted' and recorded['completion_unknown'] is True
+            assert 'package_id' not in recorded
+            assert client.get('/api/us/research/packages/'+key).status_code==404
+        else:
+            assert recorded['state']=='completed' and recorded['package_id']==key
+            assert client.get('/api/us/research/packages/'+key).json()['package']==package
+            catalog=client.get('/api/us/research/packages').json()['packages']
+            assert any(row['id']==key and row['state']=='partial' for row in catalog)
+        identity={'id':B,'_access_token':'synthetic-account-b'}
+        assert client.get('/api/us/research/jobs/'+job).status_code==404
+        assert client.get('/api/us/research/packages/'+key).status_code==404
+    local.assert_not_called()
+    assert len(generated)==1 and list(tmp_path.iterdir())==[]
+    assert 'synthetic-account-a' not in json.dumps(rpc(pg,A,'us_job_store',dict(action='get',job_id=job)))
