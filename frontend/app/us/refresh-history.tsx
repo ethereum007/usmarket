@@ -44,7 +44,7 @@ export default function RefreshHistory({ onOpen, revision }: { onOpen: (id: stri
       if (current.active && generation === current.generation) setError("Interruption was not confirmed. Reload history and check saved research before retrying.");
     } finally {
       current.busy = false;
-      if (current.active && generation === current.generation) setPending("");
+      if (current.active) setPending("");
     }
   }
   return <section className="us-notes" aria-label="Your refresh history">
