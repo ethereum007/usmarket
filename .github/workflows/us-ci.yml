@@ -50,6 +50,16 @@ jobs:
           tests/test_us_live.py tests/test_us_refresh_lock.py tests/test_us_research_routes.py tests/test_us_plans.py tests/test_us_sessions.py tests/test_us_instruments.py tests/test_us_publication.py tests/test_us_filings.py
           tests/test_swing_detector.py tests/test_swing_early_momentum.py
           tests/test_swing_acceleration.py tests/test_swing_institutional_setups.py -q
+      - name: Rehearse disposable PostgreSQL backup and restore
+        env:
+          PG_CONTAINER: ${{ job.services.postgres.id }}
+          US_TEST_POSTGRES_RESTORE_DSN: postgresql://us_test:ci-only-disposable@localhost:5432/usmarket_contract_restore_test
+        run: |
+          set -euo pipefail
+          docker exec "$PG_CONTAINER" pg_dump -U us_test -d usmarket_contract_test --format=custom --file=/tmp/usmarket-contract.dump
+          docker exec "$PG_CONTAINER" createdb -U us_test usmarket_contract_restore_test
+          docker exec "$PG_CONTAINER" pg_restore -U us_test --exit-on-error --dbname=usmarket_contract_restore_test /tmp/usmarket-contract.dump
+          python tests/verify_us_restore.py
   us-frontend:
     runs-on: ubuntu-latest
     timeout-minutes: 20
