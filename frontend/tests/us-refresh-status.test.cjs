@@ -10,7 +10,7 @@ function load(fetcher) {
     require(name){if(name==='./api')return {fetchAPI:url=>{requests.push(url);return fetcher(url);}};throw new Error(name);}};
   vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(__dirname,'../app/lib/us-refresh-status.ts'),'utf8'),{
     compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,context);
-  return {start:job=>context.exports.observeRefresh(job,value=>statuses.push(value),value=>errors.push(value)),timers,cleared,statuses,errors,requests};
+  return {restore:()=>context.exports.restoreActiveRefresh(),start:job=>context.exports.observeRefresh(job,value=>statuses.push(value),value=>errors.push(value)),timers,cleared,statuses,errors,requests};
 }
 test('transport failure preserves recorded outcome and sanitizes details',async()=>{
   const fixture=load(async()=>{throw new Error('private provider response');});
@@ -42,4 +42,24 @@ test('terminal records and missing jobs do not poll',()=>{
   const fixture=load(async()=>{throw new Error('must not fetch');});
   for(const state of ['completed','failed','interrupted'])fixture.start({id:'one',state});fixture.start(null);
   assert.equal(fixture.timers.length,0);
+});
+
+
+for(const state of ['queued','running'])test(`reload rediscovers recorded ${state} without creating work`,async()=>{
+  const fixture=load(async()=>({jobs:[{id:'terminal',state:'completed'},{id:'existing',state}]}));
+  const job=await fixture.restore();
+  assert.equal(job.id,'existing');assert.equal(job.state,state);
+  assert.deepEqual(fixture.requests,['/api/us/research/jobs']);
+  assert.equal(fixture.timers.length,0);
+  fixture.start(job);assert.equal(fixture.timers.length,1);
+});
+
+test('completed or interrupted history does not invent an active refresh',async()=>{
+  const fixture=load(async()=>({jobs:[{id:'done',state:'completed'},{id:'unknown',state:'interrupted'}]}));
+  assert.equal(await fixture.restore(),null);
+});
+for(const jobs of [null,[{id:'one',state:'invented'}],[{id:'one',state:'running'},{id:'two',state:'queued'}],
+    [{id:'same',state:'running'},{id:'same',state:'completed'}]])test('malformed or ambiguous history does not select a guessed worker '+JSON.stringify(jobs),async()=>{
+  const fixture=load(async()=>({jobs}));await assert.rejects(fixture.restore());
+  assert.equal(fixture.statuses.length,0);assert.equal(fixture.timers.length,0);
 });

@@ -29,7 +29,7 @@ import USPlans from "./plans";
 import USFilings from "./filings";
 import RefreshHistory from "./refresh-history";
 import SessionBrief from "./session-brief";
-import { observeRefresh, type RefreshJob as Job } from "../lib/us-refresh-status";
+import { observeRefresh, restoreActiveRefresh, type RefreshJob as Job } from "../lib/us-refresh-status";
 import { useAuth } from "../contexts/AuthContext";
 const Chart = dynamic(
   () =>
@@ -153,6 +153,17 @@ function USResearchContent() {
       );
     }
   }, [notes, ready, user?.id]);
+  useEffect(() => {
+    if (!user?.id) return;
+    let active = true;
+    restoreActiveRefresh().then(recorded => {
+      // A manual refresh submitted during discovery has priority.
+      if (active && recorded) setJob(current => current || recorded);
+    }).catch(() => {
+      if (active) setJobStatusError("Previous refresh status could not be restored. Reload refresh history before starting another refresh.");
+    });
+    return () => { active = false; };
+  }, [user?.id]);
   useEffect(() => observeRefresh(job, (recorded) => {
     setJobStatusError("");
     setJob(recorded);

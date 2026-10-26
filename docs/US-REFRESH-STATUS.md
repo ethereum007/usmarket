@@ -26,3 +26,8 @@ Reconciliation regressions cover multiple owners, preserved completed results, u
 A failed status request leaves the last recorded job unchanged and displays separate, sanitized feedback with an explicit check-again action. It does not release the refresh button as if the server job had failed. Poll cleanup ignores late responses after unmount; the workspace remounts for each authenticated owner. Job identity and state must match the request contract before an observation is accepted. Only queued/running jobs poll.
 
 A completed job remains completed if catalog reloading fails. The exact package can still be selected, while catalog failure receives separate feedback; the UI no longer claims research reloaded merely because a completed status arrived. History remains available for explicit result opening. Unit tests simulate disconnect/retry, terminal outcomes, unexpected responses and late completion. These checks do not substitute for a real browser or market-open outage drill.
+
+
+## Page reload rediscovery
+
+An authenticated account workspace reads its owner-scoped recent job history on mount and resumes observation of a single queued/running record. This does not restart provider work or prove worker liveness. Terminal records do not become active; multiple active or malformed/duplicate observations fail without guessing. A new manual request takes precedence over a late discovery response, and cleanup ignores responses after the account workspace unmounts. Failed discovery keeps an explicit warning to inspect/reload history before another refresh. The latest-20 history window and actual hosted account/restart acceptance remain limits. No storage flag or hosted migration is enabled by this source change.

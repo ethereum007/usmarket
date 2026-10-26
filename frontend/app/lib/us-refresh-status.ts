@@ -20,3 +20,19 @@ export function observeRefresh(job: RefreshJob | null, onStatus: (job: RefreshJo
   }, 2500);
   return () => { active = false; clearTimeout(timer); };
 }
+
+
+// Rediscover only recorded active work; never infer liveness or restart a worker.
+export async function restoreActiveRefresh(): Promise<RefreshJob | null> {
+  const result = await fetchAPI<{ jobs: RefreshJob[] }>("/api/us/research/jobs");
+  if (!Array.isArray(result.jobs) || result.jobs.length > 20) throw new Error("Invalid refresh history");
+  const identities = new Set<string>();
+  for (const job of result.jobs) {
+    if (!job || typeof job.id !== "string" || !job.id || identities.has(job.id) ||
+        !["queued", "running", "completed", "failed", "interrupted"].includes(job.state)) throw new Error("Invalid refresh history");
+    identities.add(job.id);
+  }
+  const active = result.jobs.filter(job => ["queued", "running"].includes(job.state));
+  if (active.length > 1) throw new Error("Ambiguous active refresh history");
+  return active[0] || null;
+}
