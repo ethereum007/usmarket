@@ -12,7 +12,7 @@ import {
   RefreshCw,
   Search,
 } from "lucide-react";
-import { fetchAPI, postAPI } from "../lib/api";
+import { fetchAPI } from "../lib/api";
 import { useTheme } from "../lib/theme";
 import { weeklyBars } from "../lib/swing-research";
 import {
@@ -24,6 +24,7 @@ import {
 } from "../lib/us-research";
 import { readNotes, writeNotes, type BrowserNotes as Notes } from "../lib/us-browser-notes";
 import { currentCatalog, defaultCatalogPackage } from "../lib/us-catalog";
+import { submitRefresh } from "../lib/us-refresh-submit";
 import "./us.css";
 import LiveFeed from "./live-feed";
 import USPlans from "./plans";
@@ -65,6 +66,13 @@ function USResearchContent() {
   const [loading, setLoading] = useState(true);
   const [job, setJob] = useState<Job | null>(null);
   const [jobStatusError, setJobStatusError] = useState("");
+  const [submittingRefresh, setSubmittingRefresh] = useState(false);
+  const [refreshRequestError, setRefreshRequestError] = useState("");
+  const refreshSubmission = useRef({ active: true, pending: false });
+  useEffect(() => {
+    refreshSubmission.current.active = true;
+    return () => { refreshSubmission.current.active = false; };
+  }, []);
   const [statusRetry, setStatusRetry] = useState(0);
   const [draftSymbols, setDraftSymbols] = useState("");
   const [benchmark, setBenchmark] = useState("SPY");
@@ -227,17 +235,8 @@ function USResearchContent() {
     }));
   }
   async function refresh() {
-    setError("");
-    try {
-      const result = await postAPI<{ job: Job }>(`${ROOT}/refresh`, {
-        symbols: draftSymbols,
-        benchmark,
-        feed: "sip",
-      });
-      setJob(result.job);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Refresh failed");
-    }
+    await submitRefresh({ symbols: draftSymbols, benchmark, feed: "sip" },
+      refreshSubmission.current, setJob, setRefreshRequestError, setSubmittingRefresh);
   }
   function exportResearch() {
     if (!data) return;
@@ -723,10 +722,10 @@ function USResearchContent() {
           <button
             className="us-primary"
             onClick={() => void refresh()}
-            disabled={Boolean(busy) || !draftSymbols.trim()}
+            disabled={submittingRefresh || Boolean(busy) || !draftSymbols.trim()}
           >
-            <RefreshCw size={15} className={busy ? "us-spin" : ""} />
-            {busy ? "Refreshing…" : "Refresh completed-session research"}
+            <RefreshCw size={15} className={busy || submittingRefresh ? "us-spin" : ""} />
+            {submittingRefresh ? "Submitting refresh…" : busy ? "Refreshing…" : "Refresh completed-session research"}
           </button>
         </div>
         {job && (
@@ -737,6 +736,7 @@ function USResearchContent() {
             {busy ? " Status is not a worker heartbeat; after an outage, check saved research before retrying." : ""}
           </p>
         )}
+        {refreshRequestError && <p role="alert">{refreshRequestError}</p>}
         {jobStatusError && <div role="alert">
           <p>{jobStatusError}</p>
           <button type="button" className="workspace-button" onClick={() => { setJobStatusError(""); setStatusRetry(value => value + 1); }}>Check refresh status again</button>

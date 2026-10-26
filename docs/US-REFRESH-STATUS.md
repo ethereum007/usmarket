@@ -31,3 +31,8 @@ A completed job remains completed if catalog reloading fails. The exact package 
 ## Page reload rediscovery
 
 An authenticated account workspace reads its owner-scoped recent job history on mount and resumes observation of a single queued/running record. This does not restart provider work or prove worker liveness. Terminal records do not become active; multiple active or malformed/duplicate observations fail without guessing. A new manual request takes precedence over a late discovery response, and cleanup ignores responses after the account workspace unmounts. Failed discovery keeps an explicit warning to inspect/reload history before another refresh. The latest-20 history window and actual hosted account/restart acceptance remain limits. No storage flag or hosted migration is enabled by this source change.
+
+
+## Admission submission guard
+
+The workspace locks submission synchronously before the refresh POST returns and displays a submitting state, preventing rapid duplicate clicks before job acknowledgement. Only a canonical queued-job acknowledgement starts observation; unexpected fields are excluded. Account cleanup ignores late acknowledgements/errors and does not invent a job outcome. Timeout or malformed response is unconfirmed and asks the user to inspect history before an explicit retry. This UI guard is not server idempotency and cannot prove a timed-out request was not admitted. Durable remote admission remains authoritative; no automatic resubmission is added. Hosted browser acceptance remains open.
