@@ -65,6 +65,12 @@ def execute(action, token, job_id=None, payload=None):
             raise ValueError()
         if action == 'list':
             return [public_observation(row) for row in result]
-        return None if result is None else public_observation(result, job_id)
+        observation = None if result is None else public_observation(result, job_id)
+        if action == 'save':
+            if observation['state'] != payload['state']:
+                raise ValueError('Unconfirmed job transition')
+            if payload['state'] == 'completed' and observation['package_id'] != payload.get('package_id'):
+                raise ValueError('Unconfirmed completion identity')
+        return observation
     except (httpx.HTTPError, ValueError, TypeError):
         raise HTTPException(503, 'Refresh status storage is temporarily unavailable') from None

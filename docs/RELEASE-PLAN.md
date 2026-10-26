@@ -6,6 +6,8 @@ Owner: Kiran Dutta. Repository: ethereum007/usmarket. Target: US Thanksgiving, T
 
 Private hosted MVP for invited users by Sunday, 25 October 2026, confirmed by the user on 20 October. Execute docs/WEEKEND-MVP.md before adding broader features. Private access and actual display permissions still apply; source tests alone do not satisfy hosted acceptance.
 
+The 25 October target was missed without hosted acceptance. The gate remains failed; no revised private-MVP deadline is assigned. Continue independent source work while hosted migration approval is pending.
+
 ## Product promise
 
 A US swing-research workspace that answers: what is leading, why a stock deserves attention today, which evidence supports the setup, what invalidates the thesis, which events change the risk, and what happened afterward.

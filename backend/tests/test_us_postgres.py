@@ -163,3 +163,33 @@ def test_job_retry_preserves_observation_and_terminal_evidence(pg,terminal):
     assert error.value.sqlstate=='PT409'
     assert rpc(pg,A,'us_job_store',dict(action='get',job_id=job))==first
     assert rpc(pg,B,'us_job_store',dict(action='get',job_id=job)) is None
+
+
+def test_concurrent_refresh_admission_is_owner_scoped_and_released_only_by_terminal(pg):
+    jobs=[str(uuid4()),str(uuid4())]
+    def save(owner,job,state):
+        return rpc(pg,owner,'us_job_store',dict(action='save',job_id=job,
+                   job_payload={'id':job,'state':state}))
+    def admit(job):
+        try:return save(A,job,'queued')
+        except pg.Error as error:return error.sqlstate
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results=list(pool.map(admit,jobs))
+    winners=[row for row in results if isinstance(row,dict)]
+    assert len(winners)==1
+    assert [row for row in results if isinstance(row,str)]==['23505']
+    winner=winners[0]['id']
+    loser=next(job for job in jobs if job!=winner)
+    foreign=str(uuid4())
+    assert save(B,foreign,'queued')['state']=='queued'
+    assert rpc(pg,B,'us_job_store',dict(action='get',job_id=winner)) is None
+    save(A,winner,'running')
+    # Old observations still reserve admission; elapsed time is not fencing.
+    with pg.connect(DSN) as conn:
+        conn.execute("update public.us_refresh_jobs set updated_at='2020-01-01T00:00:00Z' where owner=%s and id=%s",(A,winner))
+    with pytest.raises(pg.Error) as error:save(A,loser,'queued')
+    assert error.value.sqlstate=='23505'
+    assert save(A,winner,'failed')['state']=='failed'
+    assert save(A,loser,'queued')['state']=='queued'
+    save(A,loser,'running'); save(A,loser,'failed')
+    save(B,foreign,'running'); save(B,foreign,'failed')

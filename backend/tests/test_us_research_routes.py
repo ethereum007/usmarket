@@ -518,3 +518,39 @@ def test_remote_publication_accepts_identical_replay_with_original_observation(m
     transport=httpx.MockTransport(lambda request:httpx.Response(200,json=earlier))
     with patch.object(remote.httpx,'Client',lambda **kwargs:original(transport=transport,**kwargs)):
         assert remote.execute('publish','token',payload['id'],payload)==earlier
+
+
+@pytest.mark.parametrize('status',[409,503])
+def test_remote_admission_failure_never_schedules_provider_and_releases_local_lock(client,monkeypatch,status):
+    from unittest.mock import AsyncMock
+    from fastapi import HTTPException
+    c,_=client
+    monkeypatch.setenv('US_JOB_STORE','supabase')
+    monkeypatch.setenv('US_RESEARCH_STORE','supabase')
+    with patch.object(api.remote_jobs,'execute',side_effect=HTTPException(status,'Refresh admission unavailable')), \
+         patch.object(api,'run',AsyncMock()) as provider:
+        response=c.post('/api/us/research/refresh',json={'symbols':'AAPL'})
+    assert response.status_code==status
+    provider.assert_not_called()
+    lock=api.acquire_refresh_lock(api.settings.DATA_DIR/'us-refresh-lock.sqlite3')
+    lock.release()
+
+
+@pytest.mark.parametrize('requested,reply',[
+    ({'state':'queued'},{'state':'running'}),
+    ({'state':'running'},{'state':'queued'}),
+    ({'state':'completed','package_id':'a'*64},{'state':'completed','package_id':'b'*64}),
+])
+def test_remote_job_save_requires_exact_transition_acknowledgement(monkeypatch,requested,reply):
+    import httpx
+    from types import SimpleNamespace
+    from fastapi import HTTPException
+    from app.services import us_remote_jobs as remote
+    monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://us.example',SUPABASE_ANON_KEY='public-test'))
+    original=httpx.Client
+    transport=httpx.MockTransport(lambda request:httpx.Response(200,json={'id':'one',**reply}))
+    with patch.object(remote.httpx,'Client',lambda **kwargs:original(transport=transport,**kwargs)):
+        with pytest.raises(HTTPException) as error:
+            remote.execute('save','private-token','one',{'id':'one',**requested})
+    assert error.value.status_code==503
+    assert 'private-token' not in str(error.value)
