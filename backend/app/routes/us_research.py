@@ -151,7 +151,7 @@ class RefreshRequest(BaseModel):
 
     feed: Literal['sip','iex'] = 'sip'
 
-async def refresh_job(job_data: dict, payload: RefreshRequest, lock: RefreshLock, access_token=None):
+async def refresh_job(job_data: dict, payload: RefreshRequest, lock: RefreshLock | None, access_token=None):
     data = {**job_data, 'state': 'running'}
     try:
         # Do not fetch or publish if durable running status cannot be recorded.
@@ -175,7 +175,8 @@ async def refresh_job(job_data: dict, payload: RefreshRequest, lock: RefreshLock
         # or completion of publication; never replace it with an invented result.
         pass
     finally:
-        lock.release()
+        if lock is not None:
+            lock.release()
 
 @router.post('/refresh')
 
@@ -191,8 +192,10 @@ def refresh(payload: RefreshRequest, tasks: BackgroundTasks, user: dict = Depend
 
         raise HTTPException(422, 'Keep the benchmark separate from stock symbols')
 
+    remote_coordination = remote_jobs.enabled()
     try:
-        lock = acquire_refresh_lock(settings.DATA_DIR / 'us-refresh-lock.sqlite3')
+        # Remote queued persistence reserves per-account admission across hosts.
+        lock = None if remote_coordination else acquire_refresh_lock(settings.DATA_DIR / 'us-refresh-lock.sqlite3')
     except RefreshBusy:
         raise HTTPException(409, 'A US research refresh is already running') from None
     except (OSError, sqlite3.Error):
@@ -203,14 +206,15 @@ def refresh(payload: RefreshRequest, tasks: BackgroundTasks, user: dict = Depend
     try:
         # Exclusive ownership proves earlier API workers no longer hold this
         # coordinator. It does not prove whether their publication completed.
-        if not remote_jobs.enabled():
+        if not remote_coordination:
             repository.interrupt_jobs(database_path=job_database(),
                 updated_at=datetime.now(timezone.utc).isoformat(),
                 message='Previous refresh worker no longer owns coordination; completion is unknown. Check saved research before retrying.')
         persist_job(data, user.get('_access_token'))
         tasks.add_task(refresh_job, data, payload.model_copy(update={'symbols':','.join(symbols)}), lock, user.get('_access_token'))
     except BaseException as exc:
-        lock.release()
+        if lock is not None:
+            lock.release()
         if isinstance(exc, STORAGE_ERRORS):
             raise HTTPException(503, 'Refresh status storage is temporarily unavailable') from None
         raise

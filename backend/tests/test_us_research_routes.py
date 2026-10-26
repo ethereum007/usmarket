@@ -657,3 +657,26 @@ def test_refresh_selects_exactly_one_research_publication_destination(client,mon
     assert response.status_code==200
     assert generate.call_args.args[0].publish_local is (not remote)
     assert publish.call_count==int(remote)
+
+
+@pytest.mark.parametrize('rejected',[False,True])
+def test_remote_coordination_never_opens_local_lock_or_job_storage(client,monkeypatch,rejected):
+    from unittest.mock import AsyncMock
+    from fastapi import HTTPException
+    c,root=client
+    monkeypatch.setenv('US_JOB_STORE','supabase');monkeypatch.setenv('US_RESEARCH_STORE','supabase')
+    package={'id':'a'*64}
+    with patch.object(api,'acquire_refresh_lock',side_effect=OSError('local disk unavailable')) as local_lock, \
+         patch.object(api.repository,'save_job',side_effect=OSError('local disk unavailable')) as local_status, \
+         patch.object(api.repository,'interrupt_jobs') as local_recovery, \
+         patch.object(api.remote_jobs,'execute',side_effect=HTTPException(409,'Already reserved') if rejected else None) as remote, \
+         patch.object(api,'run',AsyncMock(return_value=package)) as provider:
+        result=c.post('/api/us/research/refresh',json={'symbols':'AAPL'})
+    local_lock.assert_not_called();local_status.assert_not_called();local_recovery.assert_not_called()
+    assert list(root.iterdir())==[]
+    if rejected:
+        assert result.status_code==409;provider.assert_not_called()
+    else:
+        assert result.status_code==200
+        assert [call.args[0] for call in remote.call_args_list]==['save','save','publish']
+        assert provider.call_args.args[0].publish_local is False
