@@ -332,21 +332,28 @@ def test_api_remote_plan_journey_uses_real_sql_and_preserves_account_boundaries(
     from fastapi.testclient import TestClient
     from app.routes import us_plans
     from app.services import us_remote_plans,us_remote_research
-    from app.us_auth import require_us_user
+    from app import us_auth
     key=uuid4().hex*2; version=uuid4().hex*2; plan=str(uuid4())
     package={'id':key,'market':'US','currency':'USD','state':'final','universe':'us-contract-journey',
              'session':'2026-10-23','computed_at':'2026-10-24T00:00:00Z','symbols':['AAPL'],'benchmark':'SPY','feed':'sip',
              'setups':[{'setup_version':version,'setup_id':'synthetic-setup','source_snapshot_id':'c'*64,
                         'symbol':'AAPL','signal':'BULL','provider_asset_id':'synthetic-asset'}]}
     rpc(pg,A,'us_research_store',dict(action='publish',package_id=key,package_payload=package))
-    identity={'id':A,'_access_token':'synthetic-account-a'}
     app=FastAPI();app.include_router(us_plans.router)
-    app.dependency_overrides[require_us_user]=lambda:identity
     client=TestClient(app)
     monkeypatch.setenv('US_PLAN_STORE','supabase');monkeypatch.setenv('US_RESEARCH_STORE','supabase')
     config=SimpleNamespace(SUPABASE_URL='https://us.example',SUPABASE_ANON_KEY='public-test')
     monkeypatch.setattr(us_remote_plans,'settings',config);monkeypatch.setattr(us_remote_research,'settings',config)
-    requests=[]
+    monkeypatch.setattr(us_auth,'settings',config)
+    monkeypatch.setenv('US_INVITED_USER_IDS',A)
+    requests=[];auth_requests=[]
+    def provider_identity(request):
+        auth_requests.append(request)
+        assert request.url.path=='/auth/v1/user' and request.headers['apikey']=='public-test'
+        owner={'Bearer synthetic-account-a':A,'Bearer synthetic-account-b':B}.get(request.headers.get('authorization'))
+        if owner is None:return httpx.Response(401,json={})
+        return httpx.Response(200,json={'id':owner,'email':'synthetic@example.test',
+            'email_confirmed_at':'2026-10-20T00:00:00Z','is_anonymous':False})
     def gateway(request):
         # Synthetic PostgREST wire shim only; execute actual migrated RPCs in PostgreSQL.
         requests.append(request)
@@ -358,12 +365,17 @@ def test_api_remote_plan_journey_uses_real_sql_and_preserves_account_boundaries(
             return httpx.Response(200,content=json.dumps(result),headers={'content-type':'application/json'})
         except pg.Error as error:
             return httpx.Response(409 if error.sqlstate in {'PT409','23505'} else 400,json={'code':error.sqlstate})
-    original=httpx.Client
+    original=httpx.Client;original_async=httpx.AsyncClient
     transport=httpx.MockTransport(gateway)
     values={'expected_revision':0,'package_id':key,'setup_version':version,'expiry':'2099-12-31',
             'exit_policy':'Conditional structural exit','notes':'Synthetic private thesis','state':'draft',
             'trigger':100,'stop':95,'capital':10000,'risk_pct':1,'allocation_cap_pct':25}
-    with patch.object(us_remote_plans.httpx,'Client',lambda **kwargs:original(transport=transport,**kwargs)):
+    with patch.object(us_remote_plans.httpx,'Client',lambda **kwargs:original(transport=transport,**kwargs)), \
+         patch.object(us_auth.httpx,'AsyncClient',lambda **kwargs:original_async(transport=httpx.MockTransport(provider_identity),**kwargs)):
+        assert client.get('/api/us/plans').status_code==401
+        assert client.get('/api/us/plans',headers={'Authorization':'Bearer invalid-token'}).status_code==401
+        assert requests==[]
+        client.headers['Authorization']='Bearer synthetic-account-a'
         first=client.post('/api/us/plans/'+plan,json=values)
         assert first.status_code==200
         saved=first.json()['plan']
@@ -375,18 +387,23 @@ def test_api_remote_plan_journey_uses_real_sql_and_preserves_account_boundaries(
         assert second.status_code==200 and second.json()['plan']['revision']==2
         assert client.get('/api/us/plans/'+plan+'?revision=1').json()['plan']==saved
         assert client.get('/api/us/plans').json()['plans'][0]['revision']==2
-        identity={'id':B,'_access_token':'synthetic-account-b'}
+        client.headers['Authorization']='Bearer synthetic-account-b'
+        before=len(requests)
+        assert client.get('/api/us/plans').status_code==403
+        assert len(requests)==before
+        monkeypatch.setenv('US_INVITED_USER_IDS',A+','+B)
         assert client.get('/api/us/plans/'+plan+'?revision=1').status_code==404
         assert client.get('/api/us/plans').json()['plans']==[]
         # Even with its own source copy, B cannot collide with A's plan UUID.
         rpc(pg,B,'us_research_store',dict(action='publish',package_id=key,package_payload=package))
         assert client.post('/api/us/plans/'+plan,json=values).status_code==409
-        identity={'id':A,'_access_token':'synthetic-account-a'}
+        client.headers['Authorization']='Bearer synthetic-account-a'
         exported=client.get('/api/us/plans/export').json()['plan_revisions']
         revisions=[row for row in exported if row['id']==plan]
         assert [row['revision'] for row in revisions]==[1,2]
         assert revisions[0]==saved and revisions[1]['notes']==changed['notes']
-    assert requests and all('owner' not in json.loads(request.content) for request in requests)
+    assert auth_requests and requests and all('owner' not in json.loads(request.content) for request in requests)
+    assert all(request.headers['authorization'] in {'Bearer synthetic-account-a','Bearer synthetic-account-b'} for request in requests)
 
 
 @pytest.mark.parametrize('interrupt_during_generation',[False,True])

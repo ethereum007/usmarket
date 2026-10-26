@@ -125,3 +125,8 @@ The disposable PostgreSQL suite now sends FastAPI plan requests through the real
 ## API-to-PostgreSQL refresh journey in CI
 
 The source integration suite also drives refresh admission, running persistence, mocked provider generation, atomic publication/completion, catalog/exact read and foreign-account denial through FastAPI/remote adapters into real PostgreSQL. A second case interrupts the running job during simulated generation and verifies that late atomic publication cannot store its package or overwrite the interrupted/unknown outcome. The fully remote path creates no local files/SQLite lock and does not persist synthetic tokens. Provider work and the HTTP gateway remain synthetic; real Supabase authentication/PostgREST, live data rights, hosted concurrency and restart acceptance remain open. No hosted flag or migration is activated.
+
+
+## Strict authentication included in plan integration
+
+The API-to-PostgreSQL plan journey now invokes the actual require_us_user dependency rather than overriding it. A synthetic identity-provider HTTP response supplies confirmed UUID identities; missing/invalid bearer tokens return 401, and a verified uninvited account returns 403 before any storage RPC. After explicitly adding the second synthetic account to test invitations, actual SQL still denies foreign plan reads and UUID collisions. The same verified bearer is relayed to owner-scoped RPCs, with no client owner selector. Provider/gateway HTTP remains synthetic and does not certify real Supabase sign-in or invitation provisioning. No actual accounts, tokens, grants or flags are changed.
