@@ -12,7 +12,12 @@ declare saved jsonb; canonical jsonb; prior_canonical jsonb;
 begin
   if auth.uid() is null then raise insufficient_privilege; end if;
   if action = 'list' then
-    return coalesce((select jsonb_agg(p.payload) from (
+    -- Catalog metadata only: never serialize complete bar histories for 120 rows.
+    return coalesce((select jsonb_agg(jsonb_build_object(
+      'id',p.payload->'id','market',p.payload->'market','currency',p.payload->'currency',
+      'universe',p.payload->'universe','session',p.payload->'session','state',p.payload->'state',
+      'benchmark',p.payload->'benchmark','feed',p.payload->'feed',
+      'computed_at',p.payload->'computed_at','symbols',p.payload->'symbols')) from (
       select payload from public.us_research_packages where owner = auth.uid()
       order by (payload->>'session')::date desc, (payload->>'computed_at')::timestamptz desc, id desc limit 120
     ) p), '[]'::jsonb);

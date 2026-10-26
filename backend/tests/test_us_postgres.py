@@ -303,3 +303,22 @@ def test_identical_plan_retry_returns_original_revision_without_append(pg):
     assert error.value.sqlstate=='PT409'
     with pytest.raises(pg.Error):rpc(pg,B,'us_plan_store',body)
     assert rpc(pg,A,'us_plan_store',dict(action='get',plan_id=key,wanted_revision=1))==first
+
+
+def test_research_catalog_returns_only_metadata_and_exact_read_keeps_full_evidence(pg):
+    key=uuid4().hex*2
+    payload={'id':key,'market':'US','currency':'USD','state':'final',
+             'universe':'us-synthetic','session':'2026-10-23','computed_at':'2026-10-24T00:00:00Z',
+             'symbols':['AAPL'],'benchmark':'SPY','feed':'sip',
+             'source_bars':{'AAPL':[{'date':'2026-10-23','close':100}]},
+             'setups':[{'setup_version':'synthetic-exact-identity'}],
+             'instrument_snapshot':{'records':{'AAPL':'synthetic-asset'}},
+             'unexpected_internal':'must not enter the catalog'}
+    rpc(pg,A,'us_research_store',dict(action='publish',package_id=key,package_payload=payload))
+    catalog=rpc(pg,A,'us_research_store',dict(action='list'))
+    summary=next(row for row in catalog if row['id']==key)
+    fields={'id','market','currency','state','universe','session','computed_at','symbols','benchmark','feed'}
+    assert summary=={field:payload[field] for field in fields}
+    assert all(set(row)==fields for row in catalog)
+    assert not any(row['id']==key for row in rpc(pg,B,'us_research_store',dict(action='list')))
+    assert rpc(pg,A,'us_research_store',dict(action='get',package_id=key))==payload
