@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import dynamic from "next/dynamic";
 import { useTheme } from "../lib/theme";
 import PlanHistory from "./plan-history";
+import PlanExport from "./plan-export";
 import type { ResearchSetup } from "../lib/swing-research";
 import { listUSPlans, loadUSPlan, saveUSPlan, previewUSPlanSizing, type USSizing, type USPlan } from "../lib/us-plans";
 import { usd, type USPackage } from "../lib/us-research";
@@ -68,6 +69,7 @@ export default function USPlans({ data, setup }: { data: USPackage | null; setup
     <section className="us-panel mt-6 space-y-5 p-5" id="us-plans" aria-labelledby="us-plans-title">
       <div className="us-panel-title"><div><span className="us-eyebrow">PRIVATE RESEARCH RECORDS</span><h2 id="us-plans-title">Your US plans</h2></div><button className="workspace-button" type="button" disabled={loading || opening} onClick={() => void refresh()}>Reload saved plans</button></div>
       <p className="text-sm text-text-secondary">Saved through your authenticated account. Hosting durability is still under validation. Browser shortlist notes remain separate and are never imported automatically.</p>
+      <PlanExport />
       {loading && <p role="status">Loading saved plans…</p>}
       {error && <p role="alert">{error}. Existing edits have not been replaced. Reload the list, then explicitly reopen a revision to discard edits and use its saved values.</p>}
       {savedMessage && <p role="status">{savedMessage}</p>}

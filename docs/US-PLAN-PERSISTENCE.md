@@ -76,3 +76,8 @@ The editor offers an explicit preview showing whole shares, hypothetical notiona
 ## Account-scoped browser notes
 
 The browser-only notes/shortlist convenience store now uses a canonical account UUID in its v2 key. Missing/invalid identities do not read or write notes. Switching accounts mounts a separate workspace and reads only that account's key. Legacy alpha-us-research-notes-v1 data has no reliable owner, so it is left untouched and never loaded or migrated automatically. Existing legacy notes therefore do not appear in the new account-scoped view. This is browser separation, not encryption, cloud synchronization or restart retention; people with device/browser-storage access may still inspect local data. Saved server plans continue to use their independent verified-owner boundary.
+
+
+## Workspace private history download
+
+The plan panel now exposes the existing authenticated export as a JSON download containing all returned revisions, with count/US/USD/schema checks. It submits no owner selector, prevents duplicate clicks and ignores late responses after its account panel unmounts. Object URLs are released after the browser download request. Errors are unconfirmed and do not modify plans; no complete-file save-to-disk claim is made. The UI states that research packages and browser notes are excluded and that the file is private, not a complete backup/confirmed restore. Hosted persistence and restore gates remain open.

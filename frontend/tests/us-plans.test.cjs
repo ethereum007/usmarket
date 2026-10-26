@@ -7,7 +7,7 @@ const ts = require('typescript');
 const React = require('react');
 const { renderToStaticMarkup } = require('react-dom/server');
 function compile(file, mocks = {}, globals = {}) {
-  const context = { exports: {}, Error, ...globals, require: name => mocks[name] || (name === "./plan-history" ? { default: () => null } : require(name)) };
+  const context = { exports: {}, Error, ...globals, require: name => mocks[name] || (["./plan-history", "./plan-export"].includes(name) ? { default: () => null } : require(name)) };
   vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(__dirname, '../app', file), 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
   }).outputText, context);
