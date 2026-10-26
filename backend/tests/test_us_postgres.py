@@ -132,3 +132,34 @@ def test_authenticated_client_cannot_append_revision_outside_rpc(pg):
             conn.execute('insert into public.us_plan_revisions(id,revision,owner,payload) values(%s,99,%s,%s)',
                          (str(uuid4()),A,Jsonb({'notes':'Bypass expected revision'})))
         assert error.value.sqlstate=='42501'
+
+
+@pytest.mark.parametrize('terminal',['completed','failed'])
+def test_job_retry_preserves_observation_and_terminal_evidence(pg,terminal):
+    job=str(uuid4()); key=uuid4().hex*2
+    def save(state,**extra):
+        return rpc(pg,A,'us_job_store',dict(action='save',job_id=job,
+                   job_payload={'id':job,'state':state,**extra}))
+    queued=save('queued')
+    assert save('queued',error='ignored private detail')==queued
+    running=save('running')
+    assert save('running')==running
+    with pytest.raises(pg.Error) as error:save('queued')
+    assert error.value.sqlstate=='PT409'
+    payload={'id':key,'market':'US','currency':'USD','state':'partial',
+             'session':'2026-10-19','computed_at':'2026-10-20T00:00:00Z'}
+    rpc(pg,A,'us_research_store',dict(action='publish',package_id=key,package_payload=payload))
+    extra={'package_id':key} if terminal=='completed' else {}
+    first=save(terminal,**extra)
+    # Separate connections and competing retries must return the original record.
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results=list(pool.map(lambda _:save(terminal,**extra),range(2)))
+    assert results==[first,first]
+    if terminal=='completed':
+        for changed in [None,uuid4().hex*2]:
+            with pytest.raises(pg.Error) as error:save('completed',package_id=changed)
+            assert error.value.sqlstate=='PT409'
+    with pytest.raises(pg.Error) as error:save('running')
+    assert error.value.sqlstate=='PT409'
+    assert rpc(pg,A,'us_job_store',dict(action='get',job_id=job))==first
+    assert rpc(pg,B,'us_job_store',dict(action='get',job_id=job)) is None

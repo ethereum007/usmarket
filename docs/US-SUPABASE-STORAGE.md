@@ -49,3 +49,8 @@ Research publication acknowledgements now reuse the imported publication validat
 ## Inherited PUBLIC grants
 
 All storage tables now revoke direct access from PostgreSQL PUBLIC as well as anon/authenticated. This prevents an inherited PUBLIC grant from reopening direct inserts that bypass the RPC revision/identity checks. Real PostgreSQL CI deliberately grants permissive default table privileges before applying the migrations, then verifies direct select/update/delete are denied for both client roles on all three tables and authenticated direct plan insertion is denied. Restricted RPCs remain available under their explicit grants. The migrations are still un-applied to the hosted project; this does not authorize activation.
+
+
+## Refresh observation retry (not activated)
+
+An identical job-state write can replay its original observation after a lost HTTP acknowledgement. The per-owner/job transaction lock serializes concurrent retries; the RPC returns the original timestamp instead of implying renewed worker liveness. Completed retries must retain exactly the original package ID. Changed results, backward transitions and terminal-to-running writes still conflict. Disposable PostgreSQL tests exercise queued/running and both terminal replays, concurrent retries, result conflicts and owner isolation. This does not add automatic retries, a distributed lease or crash recovery. The source migration remains un-applied; hosted grants and flags remain off pending approval and acceptance.

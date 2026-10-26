@@ -26,6 +26,15 @@ begin
  end if;
  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(auth.uid()::text || job_id::text,2));
  select payload into previous from public.us_refresh_jobs where owner=auth.uid() and id=job_id;
+ -- A lost HTTP acknowledgement may be retried. Preserve the original timestamp
+ -- and terminal evidence; this is replay, never a new worker heartbeat.
+ if previous is not null and previous->>'state'=job_payload->>'state' then
+  if previous->>'state' <> 'completed'
+     or previous->>'package_id' is not distinct from job_payload->>'package_id' then
+   return previous;
+  end if;
+  raise exception using errcode='PT409',message='Job result conflict';
+ end if;
  if previous is null and job_payload->>'state' <> 'queued' then
   raise exception using errcode='PT409',message='Job must start queued';
  end if;
