@@ -47,6 +47,13 @@ begin
   perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(plan_id::text, 0));
   select * into latest from public.us_plan_revisions
     where owner = auth.uid() and id = plan_id order by revision desc limit 1;
+  -- Lost-response retry: acknowledge only the exact latest committed content.
+  -- Never append a duplicate revision or turn a changed stale edit into success.
+  if latest.revision = expected_revision + 1 and
+     (latest.payload - 'owner' - 'id' - 'revision' - 'updated_at') =
+     (plan_payload - 'owner' - 'id' - 'revision' - 'updated_at') then
+    return latest.payload;
+  end if;
   if coalesce(latest.revision, 0) <> expected_revision then
     raise exception using errcode = 'PT409', message = 'Revision conflict';
   end if;

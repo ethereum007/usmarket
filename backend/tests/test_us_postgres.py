@@ -68,10 +68,10 @@ def test_real_plan_revisions_owner_isolation_conflict_and_source_immutability(pg
 
 def test_concurrent_first_save_accepts_exactly_one_revision(pg):
     key=str(uuid4())
-    def save():
-        try:return rpc(pg,A,'us_plan_store',plan_body(key))['revision']
+    def save(note):
+        try:return rpc(pg,A,'us_plan_store',plan_body(key,notes=note))['revision']
         except pg.Error as error:return error.sqlstate
-    with ThreadPoolExecutor(max_workers=2) as pool:results=list(pool.map(lambda _:save(),range(2)))
+    with ThreadPoolExecutor(max_workers=2) as pool:results=list(pool.map(save,['First writer','Different writer']))
     assert sorted(map(str,results))==['1','PT409']
 
 
@@ -280,3 +280,26 @@ def test_publication_interruption_race_has_one_preserved_outcome(pg):
     else:
         assert final==publication and final['state']=='completed' and package==payload
         assert rpc(pg,A,'us_job_interrupt',dict(job_id=job))==publication
+
+
+def test_identical_plan_retry_returns_original_revision_without_append(pg):
+    key=str(uuid4()); body=plan_body(key)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results=list(pool.map(lambda _:rpc(pg,A,'us_plan_store',body),range(2)))
+    assert results[0]==results[1] and results[0]['revision']==1
+    first=results[0]
+    assert rpc(pg,A,'us_plan_store',body)==first
+    exported=rpc(pg,A,'us_plan_store',dict(action='export'))
+    assert [row for row in exported if row['id']==key]==[first]
+    for changed in [plan_body(key,notes='Changed stale notes'),plan_body(key,symbol='MSFT')]:
+        with pytest.raises(pg.Error) as error:rpc(pg,A,'us_plan_store',changed)
+        assert error.value.sqlstate=='PT409'
+    second_body=plan_body(key,1,notes='Second revision')
+    second=rpc(pg,A,'us_plan_store',second_body)
+    assert rpc(pg,A,'us_plan_store',second_body)==second
+    assert second['revision']==2
+    # A response replay may not hide a still later revision.
+    with pytest.raises(pg.Error) as error:rpc(pg,A,'us_plan_store',body)
+    assert error.value.sqlstate=='PT409'
+    with pytest.raises(pg.Error):rpc(pg,B,'us_plan_store',body)
+    assert rpc(pg,A,'us_plan_store',dict(action='get',plan_id=key,wanted_revision=1))==first
