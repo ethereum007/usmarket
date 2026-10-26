@@ -22,6 +22,7 @@ import {
   metric,
   signed,
 } from "../lib/us-research";
+import { readNotes, writeNotes, type BrowserNotes as Notes } from "../lib/us-browser-notes";
 import "./us.css";
 import LiveFeed from "./live-feed";
 import USPlans from "./plans";
@@ -38,8 +39,7 @@ const Chart = dynamic(
   { ssr: false },
 );
 const ROOT = "/api/us/research";
-const STORAGE = "alpha-us-research-notes-v1";
-type Notes = Record<string, { note: string; saved: boolean }>;
+
 
 
 function USResearchContent() {
@@ -136,35 +136,23 @@ function USResearchContent() {
   }, [packageId]);
   useEffect(() => {
     try {
-      const saved = JSON.parse(localStorage.getItem(STORAGE) || "{}");
-      if (saved && typeof saved === "object" && !Array.isArray(saved))
-        setNotes(
-          Object.fromEntries(
-            Object.entries(saved).filter(
-              ([key, value]) =>
-                /^[A-Z][A-Z0-9.\-]{0,14}$/.test(key) &&
-                value &&
-                typeof value === "object" &&
-                typeof (value as Notes[string]).note === "string" &&
-                typeof (value as Notes[string]).saved === "boolean",
-            ),
-          ) as Notes,
-        );
+      setNotes(readNotes(localStorage, user?.id));
+      setReady(true);
     } catch {
-      setStorageError("Browser notes could not be loaded.");
+      setReady(false);
+      setStorageError("Browser notes could not be loaded; automatic saving is paused to preserve stored notes.");
     }
-    setReady(true);
-  }, []);
+  }, [user?.id]);
   useEffect(() => {
     if (!ready) return;
     try {
-      localStorage.setItem(STORAGE, JSON.stringify(notes));
+      writeNotes(localStorage, user?.id, notes);
     } catch {
       setStorageError(
         "Browser storage is unavailable; notes have not been saved.",
       );
     }
-  }, [notes, ready]);
+  }, [notes, ready, user?.id]);
   useEffect(() => observeRefresh(job, (recorded) => {
     setJobStatusError("");
     setJob(recorded);
