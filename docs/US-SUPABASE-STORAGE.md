@@ -130,3 +130,8 @@ The source integration suite also drives refresh admission, running persistence,
 ## Strict authentication included in plan integration
 
 The API-to-PostgreSQL plan journey now invokes the actual require_us_user dependency rather than overriding it. A synthetic identity-provider HTTP response supplies confirmed UUID identities; missing/invalid bearer tokens return 401, and a verified uninvited account returns 403 before any storage RPC. After explicitly adding the second synthetic account to test invitations, actual SQL still denies foreign plan reads and UUID collisions. The same verified bearer is relayed to owner-scoped RPCs, with no client owner selector. Provider/gateway HTTP remains synthetic and does not certify real Supabase sign-in or invitation provisioning. No actual accounts, tokens, grants or flags are changed.
+
+
+## Authentication origin validation (26 October 2026)
+
+Authentication and storage preflight now share a dependency-free HTTPS-origin validator. Authentication rejects URL credentials, paths, query strings, fragments, invalid ports, whitespace/control characters and backslashes before constructing an HTTP client or forwarding the bearer token. A single trailing slash remains supported. Invalid configuration returns a fixed 503 without echoing the configured value. Regression tests assert that no provider request is attempted. This validates URL structure, not ownership of the configured hostname or actual hosted authentication. The 25 October private MVP gate remains missed; migrations, grants and feature flags remain unchanged pending reviewed activation and hosted acceptance.

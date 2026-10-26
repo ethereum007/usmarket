@@ -6,20 +6,10 @@ import os
 from pathlib import Path
 import sqlite3
 import tempfile
-from urllib.parse import urlsplit
+from app.services.us_origins import https_origin
 
 from app.us_auth import configured_invites
 from app.services.swing_repository import database
-
-
-def https_origin(value):
-    try:
-        parts = urlsplit(value)
-        parts.port  # Validate optional port syntax without printing the origin.
-        return bool(parts.scheme == 'https' and parts.hostname and not parts.username
-                    and not parts.password and parts.path in {'', '/'} and not parts.query and not parts.fragment)
-    except ValueError:
-        return False
 
 
 def storage_probe(folder: Path) -> bool:

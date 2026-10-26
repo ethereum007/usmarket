@@ -129,3 +129,29 @@ def test_access_probe_uses_same_auth_boundary_and_discloses_no_identity():
     assert result.status_code==200
     assert result.json()=={'success':True,'allowed':True,'market':'US','private_mvp':True}
     assert 'private-owner' not in result.text and 'private@example.com' not in result.text
+
+
+@pytest.mark.parametrize('origin', [
+    None, 123, '', 'http://us-auth.example', 'https://',
+    'https://user:secret@us-auth.example', 'https://us-auth.example/custom',
+    'https://us-auth.example?key=secret', 'https://us-auth.example#fragment',
+    'https://us-auth.example:invalid', 'https://us-auth.example:65536',
+    ' https://us-auth.example', 'https://us-auth.example\n',
+    'https://us-auth.exa\tmple', 'https://us-auth.example\\other',
+])
+def test_invalid_auth_origin_rejected_before_sending_bearer(origin):
+    config = SimpleNamespace(SUPABASE_URL=origin, SUPABASE_ANON_KEY='test-public-key')
+    with patch.object(us_auth, 'settings', config), patch.object(us_auth.httpx, 'AsyncClient') as client:
+        response = TestClient(auth_app()).get('/private', headers={'Authorization':'Bearer test-session'})
+    assert response.status_code == 503
+    assert response.json() == {'detail':'US authentication is not configured'}
+    assert 'test-session' not in response.text and 'secret' not in response.text
+    client.assert_not_called()
+
+
+def test_auth_origin_single_trailing_slash_remains_supported():
+    identity = '11111111-1111-4111-8111-111111111111'
+    body = {'id':identity, 'email':'owner@example.com', 'email_confirmed_at':'2026-01-01T00:00:00Z'}
+    config = SimpleNamespace(SUPABASE_URL='https://us-auth.example/', SUPABASE_ANON_KEY='test-public-key')
+    with patch.dict(us_auth.os.environ, {'US_INVITED_USER_IDS':identity}), patch.object(us_auth, 'settings', config), patch.object(us_auth.httpx, 'AsyncClient', provider_client(httpx.Response(200, json=body))):
+        assert TestClient(auth_app()).get('/private', headers={'Authorization':'Bearer test-session'}).status_code == 200

@@ -12,6 +12,7 @@ from uuid import UUID
 import httpx
 from fastapi import HTTPException, Request
 from app.config import settings
+from app.services.us_origins import https_origin
 
 
 def unauthorized():
@@ -27,10 +28,11 @@ def configured_invites() -> set[str]:
 
 
 async def verify_us_token(token: str) -> dict:
-    origin = settings.SUPABASE_URL.rstrip('/')
+    origin = settings.SUPABASE_URL
     public_key = settings.SUPABASE_ANON_KEY
-    if not origin.startswith('https://') or not public_key:
+    if not https_origin(origin) or not public_key:
         raise HTTPException(503, 'US authentication is not configured')
+    origin = origin.rstrip('/')
     try:
         async with httpx.AsyncClient(timeout=5.0, follow_redirects=False) as client:
             response = await client.get(origin + '/auth/v1/user', headers={
