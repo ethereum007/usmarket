@@ -39,7 +39,7 @@ def rpc(pg, owner, name, body, role='authenticated'):
         from psycopg.types.json import Jsonb
         keys = list(body)
         assert set(keys) <= {'action','plan_id','wanted_revision','expected_revision','plan_payload','package_id','package_payload','job_id','job_payload'}
-        assert name in {'us_plan_store','us_research_store','us_job_store','us_job_publish'}
+        assert name in {'us_plan_store','us_research_store','us_job_store','us_job_publish','us_job_interrupt'}
         args = ','.join(key+' => %s' for key in keys)
         values = [Jsonb(value) if isinstance(value,dict) else value for value in body.values()]
         return conn.execute('select public.'+name+'('+args+')', values).fetchone()[0]
@@ -234,3 +234,49 @@ def test_atomic_publication_rolls_back_when_completion_fails(pg):
             conn.execute('drop trigger test_reject_completion on public.us_refresh_jobs')
             conn.execute('drop function public.test_reject_completion()')
     rpc(pg,A,'us_job_store',dict(action='save',job_id=job,job_payload={'id':job,'state':'failed'}))
+
+
+@pytest.mark.parametrize('initial',['queued','running'])
+def test_explicit_interruption_fences_publication_and_releases_admission(pg,initial):
+    job=str(uuid4()); key=uuid4().hex*2
+    def save(identity,state):
+        return rpc(pg,A,'us_job_store',dict(action='save',job_id=identity,job_payload={'id':identity,'state':state}))
+    save(job,'queued')
+    if initial=='running':save(job,'running')
+    for owner,role in [(None,'anon'),(None,'authenticated'),(B,'authenticated')]:
+        with pytest.raises(pg.Error):rpc(pg,owner,'us_job_interrupt',dict(job_id=job),role)
+    interrupted=rpc(pg,A,'us_job_interrupt',dict(job_id=job))
+    assert interrupted['state']=='interrupted' and interrupted['completion_unknown'] is True
+    assert rpc(pg,A,'us_job_interrupt',dict(job_id=job))==interrupted
+    payload={'id':key,'market':'US','currency':'USD','state':'partial'}
+    with pytest.raises(pg.Error):rpc(pg,A,'us_job_publish',dict(job_id=job,package_payload=payload))
+    assert rpc(pg,A,'us_research_store',dict(action='get',package_id=key)) is None
+    for state in ['running','failed']:
+        with pytest.raises(pg.Error):save(job,state)
+    replacement=str(uuid4())
+    assert save(replacement,'queued')['state']=='queued'
+    rpc(pg,A,'us_job_interrupt',dict(job_id=replacement))
+
+
+def test_publication_interruption_race_has_one_preserved_outcome(pg):
+    job=str(uuid4()); key=uuid4().hex*2
+    for state in ['queued','running']:
+        rpc(pg,A,'us_job_store',dict(action='save',job_id=job,job_payload={'id':job,'state':state}))
+    payload={'id':key,'market':'US','currency':'USD','state':'partial'}
+    def publish():
+        try:return rpc(pg,A,'us_job_publish',dict(job_id=job,package_payload=payload))['job']
+        except pg.Error as error:
+            assert error.sqlstate=='PT409'
+            return None
+    def interrupt():return rpc(pg,A,'us_job_interrupt',dict(job_id=job))
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        publishing=pool.submit(publish); interrupting=pool.submit(interrupt)
+        publication=publishing.result(); interruption=interrupting.result()
+    final=rpc(pg,A,'us_job_store',dict(action='get',job_id=job))
+    package=rpc(pg,A,'us_research_store',dict(action='get',package_id=key))
+    assert interruption==final
+    if publication is None:
+        assert final['state']=='interrupted' and package is None
+    else:
+        assert final==publication and final['state']=='completed' and package==payload
+        assert rpc(pg,A,'us_job_interrupt',dict(job_id=job))==publication

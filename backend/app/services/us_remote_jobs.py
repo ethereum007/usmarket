@@ -23,7 +23,7 @@ def public_observation(row, expected_id=None):
         raise ValueError('Invalid job identity')
     if expected_id is not None and row['id'] != expected_id:
         raise ValueError('Mismatched job identity')
-    if row.get('state') not in {'queued','running','completed','failed'}:
+    if row.get('state') not in {'queued','running','completed','failed','interrupted'}:
         raise ValueError('Invalid job state')
     result = {key:row[key] for key in ('id','state','updated_at') if key in row}
     if 'updated_at' in row:
@@ -37,6 +37,9 @@ def public_observation(row, expected_id=None):
         if not isinstance(row.get('package_id'), str) or not re.fullmatch('[a-f0-9]{64}', row['package_id']):
             raise ValueError('Invalid package identity')
         result['package_id'] = row['package_id']
+    if row['state'] == 'interrupted':
+        result['completion_unknown'] = True
+        result['error'] = 'Refresh interrupted; completion is unknown. Check saved research before retrying.'
     if row['state'] == 'failed':
         result['error'] = 'Research refresh failed; saved research remains available'
     return result

@@ -594,3 +594,12 @@ def test_atomic_publication_transport_validates_both_records(monkeypatch,change)
             assert error.value.status_code==503
     assert requests[0].url.path=='/rest/v1/rpc/us_job_publish'
     assert json.loads(requests[0].content)=={'job_id':'one','package_payload':package}
+
+
+def test_remote_interrupted_observation_retains_unknown_and_drops_private_fields():
+    from app.services.us_remote_jobs import public_observation
+    result=public_observation({'id':'one','state':'interrupted','completion_unknown':False,
+        'error':'private worker body','package_id':'a'*64,'owner':'private-owner'})
+    assert result['completion_unknown'] is True
+    assert 'private' not in json.dumps(result)
+    assert 'package_id' not in result
