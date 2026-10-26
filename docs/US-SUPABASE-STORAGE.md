@@ -135,3 +135,8 @@ The API-to-PostgreSQL plan journey now invokes the actual require_us_user depend
 ## Authentication origin validation (26 October 2026)
 
 Authentication and storage preflight now share a dependency-free HTTPS-origin validator. Authentication rejects URL credentials, paths, query strings, fragments, invalid ports, whitespace/control characters and backslashes before constructing an HTTP client or forwarding the bearer token. A single trailing slash remains supported. Invalid configuration returns a fixed 503 without echoing the configured value. Regression tests assert that no provider request is attempted. This validates URL structure, not ownership of the configured hostname or actual hosted authentication. The 25 October private MVP gate remains missed; migrations, grants and feature flags remain unchanged pending reviewed activation and hosted acceptance.
+
+
+## Plan request numeric types
+
+The save and sizing-preview API require JSON numbers for trigger, stop, capital, risk percentage and allocation percentage. Booleans and numeric strings return 422 before sizing, source retrieval or storage. expected_revision requires a JSON integer, rejecting booleans, strings and floating-point values rather than coercing them into concurrency identities. Integer and fractional sizing inputs retain the existing Decimal calculation, whole-share limits and USD planning policy. The workspace already serializes sizing fields as numbers and revisions as integers; no client contract change or migration is required. Synthetic API tests verify rejection without side effects and valid numeric sizing. Hosted persistence/sign-in acceptance remains outstanding; this does not change migration approval, grants or flags.

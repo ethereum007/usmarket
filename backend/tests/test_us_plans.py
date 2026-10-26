@@ -362,3 +362,46 @@ def test_remote_save_accepts_original_timestamp_and_equivalent_json_numbers():
     result=verified_plan(row,key,2,values)
     assert result['updated_at']=='2026-10-20T00:00:00Z'
     assert result['notes']==values['notes'] and 'owner' not in result and '_access_token' not in result
+
+
+@pytest.mark.parametrize('field', ['trigger', 'stop', 'capital', 'risk_pct', 'allocation_cap_pct'])
+@pytest.mark.parametrize('value', [True, False, '1'])
+def test_sizing_inputs_require_json_numbers_before_calculation_or_storage(fixture, field, value):
+    a, _, payload, _, _, root = fixture
+    preview = {key:payload[key] for key in ('trigger','stop','capital','risk_pct','allocation_cap_pct')}
+    # No calculation, source read or persistence may occur after invalid input.
+    with patch.object(api, 'calculate_sizing') as sizing, patch.object(api, 'read_package') as source, patch.object(api, 'store') as storage:
+        responses = [
+            a.post('/api/us/plans/sizing-preview', json={**preview, 'direction':'BULL', field:value}),
+            a.post('/api/us/plans/'+str(uuid4()), json={**payload, field:value}),
+        ]
+    for response in responses:
+        assert response.status_code == 422
+        assert any(error['loc'] == ['body',field] for error in response.json()['detail'])
+    sizing.assert_not_called()
+    source.assert_not_called()
+    storage.assert_not_called()
+    assert not (root/'us-plans.sqlite3').exists()
+
+
+@pytest.mark.parametrize('value', [True, False, 1.0, 1.5, '1'])
+def test_expected_revision_requires_json_integer_before_source_or_storage(fixture, value):
+    a, _, payload, _, _, _ = fixture
+    with patch.object(api, 'read_package') as source, patch.object(api, 'store') as storage:
+        response = a.post('/api/us/plans/'+str(uuid4()), json={**payload, 'expected_revision':value})
+    assert response.status_code == 422
+    assert any(error['loc'] == ['body','expected_revision'] for error in response.json()['detail'])
+    source.assert_not_called()
+    storage.assert_not_called()
+
+
+def test_strict_sizing_preserves_integer_and_fractional_json_numbers(fixture):
+    a, _, _, _, _, _ = fixture
+    values = {'direction':'BULL', 'trigger':100, 'stop':95.5, 'capital':10000,
+              'risk_pct':1.25, 'allocation_cap_pct':20}
+    response = a.post('/api/us/plans/sizing-preview', json=values)
+    assert response.status_code == 200
+    sizing = response.json()['sizing']
+    assert sizing['quantity'] == 20
+    assert sizing['stop_risk_usd'] == 90
+    assert sizing['risk_budget_usd'] == 125

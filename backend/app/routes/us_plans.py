@@ -21,11 +21,11 @@ router = APIRouter(prefix="/api/us/plans", tags=["US plans"])
 
 class SizingFields(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    trigger: float = Field(ge=0.0001, le=1_000_000, allow_inf_nan=False)
-    stop: float = Field(ge=0.0001, le=1_000_000, allow_inf_nan=False)
-    capital: float = Field(ge=1, le=1_000_000_000_000, allow_inf_nan=False)
-    risk_pct: float = Field(gt=0, le=5, allow_inf_nan=False)
-    allocation_cap_pct: float = Field(gt=0, le=100, allow_inf_nan=False)
+    trigger: float = Field(ge=0.0001, le=1_000_000, allow_inf_nan=False, strict=True)
+    stop: float = Field(ge=0.0001, le=1_000_000, allow_inf_nan=False, strict=True)
+    capital: float = Field(ge=1, le=1_000_000_000_000, allow_inf_nan=False, strict=True)
+    risk_pct: float = Field(gt=0, le=5, allow_inf_nan=False, strict=True)
+    allocation_cap_pct: float = Field(gt=0, le=100, allow_inf_nan=False, strict=True)
 
 
 class SizingPreview(SizingFields):
@@ -57,7 +57,7 @@ def sizing_preview(payload: SizingPreview, user: dict = Depends(require_us_user)
 
 class PlanRequest(SizingFields):
     model_config = ConfigDict(extra="forbid")
-    expected_revision: int = Field(default=0, ge=0)
+    expected_revision: int = Field(default=0, ge=0, strict=True)
     package_id: str = Field(pattern=r"^[a-f0-9]{64}$")
     setup_version: str = Field(pattern=r"^[a-f0-9]{64}$")
     expiry: date
