@@ -35,3 +35,8 @@ Nifty/Bank Nifty, NSE F&O leaderboards, FII/DII flows, India VIX context and bro
 ## Next sequence
 
 Protect the US API and establish CI -> durable US packages/plans -> verified earnings/catalysts -> industry/market context -> daily research brief and forward outcome review -> launch rehearsal. Keep the imported code as a reference until every dependency is classified; do not rewrite working engines solely to remove their original filenames.
+
+
+## Historical OHLCV type boundary
+
+US historical normalization rejects boolean open/high/low/close/volume values before numeric conversion. Python boolean-to-number coercion is not market evidence. Rejected stock bars flow through existing missing-session checks: incomplete history is partial and affected setups are withheld. A missing benchmark session blocks publication. Genuine numeric zero volume remains valid; no replacement bar or volume is invented. This validation is independent of provider display rights and actual market-open acceptance, which remain release gates.

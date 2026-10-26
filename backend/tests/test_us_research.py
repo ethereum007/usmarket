@@ -105,3 +105,15 @@ def test_generation_publication_mode_keeps_remote_off_local_filesystem(monkeypat
         publish.assert_not_called()
         assert capsys.readouterr().out==''
         assert list(tmp_path.iterdir())==[]
+
+
+@pytest.mark.parametrize('field',['o','h','l','c','v'])
+@pytest.mark.parametrize('value',[True,False])
+def test_boolean_ohlcv_never_becomes_numeric_evidence(field,value):
+    row={'t':'2026-07-01T04:00:00Z','o':1,'h':1,'l':1,'c':1,'v':100,field:value}
+    assert normalize_bars([row],['2026-07-01'])==[]
+
+
+def test_real_numeric_zero_volume_remains_valid_evidence():
+    row={'t':'2026-07-01T04:00:00Z','o':1,'h':1,'l':1,'c':1,'v':0}
+    assert normalize_bars([row],['2026-07-01'])[0]['volume']==0

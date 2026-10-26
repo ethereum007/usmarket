@@ -108,3 +108,23 @@ def test_calendar_identity_is_canonical_and_close_corrections_create_new_lineage
     assert first["id"] == reordered["id"]
     assert first["session_calendar"]["id"] != corrected["session_calendar"]["id"]
     assert first["id"] != corrected["id"]
+
+
+def test_boolean_stock_volume_creates_honest_gap_and_blocks_setup_detection():
+    days,calendar,bars,now=evidence()
+    malformed=[dict(row) for row in bars]
+    malformed[20]['v']=True
+    with patch('app.services.swing_research.scan_swing_spectrum',return_value=[]) as detector:
+        result=research_package(['AAPL'],{'SPY':bars,'AAPL':malformed},calendar,now)
+        detector.assert_not_called()
+    assert result['state']=='partial'
+    assert result['history_gaps']=={'AAPL':[days[20]]}
+    assert 'AAPL' in result['setup_exclusions']
+
+
+def test_boolean_benchmark_volume_blocks_publication():
+    _,calendar,bars,now=evidence()
+    malformed=[dict(row) for row in bars]
+    malformed[20]['v']=False
+    with pytest.raises(ValueError,match='Benchmark'):
+        research_package(['AAPL'],{'SPY':malformed,'AAPL':bars},calendar,now)
