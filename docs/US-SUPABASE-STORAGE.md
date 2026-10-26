@@ -38,3 +38,6 @@ The readiness CLI now rejects unknown US_PLAN_STORE, US_RESEARCH_STORE and US_JO
 
 
 Remote job responses are also checked at the transport boundary: single observations must match the requested job ID, states must be recognized, and completed observations must include a valid source-package identity. Only status fields are returned; unknown keys and arbitrary provider error text are discarded. Invalid observations produce a sanitized storage-unavailable error rather than invented completion or a local fallback.
+
+
+Remote plan acknowledgements now require a canonical plan UUID, positive integer revision and US/USD metadata. Get/save responses must match the requested identity and revision; save acknowledgements must also match every immutable source identity sent by the API. Malformed or mismatched replies fail with sanitized storage-unavailable feedback, never confirmed-save feedback or a local fallback. Owner/token transport fields are excluded from returned plan records. This checks acknowledgement consistency; it does not establish hosted storage durability.

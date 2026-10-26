@@ -1,8 +1,29 @@
 """User-token Supabase plan transport. No service-role key or local fallback."""
 import httpx
+from uuid import UUID
 from fastapi import HTTPException
 from app.config import settings
 from app.services.us_readiness import https_origin
+
+
+def verified_plan(row, plan_id=None, revision=None, source=None):
+    if not isinstance(row, dict) or not isinstance(row.get('id'), str):
+        raise ValueError('Invalid plan identity')
+    if str(UUID(row['id'])) != row['id']:
+        raise ValueError('Noncanonical plan identity')
+    if type(row.get('revision')) is not int or row['revision'] < 1:
+        raise ValueError('Invalid plan revision')
+    if plan_id is not None and row['id'] != plan_id:
+        raise ValueError('Mismatched plan identity')
+    if revision is not None and row['revision'] != revision:
+        raise ValueError('Mismatched plan revision')
+    if row.get('market') != 'US' or row.get('currency') != 'USD':
+        raise ValueError('Invalid plan market')
+    if source is not None:
+        for key in ('setup_id','package_id','setup_version','source_snapshot_id','symbol','direction','provider_asset_id'):
+            if row.get(key) != source.get(key):
+                raise ValueError('Mismatched saved source identity')
+    return {key:value for key,value in row.items() if key not in {'owner','_access_token'}}
 
 
 def execute(operation, args, token):
@@ -31,6 +52,11 @@ def execute(operation, args, token):
         valid = (isinstance(result, list) and all(isinstance(row, dict) for row in result)) if action in {'list','export'} else (isinstance(result, dict) or (action == 'get' and result is None))
         if not valid:
             raise ValueError('Invalid storage response')
-        return result
+        if action in {'list','export'}:
+            return [verified_plan(row) for row in result]
+        if result is None:
+            return None
+        return verified_plan(result, args[1], args[2] if action == 'get' else args[2]+1,
+                             args[3] if action == 'save' else None)
     except (httpx.HTTPError, ValueError, TypeError, AttributeError):
         raise HTTPException(503, 'US remote plan storage is unavailable; no save was confirmed') from None

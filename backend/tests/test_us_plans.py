@@ -296,3 +296,33 @@ def test_remote_storage_conflicts_and_failures_are_sanitized(status,body,expecte
             remote.execute(repo.list_plans, ('owner-a',), 'verified-token')
     assert error.value.status_code == expected
     assert 'secret' not in str(error.value) and 'verified-token' not in str(error.value)
+
+
+@pytest.mark.parametrize('change',[
+    {'id':'22222222-2222-4222-8222-222222222222'}, {'revision':1}, {'revision':True},
+    {'currency':'INR'}, {'source_snapshot_id':'wrong'}, {'package_id':'wrong'},
+])
+def test_remote_save_requires_exact_identity_revision_and_source(change,monkeypatch):
+    import httpx
+    from types import SimpleNamespace
+    from fastapi import HTTPException
+    from app.services import us_remote_plans as remote
+    key='11111111-1111-4111-8111-111111111111'
+    source={'market':'US','currency':'USD','setup_id':'setup','package_id':'a'*64,
+        'setup_version':'b'*64,'source_snapshot_id':'c'*64,'symbol':'AAPL','direction':'BULL','provider_asset_id':'asset'}
+    response={**source,'id':key,'revision':2,**change}
+    monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://us.example',SUPABASE_ANON_KEY='public-test'))
+    original=httpx.Client
+    transport=httpx.MockTransport(lambda request:httpx.Response(200,json=response))
+    with patch.object(remote.httpx,'Client',lambda **kwargs:original(transport=transport,**kwargs)):
+        with pytest.raises(HTTPException) as error:remote.execute(repo.save_plan,('owner',key,1,source),'token')
+    assert error.value.status_code==503
+    assert 'wrong' not in str(error.value) and key not in str(error.value)
+
+
+def test_verified_plan_retains_notes_but_strips_identity_transport_fields():
+    from app.services.us_remote_plans import verified_plan
+    key='11111111-1111-4111-8111-111111111111'
+    row={'id':key,'revision':2,'market':'US','currency':'USD','notes':'My thesis',
+        'owner':'private-owner','_access_token':'private-token'}
+    assert verified_plan(row,key,2)=={k:v for k,v in row.items() if k not in {'owner','_access_token'}}
