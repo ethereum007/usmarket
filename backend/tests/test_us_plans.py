@@ -310,7 +310,7 @@ def test_remote_save_requires_exact_identity_revision_and_source(change,monkeypa
     key='11111111-1111-4111-8111-111111111111'
     source={'market':'US','currency':'USD','setup_id':'setup','package_id':'a'*64,
         'setup_version':'b'*64,'source_snapshot_id':'c'*64,'symbol':'AAPL','direction':'BULL','provider_asset_id':'asset'}
-    response={**source,'id':key,'revision':2,**change}
+    response={**source,'id':key,'revision':2,'updated_at':'2026-10-26T00:00:00Z',**change}
     monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://etwmtakotrqlwwzttekc.supabase.co',SUPABASE_ANON_KEY='public-test'))
     original=httpx.Client
     transport=httpx.MockTransport(lambda request:httpx.Response(200,json=response))
@@ -323,7 +323,7 @@ def test_remote_save_requires_exact_identity_revision_and_source(change,monkeypa
 def test_verified_plan_retains_notes_but_strips_identity_transport_fields():
     from app.services.us_remote_plans import verified_plan
     key='11111111-1111-4111-8111-111111111111'
-    row={'id':key,'revision':2,'market':'US','currency':'USD','notes':'My thesis',
+    row={'id':key,'revision':2,'market':'US','currency':'USD','notes':'My thesis','updated_at':'2026-10-26T00:00:00Z',
         'owner':'private-owner','_access_token':'private-token'}
     assert verified_plan(row,key,2)=={k:v for k,v in row.items() if k not in {'owner','_access_token'}}
 
@@ -414,7 +414,7 @@ def test_remote_export_rejects_duplicate_or_gapped_history_before_download(monke
     from fastapi import HTTPException
     from app.services import us_remote_plans as remote
     key='11111111-1111-4111-8111-111111111111'
-    rows=[{'id':key,'revision':revision,'market':'US','currency':'USD','notes':'Private synthetic notes'} for revision in revisions]
+    rows=[{'id':key,'revision':revision,'market':'US','currency':'USD','notes':'Private synthetic notes','updated_at':'2026-10-26T00:00:00Z'} for revision in revisions]
     monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://etwmtakotrqlwwzttekc.supabase.co',SUPABASE_ANON_KEY='public-test'))
     original=httpx.Client
     transport=httpx.MockTransport(lambda request:httpx.Response(200,json=rows))
@@ -429,7 +429,7 @@ def test_remote_collection_preserves_exact_revisions_orders_export_and_strips_tr
     from app.services.us_remote_plans import verified_collection
     a='11111111-1111-4111-8111-111111111111';b='22222222-2222-4222-8222-222222222222'
     def row(key,revision):
-        return {'id':key,'revision':revision,'market':'US','currency':'USD','notes':str(revision),
+        return {'id':key,'revision':revision,'market':'US','currency':'USD','notes':str(revision),'updated_at':'2026-10-26T00:00:00Z',
                 'owner':'private-owner','_access_token':'private-token'}
     exported=verified_collection([row(b,1),row(a,2),row(a,1)],export=True)
     assert [(item['id'],item['revision']) for item in exported]==[(a,1),(a,2),(b,1)]
@@ -449,14 +449,44 @@ def test_remote_collection_rejects_oversize_instead_of_truncating(export):
 
 def test_remote_latest_list_cannot_repeat_a_plan_identity():
     from app.services.us_remote_plans import verified_collection
-    row={'id':'11111111-1111-4111-8111-111111111111','revision':2,'market':'US','currency':'USD'}
+    row={'id':'11111111-1111-4111-8111-111111111111','revision':2,'market':'US','currency':'USD','updated_at':'2026-10-26T00:00:00Z'}
     with pytest.raises(ValueError,match='Duplicate'):
         verified_collection([row,{**row,'revision':1}])
 
 
 def test_remote_export_accepts_exact_download_limit_without_losing_revisions():
     from app.services.us_remote_plans import verified_collection
-    base={'id':'11111111-1111-4111-8111-111111111111','market':'US','currency':'USD'}
+    base={'id':'11111111-1111-4111-8111-111111111111','market':'US','currency':'USD','updated_at':'2026-10-26T00:00:00Z'}
     exported=verified_collection([{**base,'revision':revision} for revision in range(10000,0,-1)],export=True)
     assert len(exported)==10000
     assert exported[0]['revision']==1 and exported[-1]['revision']==10000
+
+
+@pytest.mark.parametrize('stamp',[None,False,123,'private-invalid-time','2026-10-26','2026-10-26T00:00:00'])
+@pytest.mark.parametrize('operation',['save','get','export'])
+def test_remote_plan_unverifiable_saved_time_never_confirms_record(monkeypatch,stamp,operation):
+    import httpx
+    from types import SimpleNamespace
+    from fastapi import HTTPException
+    from app.services import us_remote_plans as remote
+    key='11111111-1111-4111-8111-111111111111'
+    values={'market':'US','currency':'USD','notes':'Synthetic thesis'}
+    row={**values,'id':key,'revision':1,'updated_at':stamp}
+    result=[row] if operation=='export' else row
+    monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://etwmtakotrqlwwzttekc.supabase.co',SUPABASE_ANON_KEY='synthetic-public-key'))
+    original=httpx.Client
+    transport=httpx.MockTransport(lambda request:httpx.Response(200,json=result))
+    function,args={'save':(repo.save_plan,('owner',key,0,values)),
+                   'get':(repo.get_plan,('owner',key,1)),
+                   'export':(repo.export_plan_revisions,('owner',))}[operation]
+    with patch.object(remote.httpx,'Client',lambda **kwargs:original(transport=transport,**kwargs)):
+        with pytest.raises(HTTPException) as error:remote.execute(function,args,'synthetic-token')
+    assert error.value.status_code==503
+    assert 'private-invalid-time' not in error.value.detail
+
+
+@pytest.mark.parametrize('stamp',['2026-10-26T00:00:00Z','2026-10-25T20:00:00-04:00'])
+def test_verified_plan_preserves_original_zoned_observation(stamp):
+    from app.services.us_remote_plans import verified_plan
+    row={'id':'11111111-1111-4111-8111-111111111111','revision':1,'market':'US','currency':'USD','updated_at':stamp}
+    assert verified_plan(row)['updated_at']==stamp

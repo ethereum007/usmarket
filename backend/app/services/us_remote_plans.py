@@ -1,4 +1,5 @@
 """User-token Supabase plan transport. No service-role key or local fallback."""
+from datetime import datetime
 import httpx
 from uuid import UUID
 from fastapi import HTTPException
@@ -20,6 +21,14 @@ def verified_plan(row, plan_id=None, revision=None, source=None):
         raise ValueError('Mismatched plan revision')
     if row.get('market') != 'US' or row.get('currency') != 'USD':
         raise ValueError('Invalid plan market')
+    recorded = row.get('updated_at')
+    if not isinstance(recorded, str):
+        raise ValueError('Missing plan observation time')
+    try:
+        if datetime.fromisoformat(recorded.replace('Z', '+00:00')).utcoffset() is None:
+            raise ValueError('Unzoned plan observation time')
+    except ValueError:
+        raise ValueError('Invalid plan observation time') from None
     if source is not None:
         metadata = {'owner','_access_token','id','revision','updated_at'}
         actual = {key:value for key,value in row.items() if key not in metadata}
