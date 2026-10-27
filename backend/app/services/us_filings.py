@@ -7,6 +7,8 @@ import time
 
 import httpx
 
+REQUEST_DEADLINE_SECONDS = 20
+
 
 class FilingUnavailable(ValueError):
     pass
@@ -120,6 +122,13 @@ class SecGateway:
             return observed
 
     async def load(self, symbol, client=None):
+        try:
+            async with asyncio.timeout(REQUEST_DEADLINE_SECONDS):
+                return await self._load(symbol, client)
+        except TimeoutError:
+            raise FilingUnavailable("SEC evidence request timed out; earnings status remains unknown") from None
+
+    async def _load(self, symbol, client=None):
         if not re.fullmatch(r"[A-Z][A-Z0-9.\-]{0,14}", symbol):
             raise FilingUnavailable("Invalid US filing symbol")
         if client is None:
@@ -127,7 +136,7 @@ class SecGateway:
             if not agent or "@" not in agent or "\n" in agent or "\r" in agent:
                 raise FilingUnavailable("SEC access is not configured for this service")
             async with httpx.AsyncClient(headers={"User-Agent": agent}, timeout=10, follow_redirects=False) as owned:
-                return await self.load(symbol, owned)
+                return await self._load(symbol, owned)
         mapping, mapping_at = await self.get(client, "https://www.sec.gov/files/company_tickers.json", 3600)
         cik = issuer_for(symbol, mapping)
         payload, observed_at = await self.get(client, f"https://data.sec.gov/submissions/CIK{int(cik):010d}.json", 120)

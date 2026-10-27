@@ -119,6 +119,66 @@ def test_missing_service_user_agent_fails_without_network():
     asyncio.run(exercise())
 
 
+@pytest.mark.parametrize('blocked_at', ['lock', 'mapping', 'submissions'])
+def test_total_deadline_cancels_wait_and_allows_later_recovery(monkeypatch, blocked_at):
+    monkeypatch.setattr('app.services.us_filings.REQUEST_DEADLINE_SECONDS', 0.02)
+    async def exercise():
+        gateway = SecGateway(interval=0)
+        requests, cancelled = [], []
+        blocked = asyncio.Event()
+        async def handler(request):
+            requests.append(request.url.host)
+            is_mapping = request.url.host == 'www.sec.gov'
+            if (blocked_at == 'mapping' and is_mapping) or (blocked_at == 'submissions' and not is_mapping):
+                try:
+                    await blocked.wait()
+                finally:
+                    cancelled.append(True)
+            return httpx.Response(200, json={'0': {'ticker': 'AAPL', 'cik_str': 123}} if is_mapping else payload())
+        if blocked_at == 'lock':
+            await gateway.lock.acquire()
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            try:
+                with pytest.raises(FilingUnavailable, match='timed out; earnings status remains unknown'):
+                    await gateway.load('AAPL', client)
+            finally:
+                if blocked_at == 'lock':
+                    gateway.lock.release()
+            if blocked_at == 'lock':
+                assert requests == [] and cancelled == []
+            else:
+                assert cancelled == [True]
+                assert not gateway.lock.locked()
+            assert all('submissions' not in url for url in gateway.cache)
+            blocked.set()
+            monkeypatch.setattr('app.services.us_filings.REQUEST_DEADLINE_SECONDS', 1)
+            recovered = await gateway.load('AAPL', client)
+            assert recovered['earnings_status'] == 'unknown'
+            assert recovered['filings']
+    asyncio.run(exercise())
+
+
+def test_caller_cancellation_is_not_relabelled_as_provider_failure():
+    async def exercise():
+        gateway = SecGateway(interval=0)
+        entered, cancelled = asyncio.Event(), asyncio.Event()
+        async def handler(request):
+            entered.set()
+            try:
+                await asyncio.Event().wait()
+            finally:
+                cancelled.set()
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            task = asyncio.create_task(gateway.load('AAPL', client))
+            await entered.wait()
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+            assert cancelled.is_set() and not gateway.lock.locked()
+            assert gateway.cache == {}
+    asyncio.run(exercise())
+
+
 def test_hosted_route_requires_auth_and_validates_symbol():
     from app.us_main import app
     from app.us_auth import require_us_user

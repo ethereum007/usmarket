@@ -31,3 +31,8 @@ Official references: [SEC data APIs](https://www.sec.gov/search-filings/edgar-ap
 The stock evidence panel now distinguishes acceptance timestamp (ET), filing date and report date. Date-only source values are displayed literally to avoid shifting them across timezones. Unknown report dates remain unknown; report dates do not establish fiscal quarter/year or earnings-event timing.
 
 Client filters narrow the existing returned recent records to results-item reports or periodic reports (including amendments); they do not fetch older documents or a forthcoming calendar. Displayed/returned counts, partial-evidence warnings and separate empty-filter feedback prevent a filtered empty list from becoming an assertion of no events. Existing SEC-only source validation and amendment disclosures remain. This is evidence navigation for the weekend MVP, not verified earnings coverage; actual provider/browser acceptance remains open.
+
+
+## Bounded evidence requests
+
+Each SEC evidence load has a 20-second total async deadline covering rate-limit lock waits, spacing and both mapping/submission requests, including cached lookup paths. Deadline expiry cancels pending I/O, releases any held gateway lock and returns fixed unavailable feedback with earnings status still unknown. A successfully retrieved mapping may remain cached with its original observation time; failed submissions are not cached as empty evidence. Caller cancellation propagates. Synthetic blocked-lock/mapping/submission tests verify cancellation and subsequent recovery. The async deadline does not preempt synchronous JSON decoding or evidence normalization. This does not establish real SEC availability, earnings-calendar coverage or hosted market-open acceptance.
