@@ -102,11 +102,22 @@ export function USPlanEditor({ data, setup, existing, onSaved }: { data: USPacka
   const [sizingError, setSizingError] = useState("");
   const previewVersion = useRef(0);
   const pending = useRef(false);
+  const dirty = useRef(false);
   const planId = useRef(existing?.id || "");
   const active = useRef(true);
   useEffect(() => {
     active.current = true;
     return () => { active.current = false; previewVersion.current++; };
+  }, []);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const beforeLeave = (event: BeforeUnloadEvent) => {
+      if (!dirty.current && !pending.current) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", beforeLeave);
+    return () => window.removeEventListener("beforeunload", beforeLeave);
   }, []);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -118,12 +129,12 @@ export function USPlanEditor({ data, setup, existing, onSaved }: { data: USPacka
       // Retain identity after an ambiguous timeout; do not create duplicate plans on retry.
       if (!planId.current) planId.current = crypto.randomUUID();
       const result = await saveUSPlan(planId.current, data, setup, existing, new FormData(event.currentTarget));
-      if (active.current) onSaved(result.plan);
+      if (active.current) { dirty.current = false; onSaved(result.plan); }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Plan save was not confirmed");
+      if (active.current) setError(cause instanceof Error ? cause.message : "Plan save was not confirmed");
     } finally {
       pending.current = false;
-      setSaving(false);
+      if (active.current) setSaving(false);
     }
   }
   async function preview(form: HTMLFormElement | null) {
@@ -139,7 +150,8 @@ export function USPlanEditor({ data, setup, existing, onSaved }: { data: USPacka
       if (active.current && version === previewVersion.current) setPreviewing(false);
     }
   }
-  return <form onChange={() => { previewVersion.current++; setSizing(null); setSizingError(""); setPreviewing(false); }} onSubmit={submit} aria-label="US conditional plan" className="space-y-4 border-t border-card-border pt-5">
+  return <form onChange={() => { dirty.current = true; previewVersion.current++; setSizing(null); setSizingError(""); setPreviewing(false); }} onSubmit={submit} aria-label="US conditional plan" className="space-y-4 border-t border-card-border pt-5">
+    <p className="text-xs text-text-secondary">Save your draft before changing research or leaving this page. Unsaved edits are held only in this open editor.</p>
     <h3>{existing ? `Revise ${setup.symbol} plan · revision ${existing.revision}` : `Create ${setup.symbol} conditional plan`}</h3>
     <p className="text-xs text-text-secondary">Source session {data.session} · {setup.signal} · USD · Package {data.id.slice(0, 12)} · Setup {setup.setup_version.slice(0, 12)}</p>
     <fieldset disabled={saving} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"><legend className="sr-only">Plan parameters in US dollars</legend>

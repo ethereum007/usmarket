@@ -49,7 +49,7 @@ for (const badSetup of [{ ...setup, source_snapshot_id: 'wrong' }, { ...setup, s
   const lib = compile('lib/us-plans.ts', { './api': { fetchAPI: async url => url.includes('/research/') ? { package: { ...data, setups: [badSetup] } } : { plan } } });
   await assert.rejects(lib.loadUSPlan(plan), /could not be verified/);
 });
-function editorFixture(save, existing = null, preview = async () => ({ sizing: { quantity: 20 } })) {
+function editorFixture(save, existing = null, preview = async () => ({ sizing: { quantity: 20 } }), browser) {
   const updates = [], saved = [], effects = [];
   let uuids = 0;
   const react = { ...React, useState: value => [value, next => updates.push(next)], useRef: value => ({ current: value }), useEffect: effect => effects.push(effect) };
@@ -57,7 +57,7 @@ function editorFixture(save, existing = null, preview = async () => ({ sizing: {
     react, 'next/dynamic': { default: () => () => null },
     '../lib/theme': { useTheme: () => ({ theme: 'dark' }) },
     '../lib/us-plans': { saveUSPlan: save, previewUSPlanSizing: preview }, '../lib/us-research': { usd: value => `$${value}` },
-  }, { FormData: class { constructor() { return fields(); } }, crypto: { randomUUID: () => `new-${++uuids}` } });
+  }, { ...(browser ? { window: browser } : {}), FormData: class { constructor() { return fields(); } }, crypto: { randomUUID: () => `new-${++uuids}` } });
   const element = lib.USPlanEditor({ data, setup, existing, onSaved: item => saved.push(item) });
   const cleanups = effects.map(fn => fn());
   return { element, updates, saved, cleanups };
@@ -148,4 +148,39 @@ test('closing editor invalidates an in-flight sizing response',async()=>{
   let resolve;const fixture=editorFixture(async()=>({plan}),null,()=>new Promise(done=>resolve=done));
   previewButton(fixture.element).props.onClick({currentTarget:{form:{}}});fixture.cleanups.forEach(fn=>fn?.());resolve({sizing:{quantity:20}});
   await new Promise(done=>setImmediate(done));assert.equal(fixture.updates.some(value=>value?.quantity===20),false);
+});
+
+
+function departureFixture(save) {
+  const listeners=new Map();
+  const browser={addEventListener:(name,callback)=>listeners.set(name,callback),removeEventListener:(name,callback)=>{if(listeners.get(name)===callback)listeners.delete(name);}};
+  const f=editorFixture(save,null,undefined,browser);
+  function departure() { let blocked=false;const event={preventDefault:()=>{blocked=true;},returnValue:undefined};listeners.get('beforeunload')?.(event);return {blocked,event}; }
+  return {...f,listeners,departure};
+}
+test('clean editor leaves freely but edited draft requests browser departure warning',()=>{
+  const f=departureFixture(async()=>({plan}));
+  assert.equal(f.departure().blocked,false);
+  f.element.props.onChange();
+  assert.equal(f.departure().blocked,true);
+  assert.equal(f.departure().event.returnValue,'');
+  f.cleanups.forEach(cleanup=>cleanup?.());
+  assert.equal(f.listeners.size,0);
+});
+test('failed save preserves unsaved departure warning and confirmed save clears it',async()=>{
+  let fails=true;const f=departureFixture(async()=>{if(fails)throw Error('Not confirmed');return {plan};});
+  f.element.props.onChange();
+  const event={preventDefault(){},currentTarget:{}};
+  await f.element.props.onSubmit(event);
+  assert.equal(f.departure().blocked,true);assert.equal(f.saved.length,0);
+  fails=false;await f.element.props.onSubmit(event);
+  assert.equal(f.departure().blocked,false);assert.deepEqual(f.saved,[plan]);
+});
+test('pending save warns on departure and late failure cannot update unmounted editor',async()=>{
+  let reject;const f=departureFixture(()=>new Promise((done,fail)=>{reject=fail;}));
+  const pending=f.element.props.onSubmit({preventDefault(){},currentTarget:{}});
+  assert.equal(f.departure().blocked,true);
+  f.cleanups.forEach(cleanup=>cleanup?.());
+  const before=f.updates.length;reject(Error('Synthetic late failure'));await pending;
+  assert.equal(f.updates.length,before);assert.equal(f.listeners.size,0);
 });
