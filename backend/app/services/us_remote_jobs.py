@@ -6,7 +6,7 @@ import httpx
 from fastapi import HTTPException
 from app.config import settings
 from app.services.us_json import same_value
-from app.services.us_readiness import https_origin
+from app.services.us_target import dedicated_supabase_origin
 from app.services.us_publication import validate, content
 
 
@@ -47,7 +47,7 @@ def public_observation(row, expected_id=None):
 
 
 def execute(action, token, job_id=None, payload=None):
-    if not token or not https_origin(settings.SUPABASE_URL) or not settings.SUPABASE_ANON_KEY:
+    if not token or not dedicated_supabase_origin(settings.SUPABASE_URL) or not settings.SUPABASE_ANON_KEY:
         raise HTTPException(503, 'US remote job storage is not configured')
     body = {'action':action}
     if job_id is not None:

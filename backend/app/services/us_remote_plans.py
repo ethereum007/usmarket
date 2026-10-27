@@ -3,7 +3,7 @@ import httpx
 from uuid import UUID
 from fastapi import HTTPException
 from app.config import settings
-from app.services.us_readiness import https_origin
+from app.services.us_target import dedicated_supabase_origin
 from app.services.us_json import same_value
 
 
@@ -50,7 +50,7 @@ def verified_collection(rows, export=False):
 
 
 def execute(operation, args, token):
-    if not token or not https_origin(settings.SUPABASE_URL) or not settings.SUPABASE_ANON_KEY:
+    if not token or not dedicated_supabase_origin(settings.SUPABASE_URL) or not settings.SUPABASE_ANON_KEY:
         raise HTTPException(503, 'US remote plan storage is not configured')
     names = {'list_plans':'list', 'get_plan':'get', 'save_plan':'save', 'export_plan_revisions':'export'}
     action = names.get(operation.__name__)
