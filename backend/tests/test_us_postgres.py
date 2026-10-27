@@ -324,7 +324,8 @@ def test_research_catalog_returns_only_metadata_and_exact_read_keeps_full_eviden
     assert rpc(pg,A,'us_research_store',dict(action='get',package_id=key))==payload
 
 
-def test_api_remote_plan_journey_uses_real_sql_and_preserves_account_boundaries(pg,monkeypatch):
+@pytest.mark.parametrize('lost_revision',[None,1,2])
+def test_api_remote_plan_journey_uses_real_sql_and_preserves_account_boundaries(pg,monkeypatch,lost_revision):
     import httpx
     from types import SimpleNamespace
     from unittest.mock import patch
@@ -346,7 +347,7 @@ def test_api_remote_plan_journey_uses_real_sql_and_preserves_account_boundaries(
     monkeypatch.setattr(us_remote_plans,'settings',config);monkeypatch.setattr(us_remote_research,'settings',config)
     monkeypatch.setattr(us_auth,'settings',config)
     monkeypatch.setenv('US_INVITED_USER_IDS',A)
-    requests=[];auth_requests=[]
+    requests=[];auth_requests=[];lost=[]
     def provider_identity(request):
         auth_requests.append(request)
         assert request.url.path=='/auth/v1/user' and request.headers['apikey']=='public-test'
@@ -360,7 +361,11 @@ def test_api_remote_plan_journey_uses_real_sql_and_preserves_account_boundaries(
         owner={'Bearer synthetic-account-a':A,'Bearer synthetic-account-b':B}[request.headers['authorization']]
         name=request.url.path.rsplit('/',1)[-1]
         try:
-            result=rpc(pg,owner,name,json.loads(request.content))
+            body=json.loads(request.content)
+            result=rpc(pg,owner,name,body)
+            if name=='us_plan_store' and body.get('action')=='save' and result['revision']==lost_revision and not lost:
+                lost.append(result)
+                raise httpx.ReadTimeout('Synthetic lost plan acknowledgement after commit',request=request)
             # httpx json=None constructs an empty body, not JSON null.
             return httpx.Response(200,content=json.dumps(result),headers={'content-type':'application/json'})
         except pg.Error as error:
@@ -377,14 +382,30 @@ def test_api_remote_plan_journey_uses_real_sql_and_preserves_account_boundaries(
         assert requests==[]
         client.headers['Authorization']='Bearer synthetic-account-a'
         first=client.post('/api/us/plans/'+plan,json=values)
-        assert first.status_code==200
-        saved=first.json()['plan']
+        assert first.status_code==(503 if lost_revision==1 else 200)
+        if lost_revision==1:
+            assert 'plan' not in first.json() and 'Synthetic' not in first.text
+            saved=client.get('/api/us/plans/'+plan+'?revision=1').json()['plan']
+            assert saved==lost[0]
+            # Changing the ambiguous first write is not an identical retry.
+            assert client.post('/api/us/plans/'+plan,json={**values,'notes':'Changed ambiguous draft'}).status_code==409
+        else:
+            saved=first.json()['plan']
         assert saved['revision']==1 and saved['quantity']==20 and saved['filled'] is False
         assert 'owner' not in saved and '_access_token' not in saved
         assert client.post('/api/us/plans/'+plan,json=values).json()['plan']==saved
         changed={**values,'expected_revision':1,'notes':'Revised synthetic thesis'}
         second=client.post('/api/us/plans/'+plan,json=changed)
-        assert second.status_code==200 and second.json()['plan']['revision']==2
+        assert second.status_code==(503 if lost_revision==2 else 200)
+        if lost_revision==2:
+            assert 'plan' not in second.json() and 'Synthetic' not in second.text
+            reopened=client.get('/api/us/plans/'+plan+'?revision=2').json()['plan']
+            assert reopened==lost[0]
+            replay=client.post('/api/us/plans/'+plan,json=changed)
+            assert replay.status_code==200 and replay.json()['plan']==reopened
+            assert client.post('/api/us/plans/'+plan,json={**changed,'notes':'Changed ambiguous revision'}).status_code==409
+        else:
+            assert second.json()['plan']['revision']==2
         assert client.get('/api/us/plans/'+plan+'?revision=1').json()['plan']==saved
         assert client.get('/api/us/plans').json()['plans'][0]['revision']==2
         client.headers['Authorization']='Bearer synthetic-account-b'
@@ -404,6 +425,9 @@ def test_api_remote_plan_journey_uses_real_sql_and_preserves_account_boundaries(
         assert revisions[0]==saved and revisions[1]['notes']==changed['notes']
     assert auth_requests and requests and all('owner' not in json.loads(request.content) for request in requests)
     assert all(request.headers['authorization'] in {'Bearer synthetic-account-a','Bearer synthetic-account-b'} for request in requests)
+
+
+    assert len(lost)==int(lost_revision is not None)
 
 
 @pytest.mark.parametrize('interrupt_during_generation,lost_ack',[(False,None),(True,None),(False,'queued'),(False,'running'),(False,'publish')])
