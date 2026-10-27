@@ -75,3 +75,37 @@ def test_symlink_destination_is_not_followed(tmp_path):
     except OSError:pytest.skip('Symlink creation is unavailable for this Windows account')
     with pytest.raises(ValueError):backup.backup_database(source,link)
     assert link.is_symlink() and not destination.exists()
+
+
+@pytest.mark.parametrize('kind,selector',[('plans','US_PLAN_STORE'),('jobs','US_JOB_STORE')])
+@pytest.mark.parametrize('mode',['supabase','private-invalid-mode',''])
+def test_cli_rejects_remote_or_invalid_mode_without_backing_up_stale_local_files(tmp_path,capsys,kind,selector,mode):
+    source=tmp_path/backup.DATABASES[kind]
+    source.write_bytes(b'Private stale local database sentinel')
+    target=tmp_path/'new-backup.sqlite3'
+    values={'DATA_DIR':str(tmp_path),selector:mode}
+    with patch.dict(backup.os.environ,values,clear=True),patch('sys.argv',['backup','--kind',kind,'--output',str(target)]),patch.object(backup,'backup_database') as copy:
+        assert backup.main()==1
+    copy.assert_not_called()
+    assert not target.exists()
+    assert source.read_bytes()==b'Private stale local database sentinel'
+    report=capsys.readouterr().out
+    assert json.loads(report)['success'] is False
+    assert str(tmp_path) not in report and 'private-invalid-mode' not in report and 'sentinel' not in report
+
+
+@pytest.mark.parametrize('kind,selector,local',[('plans','US_PLAN_STORE','sqlite'),('jobs','US_JOB_STORE','local')])
+@pytest.mark.parametrize('explicit',[False,True])
+def test_cli_local_defaults_and_explicit_modes_still_back_up_requested_store(tmp_path,capsys,kind,selector,local,explicit):
+    source=tmp_path/backup.DATABASES[kind]
+    with repo.database(source):pass
+    target=tmp_path/'private-copy.sqlite3'
+    values={'DATA_DIR':str(tmp_path)}
+    if explicit:values[selector]=local
+    # The other kind may already be remote; do not reject the selected local store.
+    values['US_JOB_STORE' if kind=='plans' else 'US_PLAN_STORE']='supabase'
+    with patch.dict(backup.os.environ,values,clear=True),patch('sys.argv',['backup','--kind',kind,'--output',str(target)]):
+        assert backup.main()==0
+    assert json.loads(capsys.readouterr().out)['integrity']=='ok'
+    with closing(sqlite3.connect(target)) as connection:
+        assert connection.execute('PRAGMA integrity_check').fetchone()[0]=='ok'

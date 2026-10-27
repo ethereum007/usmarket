@@ -49,6 +49,9 @@ def main():
     parser.add_argument('--output', type=Path, required=True, help='New private file outside the source checkout; parent must exist')
     args = parser.parse_args()
     try:
+        selector, local = ('US_PLAN_STORE', 'sqlite') if args.kind == 'plans' else ('US_JOB_STORE', 'local')
+        if os.environ.get(selector, local) != local:
+            raise ValueError('SQLite backup does not cover the selected storage mode')
         directory = Path(os.environ.get('DATA_DIR', ''))
         if not os.environ.get('DATA_DIR') or not directory.is_absolute() or not args.output.is_absolute():
             raise ValueError('Explicit absolute paths required')

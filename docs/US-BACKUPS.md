@@ -7,6 +7,8 @@ python -m app.services.us_backup --kind plans --output /private-backups/plans-un
 python -m app.services.us_backup --kind jobs --output /private-backups/jobs-unique.sqlite3
 ```
 
+The selected kind must still use local storage: plans require US_PLAN_STORE=sqlite (or unset), and jobs require US_JOB_STORE=local (or unset). Remote or invalid selectors return a sanitized nonzero failure before opening a source or creating output, even when stale local files exist. In mixed configurations, backing up the local kind remains available; it does not cover the remote kind. Use the separately reviewed hosted backup procedure for Supabase.
+
 Choose a new filename for each run. The command opens source read-only, exclusively creates a private destination, uses SQLite online backup (including committed WAL state), checks integrity and flushes the file. It never overwrites an existing target or creates a missing source DB. Partial new files are removed on handled failure; process termination can leave an incomplete file, which must not be treated as a verified backup. Progress is bounded to 30 seconds; lock/access failures return nonzero and sanitized JSON without paths, owner records or exception text. Filesystem/ACL controls remain the operator's responsibility, especially on Windows.
 
 This covers plan/job SQLite files only. Immutable research JSON is also required to reopen original plan evidence; plan DB backups alone are not a complete product restore. Refresh coordination DBs must not be copied/replaced while workers run. Never put backups in Git, public storage, chat or a shared URL. A backup on the same disk does not cover disk loss: configure private off-host retention separately with approved access.
