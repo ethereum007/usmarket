@@ -169,3 +169,13 @@ test('same-account token rotation after header preparation does not rebind the r
   assert.equal(f.calls.length,1);
   assert.equal(new Headers(f.calls[0].init.headers).get('Authorization'),`Bearer ${token(A)}`);
 });
+
+for (const [header,expected] of [['30',30],['3600',3600],['0',undefined],['-1',undefined],['3601',undefined],['NaN',undefined],['Wed, 28 Oct 2026 00:00:00 GMT',undefined]]) test(`HTTP rejection retains bounded retry metadata: ${header}`,async()=>{
+  const f=fixture({response:()=>new Response(JSON.stringify({detail:'Private upstream detail'}),{status:429,headers:{'Retry-After':header}})});
+  await assert.rejects(f.api.postAPI('/api/us/research/refresh',{}),error=>{
+    assert.ok(error instanceof f.api.APIError);
+    assert.equal(error.status,429);assert.equal(error.retryAfterSeconds,expected);
+    assert.doesNotMatch(error.message,/Private upstream/);return true;
+  });
+  assert.equal(f.calls.length,1);assert.equal(f.refreshed(),0);
+});

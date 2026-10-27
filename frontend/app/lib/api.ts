@@ -9,12 +9,27 @@ const WS_URL =
 const API_TIMEOUT_MS = Number(process.env.NEXT_PUBLIC_API_TIMEOUT_MS || 12000);
 const AUTH_SESSION_TIMEOUT_MS = Number(process.env.NEXT_PUBLIC_AUTH_SESSION_TIMEOUT_MS || 6000);
 
+export class APIError extends Error {
+  constructor(message: string, readonly status: number, readonly retryAfterSeconds?: number) {
+    super(message);
+    Object.setPrototypeOf(this, new.target.prototype);
+    this.name = "APIError";
+  }
+}
+
+async function responseError(response: Response): Promise<APIError> {
+  const raw = response.headers.get("retry-after") || "";
+  const seconds = /^\d{1,4}$/.test(raw) ? Number(raw) : NaN;
+  const retry = Number.isInteger(seconds) && seconds >= 1 && seconds <= 3600 ? seconds : undefined;
+  return new APIError(await apiErrorMessage(response), response.status, retry);
+}
+
 export async function fetchAPI<T = any>(path: string): Promise<T> {
   const res = await fetchWithAuthRetry(path, {
     credentials: "include",
     headers: await authHeaders(),
   });
-  if (!res.ok) throw new Error(await apiErrorMessage(res));
+  if (!res.ok) throw await responseError(res);
   return res.json();
 }
 
@@ -25,7 +40,7 @@ export async function postAPI<T = any>(path: string, body: any): Promise<T> {
     headers: { "Content-Type": "application/json", ...(await authHeaders()) },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(await apiErrorMessage(res));
+  if (!res.ok) throw await responseError(res);
   return res.json();
 }
 
@@ -35,7 +50,7 @@ export async function deleteAPI<T = any>(path: string): Promise<T> {
     credentials: "include",
     headers: await authHeaders(),
   });
-  if (!res.ok) throw new Error(await apiErrorMessage(res));
+  if (!res.ok) throw await responseError(res);
   return res.json();
 }
 
