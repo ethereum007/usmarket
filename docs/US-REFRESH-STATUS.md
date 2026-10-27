@@ -51,3 +51,10 @@ Historical calendar/bar GETs now allow at most three attempts for transport fail
 ## Historical pagination boundary
 
 Historical bar pages must contain a bars mapping with lists of object rows. Continuation is only a string up to 4,096 characters or a terminal null/empty string; false/zero/list/object tokens cannot masquerade as successful completion. Repeated tokens remain rejected. Each page is limited to the requested 10,000 rows, and accumulation is capped at the larger of 10,000 or twice requested symbols times completed calendar sessions. Exceeding the cap fails rather than truncates/publishes. Valid rows, pagination tokens, feed and split-adjustment query remain unchanged. This bounds accumulation after decoding, not HTTP body size or total multi-user memory; hosted load/rate-limit acceptance remains open. Tests use synthetic pages only.
+
+
+## Remote refresh process capacity
+
+The remote-coordination API permits one refresh pipeline per process across accounts. A nonblocking process semaphore is acquired before queued persistence; a busy request returns 429 with Retry-After: 30 without creating a job, storing credentials or fetching provider data. This is capacity feedback, not an admitted queued refresh, and no automatic retry is added. The slot is held through provider generation and terminal publication/status handling, then released in worker cleanup. Admission/scheduling failures release it too. Explicit interruption does not kill provider work or release this process slot early. Local-only mode retains its existing SQLite coordinator.
+
+The SQL owner reservation remains authoritative across cooperating hosts and survives response loss/process death. The process limit protects a single Free worker; additional processes/hosts have their own slots, so aggregate provider request-rate limits, live diagnostics/filings traffic and real hosted load/crash acceptance remain open. No hosted flags, grants or migrations are activated.

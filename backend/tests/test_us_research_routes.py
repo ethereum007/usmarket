@@ -706,3 +706,52 @@ def test_research_acknowledgement_preserves_nested_boolean_numeric_types(monkeyp
                 remote.execute('publish','token','one' if atomic else package['id'],package)
             assert error.value.status_code == 503
             assert 'token' not in error.value.detail and 'source_bars' not in error.value.detail
+
+
+def test_remote_process_capacity_blocks_other_accounts_before_admission_and_releases_after_work(client,monkeypatch):
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event
+    c,_ = client
+    other_app=FastAPI();other_app.include_router(api.router)
+    other_app.dependency_overrides[require_us_user]=lambda:{'id':'other-account'}
+    other=TestClient(other_app)
+    monkeypatch.setenv('US_JOB_STORE','supabase');monkeypatch.setenv('US_RESEARCH_STORE','supabase')
+    started,finish=Event(),Event()
+    calls=[]
+    async def provider(args):
+        started.set()
+        assert await asyncio.to_thread(finish.wait,10)
+        return {'id':'a'*64}
+    def remote(action,token,job_id=None,payload=None):
+        calls.append(action)
+        return {'id':job_id,'state':'completed' if action=='publish' else payload['state']}
+    with patch.object(api,'run',provider),patch.object(api.remote_jobs,'execute',side_effect=remote):
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            first=pool.submit(c.post,'/api/us/research/refresh',json={'symbols':'AAPL'})
+            try:
+                assert started.wait(5)
+                before=list(calls)
+                busy=other.post('/api/us/research/refresh',json={'symbols':'MSFT'})
+                assert busy.status_code==429 and busy.headers['retry-after']=='30'
+                assert busy.json()=={'detail':'Research refresh capacity is busy; retry shortly'}
+                assert calls==before
+            finally:
+                finish.set()
+            assert first.result(timeout=10).status_code==200
+        assert other.post('/api/us/research/refresh',json={'symbols':'MSFT'}).status_code==200
+    assert calls==['save','save','publish','save','save','publish']
+
+
+def test_remote_admission_rejection_and_scheduling_failure_release_process_capacity(client,monkeypatch):
+    from unittest.mock import Mock
+    from fastapi import HTTPException
+    monkeypatch.setenv('US_JOB_STORE','supabase');monkeypatch.setenv('US_RESEARCH_STORE','supabase')
+    for rejected in [True,False]:
+        tasks=Mock()
+        if not rejected:tasks.add_task.side_effect=RuntimeError('Synthetic scheduling failure')
+        with patch.object(api.remote_jobs,'execute',side_effect=HTTPException(409,'Reserved') if rejected else None):
+            with pytest.raises(HTTPException if rejected else RuntimeError):
+                api.refresh(api.RefreshRequest(symbols='AAPL'),tasks,{'id':'owner'})
+        assert api._REMOTE_REFRESH_CAPACITY.acquire(blocking=False)
+        api._REMOTE_REFRESH_CAPACITY.release()

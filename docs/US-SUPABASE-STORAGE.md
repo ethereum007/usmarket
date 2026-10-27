@@ -170,3 +170,8 @@ The disposable PostgreSQL/API journey now injects HTTP timeouts after the databa
 ## Lost plan acknowledgement rehearsal
 
 The authenticated FastAPI-to-PostgreSQL plan journey now injects a timeout after first-save or revision-update commit. The API must report unconfirmed 503 without returning a confirmed plan, while an explicit exact-revision read reopens the committed values. Identical request replay must return the original revision/timestamp; changed stale notes must conflict. Final export must retain exactly revisions one and two, with no retry duplicate, and the second account remains unable to read/write the plan. These cases use actual migrated SQL and strict API auth with synthetic identity/gateway responses. They do not certify real Supabase transport, hosted browser/restart retention or deployment approval. No hosted migration, grant, flag or account is changed.
+
+
+## Free-worker refresh capacity
+
+Remote refresh admission now first reserves one process-wide nonblocking capacity slot across accounts. A busy process returns retryable 429 before any storage/provider request; accepted work retains the slot through completion/error cleanup. Durable per-owner SQL admission, immutable publication and explicit recovery semantics remain unchanged. Different accounts remain independently reserved in SQL but cannot run provider pipelines simultaneously in one process. This does not impose a cross-host rate limit or kill interrupted provider work. Threaded route tests verify cross-account exclusion, no busy-request storage calls and release after work/admission/scheduling failure. Hosted load and aggregate provider limits remain unverified; migration/grants/flags are unchanged.

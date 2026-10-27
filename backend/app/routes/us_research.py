@@ -16,6 +16,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from uuid import uuid4
+from threading import BoundedSemaphore
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 
@@ -35,6 +36,9 @@ from app.services import us_remote_research as remote_research
 from app.services import us_remote_jobs as remote_jobs
 
 router = APIRouter(prefix='/api/us/research', tags=['US research'])
+
+# Free-worker protection across accounts; remote SQL still owns durable admission.
+_REMOTE_REFRESH_CAPACITY = BoundedSemaphore(1)
 
 DEFAULT_SYMBOLS = 'AAPL,MSFT,NVDA,AMZN,META,GOOGL,AVGO,TSLA,AMD,ORCL,CRM,PLTR,JPM,BAC,GS,V,MA,UNH,LLY,JNJ,XOM,CVX,CAT,GE,COST,WMT,HD,NFLX,MU,AMAT'
 
@@ -151,7 +155,7 @@ class RefreshRequest(BaseModel):
 
     feed: Literal['sip','iex'] = 'sip'
 
-async def refresh_job(job_data: dict, payload: RefreshRequest, lock: RefreshLock | None, access_token=None):
+async def refresh_job(job_data: dict, payload: RefreshRequest, lock: RefreshLock | None, access_token=None, capacity=None):
     data = {**job_data, 'state': 'running'}
     try:
         # Do not fetch or publish if durable running status cannot be recorded.
@@ -177,6 +181,8 @@ async def refresh_job(job_data: dict, payload: RefreshRequest, lock: RefreshLock
     finally:
         if lock is not None:
             lock.release()
+        if capacity is not None:
+            capacity.release()
 
 @router.post('/refresh')
 
@@ -193,6 +199,11 @@ def refresh(payload: RefreshRequest, tasks: BackgroundTasks, user: dict = Depend
         raise HTTPException(422, 'Keep the benchmark separate from stock symbols')
 
     remote_coordination = remote_jobs.enabled()
+    capacity = None
+    if remote_coordination:
+        if not _REMOTE_REFRESH_CAPACITY.acquire(blocking=False):
+            raise HTTPException(429, 'Research refresh capacity is busy; retry shortly', headers={'Retry-After':'30'})
+        capacity = _REMOTE_REFRESH_CAPACITY
     try:
         # Remote queued persistence reserves per-account admission across hosts.
         lock = None if remote_coordination else acquire_refresh_lock(settings.DATA_DIR / 'us-refresh-lock.sqlite3')
@@ -211,10 +222,12 @@ def refresh(payload: RefreshRequest, tasks: BackgroundTasks, user: dict = Depend
                 updated_at=datetime.now(timezone.utc).isoformat(),
                 message='Previous refresh worker no longer owns coordination; completion is unknown. Check saved research before retrying.')
         persist_job(data, user.get('_access_token'))
-        tasks.add_task(refresh_job, data, payload.model_copy(update={'symbols':','.join(symbols)}), lock, user.get('_access_token'))
+        tasks.add_task(refresh_job, data, payload.model_copy(update={'symbols':','.join(symbols)}), lock, user.get('_access_token'), capacity)
     except BaseException as exc:
         if lock is not None:
             lock.release()
+        if capacity is not None:
+            capacity.release()
         if isinstance(exc, STORAGE_ERRORS):
             raise HTTPException(503, 'Refresh status storage is temporarily unavailable') from None
         raise
