@@ -406,8 +406,8 @@ def test_api_remote_plan_journey_uses_real_sql_and_preserves_account_boundaries(
     assert all(request.headers['authorization'] in {'Bearer synthetic-account-a','Bearer synthetic-account-b'} for request in requests)
 
 
-@pytest.mark.parametrize('interrupt_during_generation',[False,True])
-def test_api_remote_refresh_journey_and_interruption_use_real_sql(pg,monkeypatch,tmp_path,interrupt_during_generation):
+@pytest.mark.parametrize('interrupt_during_generation,lost_ack',[(False,None),(True,None),(False,'queued'),(False,'running'),(False,'publish')])
+def test_api_remote_refresh_journey_and_interruption_use_real_sql(pg,monkeypatch,tmp_path,interrupt_during_generation,lost_ack):
     import httpx
     from dataclasses import replace
     from types import SimpleNamespace
@@ -429,13 +429,19 @@ def test_api_remote_refresh_journey_and_interruption_use_real_sql(pg,monkeypatch
     monkeypatch.setattr(api,'settings',replace(api.settings,DATA_DIR=tmp_path))
     config=SimpleNamespace(SUPABASE_URL='https://us.example',SUPABASE_ANON_KEY='public-test')
     monkeypatch.setattr(us_remote_jobs,'settings',config);monkeypatch.setattr(us_remote_research,'settings',config)
-    requests=[];generated=[]
+    requests=[];generated=[];lost=[]
     def gateway(request):
         requests.append(request)
         owner={'Bearer synthetic-account-a':A,'Bearer synthetic-account-b':B}[request.headers['authorization']]
         name=request.url.path.rsplit('/',1)[-1]
         try:
-            result=rpc(pg,owner,name,json.loads(request.content))
+            body=json.loads(request.content)
+            result=rpc(pg,owner,name,body)
+            stage='publish' if name=='us_job_publish' else body.get('job_payload',{}).get('state')
+            if stage==lost_ack and lost_ack is not None and not lost:
+                lost.append(result)
+                # rpc() has exited its connection/transaction and committed before the reply is lost.
+                raise httpx.ReadTimeout('Synthetic lost post-commit response',request=request)
             return httpx.Response(200,content=json.dumps(result),headers={'content-type':'application/json'})
         except pg.Error as error:
             return httpx.Response(409 if error.sqlstate in {'PT409','23505'} else 400,json={'code':error.sqlstate})
@@ -452,10 +458,28 @@ def test_api_remote_refresh_journey_and_interruption_use_real_sql(pg,monkeypatch
          patch.object(api,'run',generate), \
          patch.object(api,'acquire_refresh_lock',side_effect=OSError('No local storage allowed')) as local:
         response=client.post('/api/us/research/refresh',json={'symbols':'AAPL'})
-        assert response.status_code==200
-        job=response.json()['job']['id']
+        assert response.status_code==(503 if lost_ack=='queued' else 200)
+        job=lost[0]['id'] if lost_ack=='queued' else response.json()['job']['id']
         recorded=client.get('/api/us/research/jobs/'+job).json()['job']
-        if interrupt_during_generation:
+        if lost_ack in {'queued','running'}:
+            assert recorded['state']==lost_ack
+            assert generated==[]
+            assert client.get('/api/us/research/packages/'+key).status_code==404
+            # A committed admission remains reserved; response loss never means safe takeover.
+            assert client.post('/api/us/research/refresh',json={'symbols':'AAPL'}).status_code==409
+            assert generated==[]
+            identity={'id':B,'_access_token':'synthetic-account-b'}
+            assert client.post('/api/us/research/jobs/'+job+'/interrupt').status_code==409
+            identity={'id':A,'_access_token':'synthetic-account-a'}
+            recovered=client.post('/api/us/research/jobs/'+job+'/interrupt')
+            assert recovered.status_code==200
+            assert recovered.json()['job']['state']=='interrupted'
+            assert recovered.json()['job']['completion_unknown'] is True
+            retry=client.post('/api/us/research/refresh',json={'symbols':'AAPL'})
+            assert retry.status_code==200 and retry.json()['job']['id']!=job
+            assert client.get('/api/us/research/jobs/'+retry.json()['job']['id']).json()['job']['state']=='completed'
+            assert client.get('/api/us/research/packages/'+key).json()['package']==package
+        elif interrupt_during_generation:
             assert recorded['state']=='interrupted' and recorded['completion_unknown'] is True
             assert 'package_id' not in recorded
             assert client.get('/api/us/research/packages/'+key).status_code==404
@@ -464,9 +488,21 @@ def test_api_remote_refresh_journey_and_interruption_use_real_sql(pg,monkeypatch
             assert client.get('/api/us/research/packages/'+key).json()['package']==package
             catalog=client.get('/api/us/research/packages').json()['packages']
             assert any(row['id']==key and row['state']=='partial' for row in catalog)
+            if lost_ack=='publish':
+                assert recorded==us_remote_jobs.public_observation(lost[0]['job'],job)
+                recovered=client.post('/api/us/research/jobs/'+job+'/interrupt').json()['job']
+                assert recovered==recorded
+                assert client.get('/api/us/research/packages/'+key).json()['package']==package
+                attempted=[json.loads(request.content) for request in requests]
+                assert any(body.get('job_payload',{}).get('state')=='failed' for body in attempted)
+                # SQL has rejected that failure write; completion and the exact package persist.
+                assert rpc(pg,A,'us_job_store',dict(action='get',job_id=job))['state']=='completed'
+
         identity={'id':B,'_access_token':'synthetic-account-b'}
         assert client.get('/api/us/research/jobs/'+job).status_code==404
         assert client.get('/api/us/research/packages/'+key).status_code==404
     local.assert_not_called()
     assert len(generated)==1 and list(tmp_path.iterdir())==[]
     assert 'synthetic-account-a' not in json.dumps(rpc(pg,A,'us_job_store',dict(action='get',job_id=job)))
+
+    assert len(lost)==int(lost_ack is not None)
