@@ -29,6 +29,26 @@ def verified_plan(row, plan_id=None, revision=None, source=None):
     return {key:value for key,value in row.items() if key not in {'owner','_access_token'}}
 
 
+def verified_collection(rows, export=False):
+    if not isinstance(rows, list) or len(rows) > 10000:
+        raise ValueError('Invalid plan collection size')
+    result = [verified_plan(row) for row in rows]
+    observed = {}
+    for row in result:
+        observed.setdefault(row['id'], []).append(row['revision'])
+    for revisions in observed.values():
+        if export:
+            # Immutable histories start at one and cannot delete/skip revisions.
+            # Work is bounded by received rows, never by an untrusted revision number.
+            if sorted(revisions) != list(range(1, len(revisions)+1)):
+                raise ValueError('Invalid revision history continuity')
+        elif len(revisions) != 1:
+            raise ValueError('Duplicate latest plan identity')
+    if export:
+        result.sort(key=lambda row:(row['id'],row['revision']))
+    return result
+
+
 def execute(operation, args, token):
     if not token or not https_origin(settings.SUPABASE_URL) or not settings.SUPABASE_ANON_KEY:
         raise HTTPException(503, 'US remote plan storage is not configured')
@@ -56,7 +76,7 @@ def execute(operation, args, token):
         if not valid:
             raise ValueError('Invalid storage response')
         if action in {'list','export'}:
-            return [verified_plan(row) for row in result]
+            return verified_collection(result, export=action == 'export')
         if result is None:
             return None
         return verified_plan(result, args[1], args[2] if action == 'get' else args[2]+1,

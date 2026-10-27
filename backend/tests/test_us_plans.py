@@ -405,3 +405,58 @@ def test_strict_sizing_preserves_integer_and_fractional_json_numbers(fixture):
     assert sizing['quantity'] == 20
     assert sizing['stop_risk_usd'] == 90
     assert sizing['risk_budget_usd'] == 125
+
+
+@pytest.mark.parametrize('revisions',[[1,1],[2],[1,3],[1,2,2],[1,1000000000]])
+def test_remote_export_rejects_duplicate_or_gapped_history_before_download(monkeypatch,revisions):
+    import httpx
+    from types import SimpleNamespace
+    from fastapi import HTTPException
+    from app.services import us_remote_plans as remote
+    key='11111111-1111-4111-8111-111111111111'
+    rows=[{'id':key,'revision':revision,'market':'US','currency':'USD','notes':'Private synthetic notes'} for revision in revisions]
+    monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://us.example',SUPABASE_ANON_KEY='public-test'))
+    original=httpx.Client
+    transport=httpx.MockTransport(lambda request:httpx.Response(200,json=rows))
+    with patch.object(remote.httpx,'Client',lambda **kwargs:original(transport=transport,**kwargs)):
+        with pytest.raises(HTTPException) as error:
+            remote.execute(repo.export_plan_revisions,('owner',),'synthetic-token')
+    assert error.value.status_code==503
+    assert 'Private synthetic notes' not in error.value.detail and key not in error.value.detail
+
+
+def test_remote_collection_preserves_exact_revisions_orders_export_and_strips_transport_fields():
+    from app.services.us_remote_plans import verified_collection
+    a='11111111-1111-4111-8111-111111111111';b='22222222-2222-4222-8222-222222222222'
+    def row(key,revision):
+        return {'id':key,'revision':revision,'market':'US','currency':'USD','notes':str(revision),
+                'owner':'private-owner','_access_token':'private-token'}
+    exported=verified_collection([row(b,1),row(a,2),row(a,1)],export=True)
+    assert [(item['id'],item['revision']) for item in exported]==[(a,1),(a,2),(b,1)]
+    assert all('owner' not in item and '_access_token' not in item for item in exported)
+    assert [item['notes'] for item in exported]==['1','2','1']
+    # Latest lists may legitimately contain revision numbers above one.
+    assert verified_collection([row(a,7),row(b,3)])[0]['revision']==7
+    assert verified_collection([],export=True)==[]
+
+
+@pytest.mark.parametrize('export',[False,True])
+def test_remote_collection_rejects_oversize_instead_of_truncating(export):
+    from app.services.us_remote_plans import verified_collection
+    with pytest.raises(ValueError,match='size'):
+        verified_collection([{}]*10001,export=export)
+
+
+def test_remote_latest_list_cannot_repeat_a_plan_identity():
+    from app.services.us_remote_plans import verified_collection
+    row={'id':'11111111-1111-4111-8111-111111111111','revision':2,'market':'US','currency':'USD'}
+    with pytest.raises(ValueError,match='Duplicate'):
+        verified_collection([row,{**row,'revision':1}])
+
+
+def test_remote_export_accepts_exact_download_limit_without_losing_revisions():
+    from app.services.us_remote_plans import verified_collection
+    base={'id':'11111111-1111-4111-8111-111111111111','market':'US','currency':'USD'}
+    exported=verified_collection([{**base,'revision':revision} for revision in range(10000,0,-1)],export=True)
+    assert len(exported)==10000
+    assert exported[0]['revision']==1 and exported[-1]['revision']==10000
