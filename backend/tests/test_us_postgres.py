@@ -530,3 +530,36 @@ def test_api_remote_refresh_journey_and_interruption_use_real_sql(pg,monkeypatch
     assert 'synthetic-account-a' not in json.dumps(rpc(pg,A,'us_job_store',dict(action='get',job_id=job)))
 
     assert len(lost)==int(lost_ack is not None)
+
+
+def inspection_sql():
+    return (Path(__file__).resolve().parents[2]/'supabase'/'inspect_us_storage.sql').read_text(encoding='utf-8')
+
+
+def test_read_only_operator_inspection_recognizes_applied_structure(pg):
+    with pg.connect(DSN) as connection:
+        rows=connection.execute(inspection_sql()).fetchall()
+    assert len(rows)==9
+    assert all(present and secure for _,_,present,secure in rows)
+
+
+def test_operator_inspection_detects_permission_drift_without_printing_records(pg):
+    with pg.connect(DSN) as connection:
+        connection.execute('grant select on public.us_plan_revisions to anon')
+        connection.execute('grant execute on function public.us_job_interrupt(uuid) to anon')
+        rows=connection.execute(inspection_sql()).fetchall()
+        checks={name:secure for _,name,_,secure in rows}
+        assert checks['us_plan_revisions'] is False
+        assert checks['us_job_interrupt(uuid)'] is False
+        connection.rollback()
+    with pg.connect(DSN) as connection:
+        assert all(secure for _,_,_,secure in connection.execute(inspection_sql()).fetchall())
+
+
+def test_operator_inspection_reports_missing_objects_instead_of_failing(pg):
+    query=inspection_sql().replace('us_plan_revisions','missing_us_plan_revisions').replace('us_job_interrupt','missing_us_job_interrupt')
+    with pg.connect(DSN) as connection:
+        rows=connection.execute(query).fetchall()
+    missing=[row for row in rows if row[1].startswith('missing_')]
+    assert len(missing)==2
+    assert all(present is False and secure is False for _,_,present,secure in missing)
