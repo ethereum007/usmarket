@@ -2,6 +2,7 @@
 import hashlib
 import json
 from pathlib import Path
+from app.services.us_target import PROJECT_REFERENCE
 
 NAMES = (
     '202610200001_us_plan_revisions.sql',
@@ -30,7 +31,7 @@ def manifest(folder=None):
                       'sha256_utf8_lf':hashlib.sha256(source.encode('utf-8')).hexdigest()})
     fingerprint = hashlib.sha256(json.dumps(files,sort_keys=True,separators=(',',':')).encode('utf-8')).hexdigest()
     return {'schema_version':1,'migration_count':len(files),'files':files,'bundle_sha256':fingerprint,
-            'target_project_reference':'etwmtakotrqlwwzttekc',
+            'target_project_reference':PROJECT_REFERENCE,
             'scope':'Source review only. No database connection, migration application or permission approval.',
             'hosted_application':'not_checked','activation_approval_required':True}
 

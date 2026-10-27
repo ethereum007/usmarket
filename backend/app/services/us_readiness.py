@@ -7,6 +7,7 @@ from pathlib import Path
 import sqlite3
 import tempfile
 from app.services.us_origins import https_origin
+from app.services.us_target import dedicated_supabase_origin
 
 from app.us_auth import configured_invites
 from app.services.swing_repository import database
@@ -48,6 +49,7 @@ def report(check_storage=False):
         'storage_modes_valid': modes_valid,
         'job_research_storage_consistent': job_mode != 'supabase' or research_mode == 'supabase',
         'supabase_https_origin': https_origin(os.environ.get('SUPABASE_URL', '')),
+        'supabase_dedicated_project_origin': dedicated_supabase_origin(os.environ.get('SUPABASE_URL', '')),
         'supabase_public_key_present': bool(os.environ.get('SUPABASE_ANON_KEY', '').strip()),
         'invited_user_ids_valid': invitations,
         'alpaca_credentials_present': all(os.environ.get(key, '').strip() for key in ('ALPACA_API_KEY','ALPACA_SECRET_KEY')),

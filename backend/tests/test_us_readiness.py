@@ -6,7 +6,7 @@ from app.services import us_readiness as ready
 
 
 def environment(root):
-    return {'SUPABASE_URL':'https://us.example','SUPABASE_ANON_KEY':'private-test-key',
+    return {'SUPABASE_URL':'https://etwmtakotrqlwwzttekc.supabase.co','SUPABASE_ANON_KEY':'private-test-key',
             'US_INVITED_USER_IDS':'11111111-1111-4111-8111-111111111111',
             'ALPACA_API_KEY':'private-alpaca-key','ALPACA_SECRET_KEY':'private-alpaca-secret',
             'SEC_USER_AGENT':'private-operator-contact','DATA_DIR':str(root)}
@@ -112,3 +112,43 @@ def test_any_local_repository_still_requires_an_absolute_directory(tmp_path,mode
     assert not result['checks']['data_directory_requirement_satisfied']
     assert result['storage_probe']=='failed'
     probe.assert_not_called()
+
+
+@pytest.mark.parametrize('origin',[
+    'https://another-project.supabase.co',
+    'https://etwmtakotrqlwwzttekc.supabase.co.attacker.example',
+    'https://attacker-etwmtakotrqlwwzttekc.supabase.co',
+    'https://etwmtakotrqlwwzttekc.supabase.co:444',
+    'https://us.example',
+])
+@pytest.mark.parametrize('remote',[False,True])
+def test_wrong_project_cannot_pass_operator_preflight(tmp_path,origin,remote):
+    values = environment(tmp_path)
+    values['SUPABASE_URL'] = origin
+    if remote:
+        values.update(US_PLAN_STORE='supabase',US_RESEARCH_STORE='supabase',US_JOB_STORE='supabase')
+    with patch.dict(ready.os.environ,values,clear=True):
+        result = ready.report()
+    assert result['checks']['supabase_https_origin'] is True
+    assert result['checks']['supabase_dedicated_project_origin'] is False
+    assert result['configuration_ready'] is False
+    assert origin not in json.dumps(result)
+
+
+@pytest.mark.parametrize('suffix',['','/',':443',':443/'])
+def test_dedicated_origin_is_configuration_evidence_only(tmp_path,suffix):
+    values = environment(tmp_path)
+    values['SUPABASE_URL'] += suffix
+    with patch.dict(ready.os.environ,values,clear=True):
+        result = ready.report()
+    assert result['checks']['supabase_dedicated_project_origin'] is True
+    assert result['configuration_ready'] is True
+    assert 'supabase_migrations_and_real_account_isolation' in result['unverified']
+    assert 'real_invited_sign_in_and_revocation' in result['unverified']
+
+
+def test_migration_review_and_preflight_share_dedicated_project_reference():
+    from app.services.us_migration_review import manifest
+    from app.services.us_target import PROJECT_REFERENCE
+    assert manifest()['target_project_reference'] == PROJECT_REFERENCE
+    assert ready.dedicated_supabase_origin('https://'+PROJECT_REFERENCE+'.supabase.co')
