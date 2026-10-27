@@ -41,7 +41,7 @@ test('missing configuration fails closed for both recovery actions', async () =>
 test('early SDK recovery event is captured and resets on account switch or sign-out', () => {
   let notify;
   const fake = { auth: { onAuthStateChange: callback => { notify = callback; } } };
-  const lib = load('lib/supabase.ts', { '@supabase/supabase-js': { createClient: () => fake } }, { process: { env: { NEXT_PUBLIC_SUPABASE_URL: 'https://us.example.test', NEXT_PUBLIC_SUPABASE_ANON_KEY: 'test-public' } } });
+  const lib = load('lib/supabase.ts', { '@supabase/supabase-js': { createClient: () => fake } }, { process: { env: { NEXT_PUBLIC_SUPABASE_URL: 'https://etwmtakotrqlwwzttekc.supabase.co', NEXT_PUBLIC_SUPABASE_ANON_KEY: 'test-public' } } });
   const owner = { user: { id: 'owner-a' } };
   assert.equal(lib.isRecoverySession(), false);
   notify('PASSWORD_RECOVERY', owner);

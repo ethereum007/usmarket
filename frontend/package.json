@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test:intraday": "node --test tests/intraday-priority.test.cjs",
-    "test:us": "node --test tests/us-api-session.test.cjs tests/us-refresh-submit.test.cjs tests/us-catalog.test.cjs tests/us-plan-export.test.cjs tests/us-browser-notes.test.cjs tests/us-access.test.cjs tests/us-plans.test.cjs tests/us-filings.test.cjs tests/us-recovery.test.cjs tests/us-signup.test.cjs tests/us-refresh-history.test.cjs tests/us-refresh-status.test.cjs tests/us-session-brief.test.cjs tests/us-plan-history.test.cjs tests/us-invitation-check.test.cjs"
+    "test:us": "node --test tests/us-supabase-config.test.cjs tests/us-api-session.test.cjs tests/us-refresh-submit.test.cjs tests/us-catalog.test.cjs tests/us-plan-export.test.cjs tests/us-browser-notes.test.cjs tests/us-access.test.cjs tests/us-plans.test.cjs tests/us-filings.test.cjs tests/us-recovery.test.cjs tests/us-signup.test.cjs tests/us-refresh-history.test.cjs tests/us-refresh-status.test.cjs tests/us-session-brief.test.cjs tests/us-plan-history.test.cjs tests/us-invitation-check.test.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",

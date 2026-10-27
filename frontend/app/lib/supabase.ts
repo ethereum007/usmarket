@@ -3,7 +3,11 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 
-export const supabase = supabaseUrl && supabaseAnonKey
+// Standalone US product: never send passwords/recovery requests to an inherited project.
+// Custom authentication domains require an explicit target review before support is added.
+const dedicatedUSOrigin = /^https:\/\/etwmtakotrqlwwzttekc\.supabase\.co(?::443)?\/?$/i.test(supabaseUrl)
+
+export const supabase = dedicatedUSOrigin && supabaseAnonKey.trim()
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null
 

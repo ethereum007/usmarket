@@ -73,3 +73,8 @@ The hosted API sets `Cache-Control: private, no-store`, legacy no-cache headers 
 ## Interim private plan download
 
 Authenticated GET `/api/us/plans/export` downloads all revisions belonging to the verified account, ordered by plan ID/revision, with exact saved source identities and an export timestamp. It accepts no owner selector, excludes other accounts and does not modify records. More than 10,000 revisions fails rather than silently truncates. Keep the downloaded JSON private; notes and conditional research are sensitive. Research packages are not included, and no import/restore facility or durable hosted storage is implied. A download must happen before ephemeral storage disappears; it cannot recover already-lost data. External persistence remains the next storage gate.
+
+
+## Dedicated browser authentication destination
+
+The shared browser Supabase client now initializes only for the selected US Markets project URL (etwmtakotrqlwwzttekc.supabase.co over HTTPS/default port or 443, optional trailing slash) and a present public key. Missing, malformed or different-project configuration leaves the client null, so existing sign-in/signup/recovery screens remain disabled instead of issuing auth requests to an inherited project. Other/custom auth domains require an explicit target review. This checks the configured URL, not key validity, project ownership, invitation provisioning or hosted acceptance. Synthetic tests intercept client creation and verify invalid targets never create a client or auth subscription; recovery navigation remains supported for the dedicated target. No credentials or cloud configuration were read or changed.
