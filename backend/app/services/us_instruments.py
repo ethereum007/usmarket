@@ -81,7 +81,16 @@ async def load_instruments(client: httpx.AsyncClient, symbols: list[str]) -> dic
                 return symbol, result.json()
             except (httpx.HTTPError, ValueError):
                 return symbol, None
-    rows = await asyncio.gather(*(load(symbol) for symbol in members))
+    tasks = [asyncio.create_task(load(symbol)) for symbol in members]
+    try:
+        rows = await asyncio.gather(*tasks)
+    except BaseException:
+        # gather does not cancel siblings when one lookup fails. Drain them before
+        # the caller closes its HTTP client or releases refresh capacity.
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        raise
     return instrument_snapshot(members, dict(rows), datetime.now(timezone.utc))
 
 

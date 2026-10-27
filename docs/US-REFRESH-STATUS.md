@@ -68,3 +68,8 @@ The browser API retains HTTP status and a bounded numeric Retry-After (1–3600 
 ## Overall provider retrieval deadline
 
 US generation now places instrument resolution plus calendar/history retrieval (including retries and pagination) inside one 180-second async deadline. Expiry cancels the awaited provider work, closes its HTTP client and raises a fixed publication-not-performed error before package construction or local/remote publication. The existing worker failure/status cleanup handles this error and releases its capacity slot; storage acknowledgement failures retain their existing unknown/last-recorded semantics. No feed fallback or automatic refresh retry is added. Synthetic tests stall each retrieval stage and verify cancellation/client closure/no publication. The bound applies to cooperative provider awaits, not synchronous engine calculations, process hangs or an aggregate cross-host rate policy. Real hosted outage/load acceptance remains open.
+
+
+## Instrument lookup task cleanup
+
+Instrument retrieval now owns explicit lookup tasks and cancels/awaits all remaining tasks before propagating access denial, another fatal error or caller cancellation. asyncio.gather alone does not stop siblings after one failure. This prevents queued/in-flight siblings from continuing after generation returns and the HTTP client/capacity is cleaned up. Already-sent requests cannot be undone; ordinary missing/invalid asset responses remain explicit unavailable evidence. Synthetic async HTTP tests verify both denial statuses and caller cancellation leave no lookup tasks running. No real provider request or hosted configuration change was made, and aggregate/market-open acceptance remains open.

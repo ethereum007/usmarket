@@ -119,3 +119,46 @@ def test_refresh_wires_identity_before_publication_without_network_or_credential
     assert result["instrument_snapshot"]["records"]["AAPL"]["provider_asset_id"] == str(UUID(int=1))
     assert result["version"] == "us-swing-eod-v3"
     assert (tmp_path / (result["id"] + ".json")).exists()
+
+
+@pytest.mark.parametrize('status',[401,403])
+def test_denied_lookup_cancels_and_drains_other_provider_requests(status):
+    async def exercise():
+        sibling_started=asyncio.Event();started=[];cancelled=[]
+        async def handler(request):
+            symbol=request.url.path.rsplit('/',1)[-1]
+            started.append(symbol)
+            if symbol=='AAPL':
+                await sibling_started.wait()
+                return httpx.Response(status,text='Private provider detail')
+            sibling_started.set()
+            try:await asyncio.Event().wait()
+            finally:cancelled.append(symbol)
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            with pytest.raises(RuntimeError,match='access denied') as error:
+                await load_instruments(client,['AAPL','MSFT','NVDA','SPY','QQQ','AMD','META'])
+            assert 'Private provider detail' not in str(error.value)
+            count=len(started)
+            await asyncio.sleep(0)
+            assert len(started)==count
+            assert set(cancelled)==set(started)-{'AAPL'} and cancelled
+            assert not [task for task in asyncio.all_tasks() if task is not asyncio.current_task()]
+    asyncio.run(exercise())
+
+
+def test_caller_cancellation_drains_all_instrument_lookup_tasks():
+    async def exercise():
+        started=asyncio.Event();active=set()
+        async def handler(request):
+            symbol=request.url.path.rsplit('/',1)[-1]
+            active.add(symbol);started.set()
+            try:await asyncio.Event().wait()
+            finally:active.remove(symbol)
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            parent=asyncio.create_task(load_instruments(client,['AAPL','MSFT','NVDA','SPY','QQQ','AMD']))
+            await started.wait()
+            parent.cancel()
+            with pytest.raises(asyncio.CancelledError):await parent
+            assert not active
+            assert not [task for task in asyncio.all_tasks() if task is not asyncio.current_task()]
+    asyncio.run(exercise())
