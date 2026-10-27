@@ -233,3 +233,34 @@ def test_valid_paginated_history_retains_exact_rows_and_query_identity():
     assert rows['AAPL']==[first,second]
     assert calls[-1][1]['page_token']=='exact-next'
     assert calls[-1][1]['feed']=='sip' and calls[-1][1]['adjustment']=='split'
+
+
+@pytest.mark.parametrize('stage',['instruments','history'])
+def test_provider_deadline_cancels_stalled_retrieval_closes_client_and_never_publishes(monkeypatch,tmp_path,stage,capsys):
+    import asyncio
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock,patch
+    from app.services import us_research as research
+    monkeypatch.setenv('ALPACA_API_KEY','synthetic-test-key')
+    monkeypatch.setenv('ALPACA_SECRET_KEY','synthetic-test-secret')
+    monkeypatch.setattr(research,'PROVIDER_DEADLINE_SECONDS',0.01)
+    args=SimpleNamespace(symbols='AAPL',benchmark='SPY',feed='sip',output=str(tmp_path),publish_local=False)
+    instruments={'records':{'SPY':{'resolution':'resolved'},'AAPL':{'resolution':'resolved'}}}
+    cancelled=[];clients=[]
+    async def stalled(*args):
+        try:await asyncio.Event().wait()
+        finally:cancelled.append(stage)
+    original=httpx.AsyncClient
+    def client(**kwargs):
+        result=original(**kwargs);clients.append(result);return result
+    with patch.object(research,'load_dotenv'), \
+         patch.object(research.httpx,'AsyncClient',side_effect=client), \
+         patch.object(research,'load_instruments',side_effect=stalled if stage=='instruments' else AsyncMock(return_value=instruments)), \
+         patch.object(research.AlpacaHistory,'load',side_effect=stalled if stage=='history' else AsyncMock(return_value=([],{}))), \
+         patch.object(research,'research_package') as build,patch.object(research,'save_package') as publish:
+        with pytest.raises(RuntimeError,match='retrieval deadline exceeded') as error:
+            asyncio.run(research.run(args))
+    assert cancelled==[stage] and all(client.is_closed for client in clients)
+    build.assert_not_called();publish.assert_not_called()
+    assert capsys.readouterr().out=='' and list(tmp_path.iterdir())==[]
+    assert 'synthetic-test-key' not in str(error.value) and 'synthetic-test-secret' not in str(error.value)

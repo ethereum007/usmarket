@@ -17,6 +17,7 @@ from app.services.us_instruments import load_instruments, bind_instruments
 from app.services.us_sessions import completed_calendar, missing_sessions, VERSION as SESSION_VERSION, FINALIZATION_MINUTES
 
 NY = ZoneInfo('America/New_York')
+PROVIDER_DEADLINE_SECONDS = 180
 
 
 def completed_sessions(calendar: list[dict], now: datetime) -> list[str]:
@@ -186,12 +187,16 @@ async def run(args):
     now = datetime.now(timezone.utc)
     end = now.astimezone(NY).date().isoformat()
     start = (now - timedelta(days=800)).date().isoformat()
-    async with httpx.AsyncClient(headers={'APCA-API-KEY-ID':key, 'APCA-API-SECRET-KEY':secret}, timeout=30) as client:
-        instruments = await load_instruments(client, [args.benchmark, *symbols])
-        if instruments["records"][args.benchmark]["resolution"] != "resolved":
-            raise ValueError("Benchmark current asset identity could not be resolved; research was not published")
-        eligible = [symbol for symbol in symbols if instruments["records"][symbol]["resolution"] == "resolved"]
-        calendar, raw = await AlpacaHistory(client, args.feed).load([args.benchmark, *eligible], start, end)
+    try:
+        async with asyncio.timeout(PROVIDER_DEADLINE_SECONDS):
+            async with httpx.AsyncClient(headers={'APCA-API-KEY-ID':key, 'APCA-API-SECRET-KEY':secret}, timeout=30) as client:
+                instruments = await load_instruments(client, [args.benchmark, *symbols])
+                if instruments["records"][args.benchmark]["resolution"] != "resolved":
+                    raise ValueError("Benchmark current asset identity could not be resolved; research was not published")
+                eligible = [symbol for symbol in symbols if instruments["records"][symbol]["resolution"] == "resolved"]
+                calendar, raw = await AlpacaHistory(client, args.feed).load([args.benchmark, *eligible], start, end)
+    except TimeoutError:
+        raise RuntimeError('US provider retrieval deadline exceeded; research was not published') from None
     package = research_package(symbols, raw, calendar, now, args.feed, args.benchmark)
     package = bind_instruments(package, instruments)
     # Remote API callers own publication/acknowledgement. Do not make remote

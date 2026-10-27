@@ -63,3 +63,8 @@ The SQL owner reservation remains authoritative across cooperating hosts and sur
 ## Busy and conflict feedback
 
 The browser API retains HTTP status and a bounded numeric Retry-After (1–3600 seconds) on typed errors. Refresh submission uses fixed safe text for capacity 429 and admission-conflict 409, directing users to wait/check recorded history. Unrecognized delays are omitted; timeouts/malformed acknowledgements remain unconfirmed. No job is fabricated and no retry is automatically scheduled. Late errors after account cleanup remain ignored. Existing plan/error callers still receive Error-compatible messages. Synthetic transport/submission tests verify bounded metadata, sanitized feedback, single attempts and account cleanup. Actual hosted browser/load acceptance remains open.
+
+
+## Overall provider retrieval deadline
+
+US generation now places instrument resolution plus calendar/history retrieval (including retries and pagination) inside one 180-second async deadline. Expiry cancels the awaited provider work, closes its HTTP client and raises a fixed publication-not-performed error before package construction or local/remote publication. The existing worker failure/status cleanup handles this error and releases its capacity slot; storage acknowledgement failures retain their existing unknown/last-recorded semantics. No feed fallback or automatic refresh retry is added. Synthetic tests stall each retrieval stage and verify cancellation/client closure/no publication. The bound applies to cooperative provider awaits, not synchronous engine calculations, process hangs or an aggregate cross-host rate policy. Real hosted outage/load acceptance remains open.
