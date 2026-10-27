@@ -1,6 +1,6 @@
-# Dedicated Supabase activation review — not approved or applied
+# Dedicated Supabase activation review — approved, application pending
 
-Target: US Markets FREE project etwmtakotrqlwwzttekc. No paid resources. The original request covered three migrations; current source has six, including cross-host admission, atomic publication and fenced interruption. Review the full current bundle before any activation. Existing pending approval is not permission to run SQL or change grants.
+Target: US Markets FREE project etwmtakotrqlwwzttekc. No paid resources. The original request covered three migrations; current source has six, including cross-host admission, atomic publication and fenced interruption. Review the full current bundle before any activation. The user explicitly approved applying this reviewed six-file bundle to this dedicated Free project on 27 October 2026. Approval covers this bundle only; application remains pending.
 
 Bundle fingerprint (canonical UTF-8/LF text): `6dd6e1ee11ca8e1ce214279b07d24a15f49c2da7ae5cfe4f17c9bae4c0ce323f`
 
@@ -20,3 +20,10 @@ CI applies these source files to disposable PostgreSQL, tests owner/revision/pub
 Before any approved application, compare the latest manifest and Git revision to this review. Any changed fingerprint requires renewed review of the changed SQL. Run from backend: `python -m app.services.us_migration_review`. It reads only the allowlisted source files, makes no network request and prints no environment values. Windows CRLF and Linux LF checkouts intentionally have the same canonical fingerprint. CI rejects missing/extra/empty migrations and a stale document fingerprint.
 
 Approval, when provided, should identify this dedicated project and reviewed bundle. Applying SQL does not authorize enabling storage flags, creating identities, changing credentials, activating paid resources or publishing an incomplete service. Keep flags off until controlled real-account isolation, sign-in/research/save/reopen/restart and backup/restore acceptance. The private MVP target of 25 October was missed; no replacement deadline is assigned here.
+
+
+## Approval and application status — 27 October 2026
+
+The user explicitly approved applying the reviewed six-migration bundle to US Markets project etwmtakotrqlwwzttekc on the Free plan. The source manifest was rechecked and matches bundle 6dd6e1ee11ca8e1ce214279b07d24a15f49c2da7ae5cfe4f17c9bae4c0ce323f. No additional migration or changed SQL is included.
+
+Application has not occurred: the connected Supabase dashboard redirected to sign-in. The dashboard tab was left open for the user to sign in. No credentials, project settings, grants, data or feature flags were changed. After sign-in, inspect actual target/schema state before applying the bundle; do not blindly replay partially applied migrations. Any browser action-time confirmation requirements still apply immediately before material access changes. Storage flags and hosted acceptance remain off/pending; this approval does not authorize paid resources or new accounts.
