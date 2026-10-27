@@ -88,7 +88,13 @@ def execute(action, token, job_id=None, payload=None):
         if not valid:
             raise ValueError()
         if action == 'list':
-            return [public_observation(row) for row in result]
+            observations = [public_observation(row) for row in result]
+            identities = [row['id'] for row in observations]
+            if len(set(identities)) != len(identities):
+                raise ValueError('Duplicate refresh observations')
+            if sum(row['state'] in {'queued', 'running'} for row in observations) > 1:
+                raise ValueError('Conflicting active refresh observations')
+            return observations
         observation = None if result is None else public_observation(result, job_id)
         if action == 'interrupt' and observation['state'] not in {'completed','failed','interrupted'}:
             raise ValueError('Unconfirmed interruption')

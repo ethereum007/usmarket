@@ -190,3 +190,8 @@ The backend authentication verifier and all three remote storage adapters now re
 ## Verified saved-plan observation time
 
 Remote plan records now require updated_at to be an ISO timestamp with a timezone before save acknowledgement, exact read, list or export can return them. Missing/non-string/malformed/date-only/naive values fail with sanitized unconfirmed-storage feedback. Valid zoned text is preserved rather than replaced with the current clock, so exact retry retains the original observation. This does not certify wall-clock correctness or hosted retention. Synthetic tests cover save/get/export rejection and preserved UTC/offset timestamps; actual PostgreSQL journey/restore tests remain the SQL evidence. No migration, grant, flag or runtime data was changed.
+
+
+## Refresh history integrity
+
+The remote job adapter rejects duplicate job identities and more than one queued/running observation in an owner history. These responses contradict immutable job identity or the approved active-owner uniqueness contract; they return sanitized unavailable feedback instead of presenting ambiguous recovery choices or guessing which job is active. Empty history, distinct terminal jobs and one active job with terminal history remain valid. Synthetic transport tests cover these boundaries. This does not prove hosted schema activation or cross-host behavior; the approved six-migration fingerprint and all storage flags remain unchanged.

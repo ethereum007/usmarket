@@ -1,6 +1,7 @@
 from dataclasses import replace
 from unittest.mock import patch
 import json
+from uuid import UUID
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -454,6 +455,38 @@ def test_remote_jobs_require_remote_research_and_reject_unknown_modes(monkeypatc
         monkeypatch.setenv('US_RESEARCH_STORE','local')
         with pytest.raises(HTTPException) as error:api.remote_jobs.enabled()
         assert error.value.status_code==503
+
+
+@pytest.mark.parametrize('states,duplicate,accepted',[
+    (['queued','failed'], True, False),
+    (['failed','failed'], True, False),
+    (['queued','running'], False, False),
+    (['running','running'], False, False),
+    (['queued','interrupted','failed'], False, True),
+    (['failed','failed'], False, True),
+    ([], False, True),
+])
+def test_remote_job_history_rejects_duplicate_or_conflicting_active_observations(monkeypatch,states,duplicate,accepted):
+    import httpx
+    from types import SimpleNamespace
+    from fastapi import HTTPException
+    from app.services import us_remote_jobs as remote
+    monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://etwmtakotrqlwwzttekc.supabase.co',SUPABASE_ANON_KEY='public-test'))
+    rows=[{'id':str(UUID(int=1 if duplicate else index+1)),
+           'state':state,'updated_at':'2026-10-27T10:00:00Z'} for index,state in enumerate(states)]
+    original=httpx.Client
+    transport=httpx.MockTransport(lambda request:httpx.Response(200,json=rows))
+    with patch.object(remote.httpx,'Client',lambda **kwargs:original(transport=transport,**kwargs)), \
+         patch.object(api.repository,'list_jobs') as local:
+        if accepted:
+            result=remote.execute('list','synthetic-token')
+            assert [row['id'] for row in result]==[row['id'] for row in rows]
+            assert [row['state'] for row in result]==states
+        else:
+            with pytest.raises(HTTPException) as error:remote.execute('list','synthetic-token')
+            assert error.value.status_code==503
+            assert error.value.detail=='Refresh status storage is temporarily unavailable'
+        local.assert_not_called()
 
 
 @pytest.mark.parametrize('row',[
