@@ -78,3 +78,8 @@ Authenticated GET `/api/us/plans/export` downloads all revisions belonging to th
 ## Dedicated browser authentication destination
 
 The shared browser Supabase client now initializes only for the selected US Markets project URL (etwmtakotrqlwwzttekc.supabase.co over HTTPS/default port or 443, optional trailing slash) and a present public key. Missing, malformed or different-project configuration leaves the client null, so existing sign-in/signup/recovery screens remain disabled instead of issuing auth requests to an inherited project. Other/custom auth domains require an explicit target review. This checks the configured URL, not key validity, project ownership, invitation provisioning or hosted acceptance. Synthetic tests intercept client creation and verify invalid targets never create a client or auth subscription; recovery navigation remains supported for the dedicated target. No credentials or cloud configuration were read or changed.
+
+
+## Saved revision risk review
+
+Read-only plan history now shows the displayed revision's direction, whole-share quantity, planning capital, requested risk/allocation percentages and stored sizing notional/risk/budgets. It uses the exact reopened revision, never the latest editor or current-price recalculation. Missing, malformed or non-finite values remain Unknown; actual zero-capacity values remain zero. Existing history navigation, account cleanup, exact source checks and editor separation remain unchanged. Synthetic rendering tests cover older values, missing/invalid sizing and zero capacity. This adds review context without inferring triggers, fills, outcomes or strategy edge; real hosted/mobile/keyboard acceptance remains open.

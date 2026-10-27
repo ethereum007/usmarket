@@ -3,6 +3,11 @@ import { useEffect, useRef, useState } from "react";
 import { loadUSPlanRevision, type USPlan } from "../lib/us-plans";
 import { usd } from "../lib/us-research";
 
+const recordedNumber = (value: unknown, suffix = "") =>
+  typeof value === "number" && Number.isFinite(value) && value >= 0 ? value.toLocaleString("en-US") + suffix : "Unknown";
+const recordedMoney = (value: unknown) =>
+  typeof value === "number" && Number.isFinite(value) && value >= 0 ? usd(value) : "Unknown";
+
 export default function PlanHistory({ plan }: { plan: USPlan }) {
   const [record, setRecord] = useState(plan);
   const [loading, setLoading] = useState(false);
@@ -33,9 +38,16 @@ export default function PlanHistory({ plan }: { plan: USPlan }) {
     <dl><dt>Saved at</dt><dd>{new Date(record.updated_at).toLocaleString("en-US", { timeZone: "America/New_York" })} ET</dd>
       <dt>State / source session</dt><dd>{record.state} · {record.session}</dd>
       <dt>Trigger / stop</dt><dd>{usd(record.trigger)} / {usd(record.stop)}</dd>
+      <dt>Direction / recorded quantity</dt><dd>{record.direction} · {Number.isSafeInteger(record.quantity) && record.quantity >= 0 ? record.quantity.toLocaleString("en-US") : "Unknown"} whole shares</dd>
+      <dt>Planning capital</dt><dd>{recordedMoney(record.capital)}</dd>
+      <dt>Requested risk / allocation cap</dt><dd>{recordedNumber(record.risk_pct, "%")} / {recordedNumber(record.allocation_cap_pct, "%")}</dd>
+      <dt>Recorded planning notional</dt><dd>{recordedMoney(record.sizing?.planning_notional_usd)}</dd>
+      <dt>Recorded stop-distance risk</dt><dd>{recordedMoney(record.sizing?.stop_risk_usd)}</dd>
+      <dt>Recorded risk / allocation budgets</dt><dd>{recordedMoney(record.sizing?.risk_budget_usd)} / {recordedMoney(record.sizing?.allocation_budget_usd)}</dd>
       <dt>Expiry</dt><dd>{record.expiry} (ET)</dd>
       <dt>Thesis notes</dt><dd className="whitespace-pre-wrap">{record.notes || "No notes saved."}</dd>
       <dt>Exit policy</dt><dd className="whitespace-pre-wrap">{record.exit_policy}</dd></dl>
+    <p>Sizing values belong to this saved revision. Missing values stay unknown; no current-price recalculation, gap/fee estimate or fill is inferred.</p>
     <p>Original package {record.package_id} · setup {record.setup_version}</p>
     <p>Research revisions only. No trigger, fill, return or strategy outcome is inferred.</p>
   </section>;

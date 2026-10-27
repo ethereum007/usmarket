@@ -6,6 +6,7 @@ export type USPlan = Omit<ConditionalPlan, "earnings_state"> & {
   market: "US"; currency: "USD"; timezone: "America/New_York";
   source_snapshot_id: string; updated_at: string;
   filled: false; execution_readiness: "PLANNING_ONLY";
+  sizing?: USSizing;
 };
 const ROOT = "/api/us/plans";
 export const listUSPlans = () => fetchAPI<{ plans: USPlan[] }>(ROOT);
