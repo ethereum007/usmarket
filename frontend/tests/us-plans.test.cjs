@@ -49,7 +49,7 @@ for (const badSetup of [{ ...setup, source_snapshot_id: 'wrong' }, { ...setup, s
   const lib = compile('lib/us-plans.ts', { './api': { fetchAPI: async url => url.includes('/research/') ? { package: { ...data, setups: [badSetup] } } : { plan } } });
   await assert.rejects(lib.loadUSPlan(plan), /could not be verified/);
 });
-function editorFixture(save, existing = null, preview = async () => ({ sizing: { quantity: 20 } }), browser, replacementGuard) {
+function editorFixture(save, existing = null, preview = async () => ({ sizing: { quantity: 20 } }), browser, replacementGuard, onDraftStarted) {
   const updates = [], saved = [], effects = [];
   let uuids = 0;
   const react = { ...React, useState: value => [value, next => updates.push(next)], useRef: value => ({ current: value }), useEffect: effect => effects.push(effect) };
@@ -58,7 +58,7 @@ function editorFixture(save, existing = null, preview = async () => ({ sizing: {
     '../lib/theme': { useTheme: () => ({ theme: 'dark' }) },
     '../lib/us-plans': { saveUSPlan: save, previewUSPlanSizing: preview }, '../lib/us-research': { usd: value => `$${value}` },
   }, { ...(browser ? { window: browser } : {}), FormData: class { constructor() { return fields(); } }, crypto: { randomUUID: () => `new-${++uuids}` } });
-  const element = lib.USPlanEditor({ data, setup, existing, onSaved: item => saved.push(item), replacementGuard });
+  const element = lib.USPlanEditor({ data, setup, existing, onSaved: item => saved.push(item), replacementGuard, onDraftStarted });
   const cleanups = effects.map(fn => fn());
   return { element, updates, saved, cleanups };
 }
@@ -216,4 +216,47 @@ test('evidence finishing after edits checks replacement guard before replacing e
   complete({plan,data,setup});await new Promise(resolve=>setImmediate(resolve));
   assert.equal(checks,1);assert.equal(updates.some(row=>row.index===3),false);
   assert.ok(updates.some(row=>row.index===2&&String(row.next).includes('replacement cancelled')));
+});
+
+
+function draftWorkspace() {
+  const states=[], refs=[];let stateIndex=0, refIndex=0;
+  const react={...React,useState:value=>{const index=stateIndex++;if(!(index in states))states[index]=value;return [states[index],next=>{states[index]=typeof next==='function'?next(states[index]):next;}];},useRef:value=>{const index=refIndex++;return refs[index]||(refs[index]={current:value});},useEffect(){}};
+  const lib=compile('us/plans.tsx',{react,'next/dynamic':{default:()=>()=>null},'../lib/theme':{useTheme:()=>({theme:'dark'})},'../lib/us-plans':{},'../lib/us-research':{usd:value=>`$${value}`}});
+  function find(tree,predicate){let found;function walk(node){if(!node||typeof node!=='object')return;if(predicate(node))found=node;React.Children.forEach(node.props?.children,walk);}walk(tree);return found;}
+  function render(selectedData=data,selectedSetup=setup){stateIndex=0;refIndex=0;const tree=lib.default({data:selectedData,setup:selectedSetup});return {editor:find(tree,node=>node.type===lib.USPlanEditor),start:find(tree,node=>node.type==='button'&&node.props.children==='Start a new plan for the selected setup')};}
+  return {render,refs};
+}
+
+test('new draft keeps exact research and editor identity across selection changes and loading',()=>{
+  const workspace=draftWorkspace();const first=workspace.render();first.editor.props.onDraftStarted();
+  const otherSetup={...setup,symbol:'MSFT',setup_version:'e'.repeat(64)};
+  const otherData={...data,id:'f'.repeat(64),setups:[otherSetup]};
+  const changed=workspace.render(otherData,otherSetup);
+  assert.equal(changed.editor.props.data,data);assert.equal(changed.editor.props.setup,setup);assert.equal(changed.editor.key,first.editor.key);
+  assert.equal(workspace.render(null,undefined).editor.props.data,data);
+  workspace.refs[2].current=()=>false;changed.start.props.onClick();
+  assert.equal(workspace.render(otherData,otherSetup).editor.props.data,data);
+  workspace.refs[2].current=()=>true;changed.start.props.onClick();
+  const selected=workspace.render(otherData,otherSetup);
+  assert.equal(selected.editor.props.data,otherData);assert.equal(selected.editor.props.setup,otherSetup);
+  assert.notEqual(selected.editor.key,first.editor.key);
+});
+
+
+test('input change and clean save attempt preserve draft source before asynchronous save',async()=>{
+  let pins=0, fail;
+  const changed=editorFixture(async()=>({plan}),null,undefined,undefined,undefined,()=>pins++);
+  changed.element.props.onChange();assert.equal(pins,1);
+  const clean=editorFixture(()=>{assert.equal(pins,2);return new Promise((resolve,reject)=>fail=reject);},null,undefined,undefined,undefined,()=>pins++);
+  const saving=clean.element.props.onSubmit({preventDefault(){},currentTarget:{}});
+  fail(Error('unconfirmed'));await saving;assert.equal(pins,2);assert.equal(clean.saved.length,0);
+});
+
+
+test('explicit new plan remounts editor even when selected source has not changed',()=>{
+  const workspace=draftWorkspace();const first=workspace.render();first.editor.props.onDraftStarted();
+  workspace.refs[2].current=()=>true;workspace.render().start.props.onClick();
+  const fresh=workspace.render();assert.equal(fresh.editor.props.data,data);
+  assert.notEqual(fresh.editor.key,first.editor.key);assert.equal(fresh.start,undefined);
 });

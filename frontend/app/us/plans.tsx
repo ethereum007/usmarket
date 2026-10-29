@@ -21,6 +21,8 @@ export default function USPlans({ data, setup }: { data: USPackage | null; setup
   const [editing, setEditing] = useState<Review | null>(null);
   const [opening, setOpening] = useState(false);
   const [savedMessage, setSavedMessage] = useState("");
+  const [draftSource, setDraftSource] = useState<{ data: USPackage; setup: ResearchSetup } | null>(null);
+  const [draftGeneration, setDraftGeneration] = useState(0);
   const request = useRef(0);
   const reviewRequest = useRef(0);
   const replacementGuard = useRef<(() => boolean) | null>(null);
@@ -60,8 +62,19 @@ export default function USPlans({ data, setup }: { data: USPackage | null; setup
       if (version === reviewRequest.current) setOpening(false);
     }
   }
-  const source = editing?.data || data;
-  const thesis = editing?.setup || setup;
+  const source = editing?.data || draftSource?.data || data;
+  const thesis = editing?.setup || draftSource?.setup || setup;
+  function preserveDraftSource() {
+    if (!editing && source && thesis) setDraftSource({ data: source, setup: thesis });
+  }
+  function startSelectedPlan() {
+    if (!mayReplaceEditor()) return;
+    reviewRequest.current++;
+    setEditing(null);
+    setDraftSource(null);
+    setDraftGeneration(previous => previous + 1);
+    setSavedMessage("");
+  }
   function saved(plan: USPlan) {
     if (!source || !thesis) return;
     request.current++;
@@ -87,20 +100,22 @@ export default function USPlans({ data, setup }: { data: USPackage | null; setup
         <button className="workspace-button mt-2" type="button" disabled={opening} onClick={() => void review(plan)}>Open saved evidence / revise {plan.symbol}</button>
       </li>)}</ul>
       {opening && <p role="status">Checking original research and saved revision…</p>}
-      {editing && <div className="text-sm"><p>Editing saved {editing.plan.symbol} revision {editing.plan.revision} from {editing.data.session}. This stays bound to its original setup when you browse other stocks.</p><button className="workspace-button mt-2" type="button" disabled={opening} onClick={() => { if (!mayReplaceEditor()) return; reviewRequest.current++; setEditing(null); setSavedMessage(""); }}>Start a new plan for the selected setup</button></div>}
+      {draftSource && !editing && <p role="status" className="text-sm">Your unsaved {draftSource.setup.symbol} plan stays bound to research from {draftSource.data.session} while you browse other setups.</p>}
+      {(editing || draftSource) && <button className="workspace-button" type="button" disabled={opening} onClick={startSelectedPlan}>Start a new plan for the selected setup</button>}
+      {editing && <div className="text-sm"><p>Editing saved {editing.plan.symbol} revision {editing.plan.revision} from {editing.data.session}. This stays bound to its original setup when you browse other stocks.</p></div>}
       {editing && <PlanHistory key={`${editing.plan.id}:${editing.plan.revision}`} plan={editing.plan} />}
       {editing && <details><summary>Original saved research · {editing.setup.symbol} · {editing.data.session}</summary>
         <p className="my-2 text-sm">{editing.setup.strategy} · {editing.data.benchmark} benchmark · {editing.data.feed.toUpperCase()} · Original snapshot {editing.plan.source_snapshot_id}</p>
         <Chart appearance={theme} data={editing.data.source_bars[editing.plan.symbol] || []} symbol={editing.plan.symbol} height={280} priceLevels={[{ price: editing.plan.trigger, title: "Saved trigger", color: "#3b82f6" }, { price: editing.plan.stop, title: "Saved stop", color: "#ef4444" }]} />
         <p className="text-sm">{editing.setup.notes}</p><p className="text-xs text-text-secondary">Historical source evidence; no later prices or fill outcomes are inferred.</p>
       </details>}
-      {source && thesis && source.state === "final" ? <USPlanEditor key={`${editing?.plan.id || source.id}:${thesis.setup_version}:${editing?.plan.revision || 0}`} data={source} setup={thesis} existing={editing?.plan || null} onSaved={saved} replacementGuard={replacementGuard} /> : <p>Select a detected setup in a final US research package to create a plan. Partial research cannot back a saved plan.</p>}
+      {source && thesis && source.state === "final" ? <USPlanEditor key={`${editing?.plan.id || source.id}:${thesis.setup_version}:${editing?.plan.revision || 0}:${draftGeneration}`} data={source} setup={thesis} existing={editing?.plan || null} onSaved={saved} replacementGuard={replacementGuard} onDraftStarted={preserveDraftSource} /> : <p>Select a detected setup in a final US research package to create a plan. Partial research cannot back a saved plan.</p>}
     </section>
   );
 }
 
 // Adapted from the imported swing PlanEditor; US identity, currency and event policy are explicit.
-export function USPlanEditor({ data, setup, existing, onSaved, replacementGuard }: { data: USPackage; setup: ResearchSetup; existing: USPlan | null; onSaved: (plan: USPlan) => void; replacementGuard?: RefObject<(() => boolean) | null> }) {
+export function USPlanEditor({ data, setup, existing, onSaved, replacementGuard, onDraftStarted }: { data: USPackage; setup: ResearchSetup; existing: USPlan | null; onSaved: (plan: USPlan) => void; replacementGuard?: RefObject<(() => boolean) | null>; onDraftStarted?: () => void }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [sizing, setSizing] = useState<USSizing | null>(null);
@@ -135,6 +150,7 @@ export function USPlanEditor({ data, setup, existing, onSaved, replacementGuard 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (pending.current) return;
+    onDraftStarted?.();
     pending.current = true;
     setSaving(true);
     setError("");
@@ -163,8 +179,8 @@ export function USPlanEditor({ data, setup, existing, onSaved, replacementGuard 
       if (active.current && version === previewVersion.current) setPreviewing(false);
     }
   }
-  return <form onChange={() => { dirty.current = true; previewVersion.current++; setSizing(null); setSizingError(""); setPreviewing(false); }} onSubmit={submit} aria-label="US conditional plan" className="space-y-4 border-t border-card-border pt-5">
-    <p className="text-xs text-text-secondary">Save your draft before changing research or leaving this page. Unsaved edits are held only in this open editor.</p>
+  return <form onChange={() => { onDraftStarted?.(); dirty.current = true; previewVersion.current++; setSizing(null); setSizingError(""); setPreviewing(false); }} onSubmit={submit} aria-label="US conditional plan" className="space-y-4 border-t border-card-border pt-5">
+    <p className="text-xs text-text-secondary">Unsaved edits stay with this research while you browse. Save before leaving this page; drafts are held only in this open editor.</p>
     <h3>{existing ? `Revise ${setup.symbol} plan · revision ${existing.revision}` : `Create ${setup.symbol} conditional plan`}</h3>
     <p className="text-xs text-text-secondary">Source session {data.session} · {setup.signal} · USD · Package {data.id.slice(0, 12)} · Setup {setup.setup_version.slice(0, 12)}</p>
     <fieldset disabled={saving} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"><legend className="sr-only">Plan parameters in US dollars</legend>
