@@ -210,3 +210,8 @@ Every hosted private request now gives the dedicated Supabase identity request a
 ## Required refresh observation time
 
 Remote job list/read/save, atomic publication and interruption acknowledgements now require a valid zoned updated_at. Missing, null, boolean, malformed, date-only and naive values return sanitized storage-unavailable feedback, with no current-clock substitution or local fallback. Valid offsets retain the recorded instant when normalized to UTC. The applied SQL already supplies these server timestamps; no migration changed or replayed. Synthetic transport regressions exercise all five acknowledgement paths and preserve earlier state/package mismatch checks. This is response validation, not hosted persistence or clock-correctness acceptance; runtime flags remain off.
+
+
+## Browser refresh-history validation
+
+The history panel and active-job restoration now share validation before accepting a fetched list. Non-arrays, more than 20 entries, missing/duplicate IDs, unknown states, multiple active observations, invalid completed-package identities and non-string display fields fail with sanitized unavailable feedback. Invalid history cannot enable recovery controls. This avoids rendering malformed payloads or choosing guessed active work; valid empty history remains distinct from failure. Synthetic component tests exercise malformed responses and confirm no records or interruption capability are accepted. No hosted settings or flags changed; real-account acceptance still needs the requested account/frontend inputs.

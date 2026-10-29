@@ -26,7 +26,7 @@ for(const state of ['completed','failed','interrupted'])test(`server ${state} re
 test('late responses after cleanup cannot affect another account',async()=>{
   let resolve;const fixture=load(()=>new Promise(done=>resolve=done));
   const stop=fixture.start({id:'one',state:'running'});const pending=fixture.timers[0]();
-  stop();resolve({job:{id:'one',state:'completed'}});await pending;
+  stop();resolve({job:{id:'one',state:'completed',package_id:'a'.repeat(64)}});await pending;
   assert.equal(fixture.statuses.length,0);assert.equal(fixture.errors.length,0);assert.deepEqual(fixture.cleared,[1]);
 });
 test('a fresh observation can recover after a failed status check',async()=>{
@@ -34,7 +34,7 @@ test('a fresh observation can recover after a failed status check',async()=>{
   const job={id:'one',state:'running'};fixture.start(job);await fixture.timers[0]();fixture.start(job);await fixture.timers[1]();
   assert.equal(fixture.statuses[0].state,'completed');assert.equal(fixture.requests.length,2);
 });
-for(const job of [{id:'another',state:'completed'},{id:'one',state:'invented'}])test(`unexpected response is not accepted: ${job.id}/${job.state}`,async()=>{
+for(const job of [{id:'another',state:'completed',package_id:'a'.repeat(64)},{id:'one',state:'invented'}])test(`unexpected response is not accepted: ${job.id}/${job.state}`,async()=>{
   const fixture=load(async()=>({job}));fixture.start({id:'one',state:'running'});await fixture.timers[0]();
   assert.equal(fixture.statuses.length,0);assert.equal(fixture.errors.length,1);
 });
@@ -46,7 +46,7 @@ test('terminal records and missing jobs do not poll',()=>{
 
 
 for(const state of ['queued','running'])test(`reload rediscovers recorded ${state} without creating work`,async()=>{
-  const fixture=load(async()=>({jobs:[{id:'terminal',state:'completed'},{id:'existing',state}]}));
+  const fixture=load(async()=>({jobs:[{id:'terminal',state:'completed',package_id:'a'.repeat(64)},{id:'existing',state}]}));
   const job=await fixture.restore();
   assert.equal(job.id,'existing');assert.equal(job.state,state);
   assert.deepEqual(fixture.requests,['/api/us/research/jobs']);
@@ -55,11 +55,11 @@ for(const state of ['queued','running'])test(`reload rediscovers recorded ${stat
 });
 
 test('completed or interrupted history does not invent an active refresh',async()=>{
-  const fixture=load(async()=>({jobs:[{id:'done',state:'completed'},{id:'unknown',state:'interrupted'}]}));
+  const fixture=load(async()=>({jobs:[{id:'done',state:'completed',package_id:'a'.repeat(64)},{id:'unknown',state:'interrupted'}]}));
   assert.equal(await fixture.restore(),null);
 });
 for(const jobs of [null,[{id:'one',state:'invented'}],[{id:'one',state:'running'},{id:'two',state:'queued'}],
-    [{id:'same',state:'running'},{id:'same',state:'completed'}]])test('malformed or ambiguous history does not select a guessed worker '+JSON.stringify(jobs),async()=>{
+    [{id:'same',state:'running'},{id:'same',state:'completed',package_id:'a'.repeat(64)}]])test('malformed or ambiguous history does not select a guessed worker '+JSON.stringify(jobs),async()=>{
   const fixture=load(async()=>({jobs}));await assert.rejects(fixture.restore());
   assert.equal(fixture.statuses.length,0);assert.equal(fixture.timers.length,0);
 });

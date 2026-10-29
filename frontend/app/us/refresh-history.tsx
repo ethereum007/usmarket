@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { fetchAPI, postAPI } from "../lib/api";
 
-type Job = { id: string; state: string; updated_at?: string; package_id?: string; error?: string };
+import { validateRefreshHistory, type RefreshJob as Job } from "../lib/us-refresh-status";
 
 export default function RefreshHistory({ onOpen, revision }: { onOpen: (id: string) => void; revision: string }) {
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -21,7 +21,7 @@ export default function RefreshHistory({ onOpen, revision }: { onOpen: (id: stri
     setLoading(true);
     setError("");
     fetchAPI<{ jobs: Job[]; interruption_available?: boolean }>("/api/us/research/jobs")
-      .then(result => { if (active) { setJobs(result.jobs); setCanInterrupt(result.interruption_available === true); } })
+      .then(result => { if (active) { setJobs(validateRefreshHistory(result.jobs)); setCanInterrupt(result.interruption_available === true); } })
       .catch(() => { if (active) setError("Refresh history is unavailable. Saved research may still be available."); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; current.active = false; };

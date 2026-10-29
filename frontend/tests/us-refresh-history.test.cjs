@@ -13,6 +13,11 @@ function load(states, fetcher = async () => ({ jobs: [] }), poster = async () =>
     if (name === 'react') return { ...React, useState: initial => {
       const slot = index++; return [states[slot] ?? initial, value => updates.push([slot, value])];
     }, useRef: initial => ({ current: initial }), useEffect: fn => effects.push(fn) };
+    if (name === '../lib/us-refresh-status') {
+      const module={exports:{},require:()=>({})};
+      vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(__dirname,'../app/lib/us-refresh-status.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,module);
+      return module.exports;
+    }
     if (name === '../lib/api') return { fetchAPI: fetcher, postAPI: poster };
     return require(name);
   }};
@@ -52,7 +57,7 @@ test('only completed jobs with valid package IDs can open exact research', () =>
 });
 test('history retrieves the owner-scoped API with no client-supplied owner', async () => {
   const requests=[];
-  const fixture=load([],async url => {requests.push(url);return {jobs:[{id:'saved',state:'completed'}]};});
+  const fixture=load([],async url => {requests.push(url);return {jobs:[{id:'saved',state:'completed',package_id:'a'.repeat(64)}]};});
   fixture.effects[0]();
   await new Promise(resolve=>setImmediate(resolve));
   assert.deepEqual(requests,['/api/us/research/jobs']);
@@ -129,4 +134,15 @@ test('duplicate recovery clicks send once and late account responses are ignored
   cleanup();const before=fixture.updates.length;
   resolve({job:{id:'one',state:'interrupted'}});await first;
   assert.equal(fixture.updates.length,before);
+});
+
+
+for(const jobs of [null,{},[null],[{id:'one',state:'invented'}],Array.from({length:21},(_,i)=>({id:String(i),state:'failed'})),
+  [{id:'same',state:'failed'},{id:'same',state:'interrupted'}], [{id:'one',state:'running'},{id:'two',state:'queued'}],
+  [{id:'one',state:'completed',package_id:'../wrong'}], [{id:'one',state:'failed',error:{private:'payload'}}]])
+test('malformed loaded history is unavailable rather than rendered '+JSON.stringify(jobs),async()=>{
+  const f=load([],async()=>({jobs,interruption_available:true}));f.effects[0]();await new Promise(done=>setImmediate(done));
+  assert.equal(f.updates.some(([slot])=>slot===0),false);
+  assert.equal(f.updates.some(([slot,value])=>slot===4&&value===true),false);
+  assert.ok(f.updates.some(([slot,value])=>slot===2&&value.includes('history is unavailable')));
 });
