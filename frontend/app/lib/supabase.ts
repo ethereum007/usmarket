@@ -5,7 +5,7 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 
 // Standalone US product: never send passwords/recovery requests to an inherited project.
 // Custom authentication domains require an explicit target review before support is added.
-const dedicatedUSOrigin = /^https:\/\/etwmtakotrqlwwzttekc\.supabase\.co(?::443)?\/?$/i.test(supabaseUrl)
+const dedicatedUSOrigin = /^https:\/\/apidhmrlawbjvisnadht\.supabase\.co(?::443)?\/?$/i.test(supabaseUrl)
 
 export const supabase = dedicatedUSOrigin && supabaseAnonKey.trim()
   ? createClient(supabaseUrl, supabaseAnonKey)

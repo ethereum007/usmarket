@@ -388,7 +388,7 @@ def test_remote_catalog_transport_errors_are_sanitized(status,payload,expected,m
     from types import SimpleNamespace
     from app.services import us_remote_research as remote
     from fastapi import HTTPException
-    monkeypatch.setattr(remote, 'settings', SimpleNamespace(SUPABASE_URL='https://etwmtakotrqlwwzttekc.supabase.co',SUPABASE_ANON_KEY='public-test'))
+    monkeypatch.setattr(remote, 'settings', SimpleNamespace(SUPABASE_URL='https://apidhmrlawbjvisnadht.supabase.co',SUPABASE_ANON_KEY='public-test'))
     original = httpx.Client
     transport = httpx.MockTransport(lambda request: httpx.Response(status,json=payload))
     with patch.object(remote.httpx, 'Client', lambda **kwargs: original(transport=transport, **kwargs)):
@@ -436,7 +436,7 @@ def test_remote_job_transport_strips_identity_credentials_and_arbitrary_errors(m
     import httpx
     from types import SimpleNamespace
     from app.services import us_remote_jobs as remote
-    monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://etwmtakotrqlwwzttekc.supabase.co',SUPABASE_ANON_KEY='public-test'))
+    monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://apidhmrlawbjvisnadht.supabase.co',SUPABASE_ANON_KEY='public-test'))
     requests=[]
     original=httpx.Client
     transport=httpx.MockTransport(lambda request: (requests.append(request) or httpx.Response(200,json={'id':'one','state':'queued'})))
@@ -471,7 +471,7 @@ def test_remote_job_history_rejects_duplicate_or_conflicting_active_observations
     from types import SimpleNamespace
     from fastapi import HTTPException
     from app.services import us_remote_jobs as remote
-    monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://etwmtakotrqlwwzttekc.supabase.co',SUPABASE_ANON_KEY='public-test'))
+    monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://apidhmrlawbjvisnadht.supabase.co',SUPABASE_ANON_KEY='public-test'))
     rows=[{'id':str(UUID(int=1 if duplicate else index+1)),
            'state':state,'updated_at':'2026-10-27T10:00:00Z'} for index,state in enumerate(states)]
     original=httpx.Client
@@ -501,7 +501,7 @@ def test_remote_job_read_rejects_wrong_identity_or_unverifiable_completion(row,m
     from types import SimpleNamespace
     from fastapi import HTTPException
     from app.services import us_remote_jobs as remote
-    monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://etwmtakotrqlwwzttekc.supabase.co',SUPABASE_ANON_KEY='public-test'))
+    monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://apidhmrlawbjvisnadht.supabase.co',SUPABASE_ANON_KEY='public-test'))
     original=httpx.Client
     transport=httpx.MockTransport(lambda request:httpx.Response(200,json=row))
     with patch.object(remote.httpx,'Client',lambda **kwargs:original(transport=transport,**kwargs)):
@@ -528,7 +528,7 @@ def test_remote_publication_rejects_same_id_with_changed_or_invalid_evidence(cha
     from app.services import us_remote_research as remote
     payload={'id':'a'*64,'universe':'us-test','market':'US','currency':'USD','state':'final',
         'session':'2026-10-23','computed_at':'2026-10-24T00:00:00Z','symbols':['AAPL']}
-    monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://etwmtakotrqlwwzttekc.supabase.co',SUPABASE_ANON_KEY='public-test'))
+    monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://apidhmrlawbjvisnadht.supabase.co',SUPABASE_ANON_KEY='public-test'))
     original=httpx.Client
     transport=httpx.MockTransport(lambda request:httpx.Response(200,json={**payload,**change}))
     with patch.object(remote.httpx,'Client',lambda **kwargs:original(transport=transport,**kwargs)):
@@ -546,7 +546,7 @@ def test_remote_publication_accepts_identical_replay_with_original_observation(m
         'instrument_snapshot':{'observed_at':'2026-10-24T01:00:00Z','records':{'AAPL':'synthetic'}}}
     earlier={**payload,'computed_at':'2026-10-24T00:00:00Z',
         'instrument_snapshot':{'observed_at':'2026-10-24T00:00:00Z','records':{'AAPL':'synthetic'}}}
-    monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://etwmtakotrqlwwzttekc.supabase.co',SUPABASE_ANON_KEY='public-test'))
+    monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://apidhmrlawbjvisnadht.supabase.co',SUPABASE_ANON_KEY='public-test'))
     original=httpx.Client
     transport=httpx.MockTransport(lambda request:httpx.Response(200,json=earlier))
     with patch.object(remote.httpx,'Client',lambda **kwargs:original(transport=transport,**kwargs)):
@@ -579,7 +579,7 @@ def test_remote_job_save_requires_exact_transition_acknowledgement(monkeypatch,r
     from types import SimpleNamespace
     from fastapi import HTTPException
     from app.services import us_remote_jobs as remote
-    monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://etwmtakotrqlwwzttekc.supabase.co',SUPABASE_ANON_KEY='public-test'))
+    monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://apidhmrlawbjvisnadht.supabase.co',SUPABASE_ANON_KEY='public-test'))
     original=httpx.Client
     transport=httpx.MockTransport(lambda request:httpx.Response(200,json={'id':'one',**reply}))
     with patch.object(remote.httpx,'Client',lambda **kwargs:original(transport=transport,**kwargs)):
@@ -612,7 +612,7 @@ def test_atomic_publication_transport_validates_both_records(monkeypatch,change)
     from types import SimpleNamespace
     from fastapi import HTTPException
     from app.services import us_remote_jobs as remote
-    monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://etwmtakotrqlwwzttekc.supabase.co',SUPABASE_ANON_KEY='public-test'))
+    monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://apidhmrlawbjvisnadht.supabase.co',SUPABASE_ANON_KEY='public-test'))
     package={'id':'a'*64,'universe':'us-test','market':'US','currency':'USD','state':'final',
              'session':'2026-10-23','computed_at':'2026-10-24T00:00:00Z'}
     result={'package':dict(package),'job':{'id':'one','state':'completed','package_id':package['id']}}
@@ -665,7 +665,7 @@ def test_interruption_transport_requires_terminal_acknowledgement(monkeypatch,st
     from types import SimpleNamespace
     from fastapi import HTTPException
     from app.services import us_remote_jobs as remote
-    monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://etwmtakotrqlwwzttekc.supabase.co',SUPABASE_ANON_KEY='public-test'))
+    monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://apidhmrlawbjvisnadht.supabase.co',SUPABASE_ANON_KEY='public-test'))
     row={'id':'one','state':state,'package_id':'a'*64}
     requests=[]; original=httpx.Client
     transport=httpx.MockTransport(lambda request:(requests.append(request) or httpx.Response(200,json=row)))
@@ -723,7 +723,7 @@ def test_research_acknowledgement_preserves_nested_boolean_numeric_types(monkeyp
     from fastapi import HTTPException
     from app.services import us_remote_jobs, us_remote_research
     remote = us_remote_jobs if atomic else us_remote_research
-    monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://etwmtakotrqlwwzttekc.supabase.co',SUPABASE_ANON_KEY='public-test'))
+    monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://apidhmrlawbjvisnadht.supabase.co',SUPABASE_ANON_KEY='public-test'))
     package = {'id':'a'*64,'universe':'us-test','market':'US','currency':'USD','state':'final',
                'session':'2026-10-23','computed_at':'2026-10-24T00:00:00Z',
                'source_bars':{'AAPL':[{'volume':sent}]}}

@@ -343,7 +343,7 @@ def test_api_remote_plan_journey_uses_real_sql_and_preserves_account_boundaries(
     app=FastAPI();app.include_router(us_plans.router)
     client=TestClient(app)
     monkeypatch.setenv('US_PLAN_STORE','supabase');monkeypatch.setenv('US_RESEARCH_STORE','supabase')
-    config=SimpleNamespace(SUPABASE_URL='https://etwmtakotrqlwwzttekc.supabase.co',SUPABASE_ANON_KEY='public-test')
+    config=SimpleNamespace(SUPABASE_URL='https://apidhmrlawbjvisnadht.supabase.co',SUPABASE_ANON_KEY='public-test')
     monkeypatch.setattr(us_remote_plans,'settings',config);monkeypatch.setattr(us_remote_research,'settings',config)
     monkeypatch.setattr(us_auth,'settings',config)
     monkeypatch.setenv('US_INVITED_USER_IDS',A)
@@ -451,7 +451,7 @@ def test_api_remote_refresh_journey_and_interruption_use_real_sql(pg,monkeypatch
     client=TestClient(app)
     monkeypatch.setenv('US_JOB_STORE','supabase');monkeypatch.setenv('US_RESEARCH_STORE','supabase')
     monkeypatch.setattr(api,'settings',replace(api.settings,DATA_DIR=tmp_path))
-    config=SimpleNamespace(SUPABASE_URL='https://etwmtakotrqlwwzttekc.supabase.co',SUPABASE_ANON_KEY='public-test')
+    config=SimpleNamespace(SUPABASE_URL='https://apidhmrlawbjvisnadht.supabase.co',SUPABASE_ANON_KEY='public-test')
     monkeypatch.setattr(us_remote_jobs,'settings',config);monkeypatch.setattr(us_remote_research,'settings',config)
     requests=[];generated=[];lost=[]
     def gateway(request):

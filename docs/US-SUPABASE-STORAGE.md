@@ -1,6 +1,6 @@
 # US Supabase plan storage (not activated)
 
-Target supplied by user: etwmtakotrqlwwzttekc, under US Markets. Source migration: supabase/migrations/202610200001_us_plan_revisions.sql. No SQL has been applied by this increment.
+Target supplied by user: apidhmrlawbjvisnadht, under US Markets. Source migration: supabase/migrations/202610200001_us_plan_revisions.sql. No SQL has been applied by this increment.
 
 The optional US_PLAN_STORE=supabase adapter uses the existing SUPABASE_URL/public key and each verified user's bearer token, never a service role key. Leave the flag unset until migration and real acceptance pass. Unknown modes fail closed; remote failures do not fall back to SQLite. SQLite remains the default for existing local tests/previews.
 
@@ -159,7 +159,7 @@ Pending initial session lookups now preserve newer auth events: late lookup succ
 
 ## Dedicated-project operator preflight
 
-configuration_ready now requires the exact dedicated US Supabase hostname etwmtakotrqlwwzttekc.supabase.co on HTTPS default port/443, with optional trailing slash. Valid HTTPS URLs for other projects or lookalike hosts no longer pass the operator gate. A shared source project-reference constant also supplies the migration-review manifest; migration files and bundle fingerprint are unchanged. The check emits a named boolean without echoing configured origins and performs no network request. It is an operator configuration gate, not a change to runtime adapters or proof that the supplied public key, hosted accounts, migrations or grants belong to that project. Custom domains require explicit target review. No hosted configuration, resources, credentials or flags were changed; actual acceptance remains open.
+configuration_ready now requires the exact dedicated US Supabase hostname apidhmrlawbjvisnadht.supabase.co on HTTPS default port/443, with optional trailing slash. Valid HTTPS URLs for other projects or lookalike hosts no longer pass the operator gate. A shared source project-reference constant also supplies the migration-review manifest; migration files and bundle fingerprint are unchanged. The check emits a named boolean without echoing configured origins and performs no network request. It is an operator configuration gate, not a change to runtime adapters or proof that the supplied public key, hosted accounts, migrations or grants belong to that project. Custom domains require explicit target review. No hosted configuration, resources, credentials or flags were changed; actual acceptance remains open.
 
 
 ## Post-commit response-loss rehearsal

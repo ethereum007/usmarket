@@ -2,7 +2,7 @@
 from urllib.parse import urlsplit
 from app.services.us_origins import https_origin
 
-PROJECT_REFERENCE = 'etwmtakotrqlwwzttekc'
+PROJECT_REFERENCE = 'apidhmrlawbjvisnadht'
 
 
 def dedicated_supabase_origin(value):

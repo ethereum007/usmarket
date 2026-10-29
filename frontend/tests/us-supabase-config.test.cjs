@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const ts = require('typescript');
-const origin = 'https://etwmtakotrqlwwzttekc.supabase.co';
+const origin = 'https://apidhmrlawbjvisnadht.supabase.co';
 function load(url, key) {
   if (arguments.length < 2) key = 'synthetic-public-key';
   const calls = [], subscriptions = [];
@@ -19,9 +19,9 @@ function load(url, key) {
   }).outputText,context);
   return { api:context.exports,calls,subscriptions,client };
 }
-for (const url of [undefined,'','http://etwmtakotrqlwwzttekc.supabase.co','https://other-project.supabase.co',
+for (const url of ['https://etwmtakotrqlwwzttekc.supabase.co',undefined,'','http://apidhmrlawbjvisnadht.supabase.co','https://other-project.supabase.co',
   origin+'.attacker.example',origin+':444',origin+'/auth',origin+'?project=other',origin+'#fragment',
-  'https://user:password@etwmtakotrqlwwzttekc.supabase.co',' '+origin,origin+'\n',origin+'\\other']) {
+  'https://user:password@apidhmrlawbjvisnadht.supabase.co',' '+origin,origin+'\n',origin+'\\other']) {
   test(`invalid or different browser auth target is disabled: ${JSON.stringify(url)}`,() => {
     const f = load(url);
     assert.equal(f.api.supabase,null);

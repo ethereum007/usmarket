@@ -38,7 +38,7 @@ def provider_client(response=None,error=None):
         async def __aenter__(self):return self
         async def __aexit__(self,*args):return False
         async def get(self,url,headers):
-            assert url=='https://etwmtakotrqlwwzttekc.supabase.co/auth/v1/user'
+            assert url=='https://apidhmrlawbjvisnadht.supabase.co/auth/v1/user'
             assert headers['Authorization']=='Bearer test-session'
             if error:raise error
             return response
@@ -58,7 +58,7 @@ def provider_client(response=None,error=None):
     (429,{},503), (500,{},503), (302,{},503),
 ])
 def test_provider_identity_and_failure_mapping(status,body,expected):
-    config=SimpleNamespace(SUPABASE_URL='https://etwmtakotrqlwwzttekc.supabase.co',SUPABASE_ANON_KEY='test-public-key')
+    config=SimpleNamespace(SUPABASE_URL='https://apidhmrlawbjvisnadht.supabase.co',SUPABASE_ANON_KEY='test-public-key')
     with patch.dict(us_auth.os.environ,{'US_INVITED_USER_IDS':'11111111-1111-4111-8111-111111111111'}), patch.object(us_auth,'settings',config), patch.object(us_auth.httpx,'AsyncClient',provider_client(httpx.Response(status,json=body))):
         response=TestClient(auth_app()).get('/private',headers={'Authorization':'Bearer test-session'})
     assert response.status_code==expected
@@ -67,7 +67,7 @@ def test_provider_identity_and_failure_mapping(status,body,expected):
 
 
 def test_provider_timeout_fails_closed():
-    config=SimpleNamespace(SUPABASE_URL='https://etwmtakotrqlwwzttekc.supabase.co',SUPABASE_ANON_KEY='test-public-key')
+    config=SimpleNamespace(SUPABASE_URL='https://apidhmrlawbjvisnadht.supabase.co',SUPABASE_ANON_KEY='test-public-key')
     with patch.object(us_auth,'settings',config),patch.object(us_auth.httpx,'AsyncClient',provider_client(error=httpx.ReadTimeout('provider timeout'))):
         assert TestClient(auth_app()).get('/private',headers={'Authorization':'Bearer test-session'}).status_code==503
 
@@ -101,7 +101,7 @@ def test_hosted_refresh_requires_token_and_health_remains_public():
 def test_private_mvp_invitation_is_enforced_after_provider_verification(members,expected):
     identity='11111111-1111-4111-8111-111111111111'
     body={'id':identity,'email':'owner@example.com','email_confirmed_at':'2026-01-01T00:00:00Z'}
-    config=SimpleNamespace(SUPABASE_URL='https://etwmtakotrqlwwzttekc.supabase.co',SUPABASE_ANON_KEY='test-public-key')
+    config=SimpleNamespace(SUPABASE_URL='https://apidhmrlawbjvisnadht.supabase.co',SUPABASE_ANON_KEY='test-public-key')
     with patch.dict(us_auth.os.environ,{'US_INVITED_USER_IDS':members}),patch.object(us_auth,'settings',config),patch.object(us_auth.httpx,'AsyncClient',provider_client(httpx.Response(200,json=body))):
         response=TestClient(auth_app()).get('/private',headers={'Authorization':'Bearer test-session',
             'X-Invited-User':identity,'X-Admin-Secret':'forged','Origin':'http://localhost:3108'})
@@ -112,7 +112,7 @@ def test_private_mvp_invitation_is_enforced_after_provider_verification(members,
 def test_invitation_revocation_applies_to_next_request_without_token_reissue():
     identity='11111111-1111-4111-8111-111111111111'
     body={'id':identity,'email':'owner@example.com','email_confirmed_at':'2026-01-01T00:00:00Z'}
-    config=SimpleNamespace(SUPABASE_URL='https://etwmtakotrqlwwzttekc.supabase.co',SUPABASE_ANON_KEY='test-public-key')
+    config=SimpleNamespace(SUPABASE_URL='https://apidhmrlawbjvisnadht.supabase.co',SUPABASE_ANON_KEY='test-public-key')
     client=TestClient(auth_app())
     with patch.object(us_auth,'settings',config),patch.object(us_auth.httpx,'AsyncClient',provider_client(httpx.Response(200,json=body))):
         with patch.dict(us_auth.os.environ,{'US_INVITED_USER_IDS':identity}):
@@ -132,12 +132,12 @@ def test_access_probe_uses_same_auth_boundary_and_discloses_no_identity():
 
 
 @pytest.mark.parametrize('origin', [
-    None, 123, '', 'http://etwmtakotrqlwwzttekc.supabase.co', 'https://',
-    'https://user:secret@etwmtakotrqlwwzttekc.supabase.co', 'https://etwmtakotrqlwwzttekc.supabase.co/custom',
-    'https://etwmtakotrqlwwzttekc.supabase.co?key=secret', 'https://etwmtakotrqlwwzttekc.supabase.co#fragment',
-    'https://etwmtakotrqlwwzttekc.supabase.co:invalid', 'https://etwmtakotrqlwwzttekc.supabase.co:65536',
-    ' https://etwmtakotrqlwwzttekc.supabase.co', 'https://etwmtakotrqlwwzttekc.supabase.co\n',
-    'https://us-auth.exa\tmple', 'https://etwmtakotrqlwwzttekc.supabase.co\\other',
+    None, 123, '', 'http://apidhmrlawbjvisnadht.supabase.co', 'https://',
+    'https://user:secret@apidhmrlawbjvisnadht.supabase.co', 'https://apidhmrlawbjvisnadht.supabase.co/custom',
+    'https://apidhmrlawbjvisnadht.supabase.co?key=secret', 'https://apidhmrlawbjvisnadht.supabase.co#fragment',
+    'https://apidhmrlawbjvisnadht.supabase.co:invalid', 'https://apidhmrlawbjvisnadht.supabase.co:65536',
+    ' https://apidhmrlawbjvisnadht.supabase.co', 'https://apidhmrlawbjvisnadht.supabase.co\n',
+    'https://us-auth.exa\tmple', 'https://apidhmrlawbjvisnadht.supabase.co\\other',
 ])
 def test_invalid_auth_origin_rejected_before_sending_bearer(origin):
     config = SimpleNamespace(SUPABASE_URL=origin, SUPABASE_ANON_KEY='test-public-key')
@@ -152,15 +152,16 @@ def test_invalid_auth_origin_rejected_before_sending_bearer(origin):
 def test_auth_origin_single_trailing_slash_remains_supported():
     identity = '11111111-1111-4111-8111-111111111111'
     body = {'id':identity, 'email':'owner@example.com', 'email_confirmed_at':'2026-01-01T00:00:00Z'}
-    config = SimpleNamespace(SUPABASE_URL='https://etwmtakotrqlwwzttekc.supabase.co/', SUPABASE_ANON_KEY='test-public-key')
+    config = SimpleNamespace(SUPABASE_URL='https://apidhmrlawbjvisnadht.supabase.co/', SUPABASE_ANON_KEY='test-public-key')
     with patch.dict(us_auth.os.environ, {'US_INVITED_USER_IDS':identity}), patch.object(us_auth, 'settings', config), patch.object(us_auth.httpx, 'AsyncClient', provider_client(httpx.Response(200, json=body))):
         assert TestClient(auth_app()).get('/private', headers={'Authorization':'Bearer test-session'}).status_code == 200
 
 
 @pytest.mark.parametrize('origin',[
+    'https://etwmtakotrqlwwzttekc.supabase.co',
     'https://other-project.supabase.co',
-    'https://etwmtakotrqlwwzttekc.supabase.co.attacker.example',
-    'https://etwmtakotrqlwwzttekc.supabase.co:444',
+    'https://apidhmrlawbjvisnadht.supabase.co.attacker.example',
+    'https://apidhmrlawbjvisnadht.supabase.co:444',
 ])
 def test_wrong_project_never_receives_auth_or_storage_bearers(origin):
     from fastapi import HTTPException

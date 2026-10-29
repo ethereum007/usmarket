@@ -1,6 +1,6 @@
-# Dedicated Supabase activation review — approved, application pending
+# Dedicated Supabase activation review — replacement target pending approval
 
-Target: US Markets FREE project etwmtakotrqlwwzttekc. No paid resources. The original request covered three migrations; current source has six, including cross-host admission, atomic publication and fenced interruption. Review the full current bundle before any activation. The user explicitly approved applying this reviewed six-file bundle to this dedicated Free project on 27 October 2026. Approval covers this bundle only; application remains pending.
+Current target: replacement US Markets project apidhmrlawbjvisnadht, supplied by the user on 29 October 2026. Free plan must be verified before application. Previous target: etwmtakotrqlwwzttekc. No paid resources. The original request covered three migrations; current source has six, including cross-host admission, atomic publication and fenced interruption. Review the full current bundle before any activation. The 27 October approval covered only the previous project; it does not authorize application to the replacement target. The SQL bundle is unchanged. New-target approval and application remain pending.
 
 Bundle fingerprint (canonical UTF-8/LF text): `6dd6e1ee11ca8e1ce214279b07d24a15f49c2da7ae5cfe4f17c9bae4c0ce323f`
 
@@ -32,3 +32,8 @@ Application has not occurred: the connected Supabase dashboard redirected to sig
 ## Read-only inspection before/after application
 
 Use supabase/inspect_us_storage.sql in the confirmed dedicated project to inspect presence and structural security of the three tables, five exact RPC signatures and active-owner index. It reads PostgreSQL catalogs/privileges only, never payload rows or credentials, and changes nothing. Missing objects return false rather than triggering an attempted migration replay; present objects with false security_contract require investigation. The query checks RLS/direct client privileges, security-definer/empty search path and RPC role access, plus basic index validity/uniqueness/predicate presence. It does not certify function bodies, exact index predicate, configured invitations or real hosted persistence. Compare the approved source bundle and inspect differences before applying to an existing schema. This query is outside the approved migration inventory and does not modify its fingerprint. CI exercises passing structure, transactional permission drift and missing-object reporting in disposable PostgreSQL only.
+
+
+## Replacement project — 29 October 2026
+
+The user supplied https://supabase.com/dashboard/project/apidhmrlawbjvisnadht after being unable to recover access to the previous target. Backend and frontend target restrictions and synthetic fixtures now use the replacement reference. The previous project must be rejected before forwarding credentials. No keys, runtime environments, hosted settings, migrations or flags are changed by this source update. Verify dashboard identity, Free plan and actual schema, then obtain action-time approval for this exact unchanged six-file bundle on the replacement project. Prior approval/status entries above describe the old project only. Hosted acceptance and the missed 25 October gate remain unresolved.

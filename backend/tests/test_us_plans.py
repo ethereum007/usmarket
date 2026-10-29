@@ -268,7 +268,7 @@ def test_remote_plans_use_verified_token_without_owner_selector(fixture, monkeyp
     from types import SimpleNamespace
     a, *_ = fixture
     monkeypatch.setenv('US_PLAN_STORE', 'supabase')
-    monkeypatch.setattr(remote, 'settings', SimpleNamespace(SUPABASE_URL='https://etwmtakotrqlwwzttekc.supabase.co', SUPABASE_ANON_KEY='public-test'))
+    monkeypatch.setattr(remote, 'settings', SimpleNamespace(SUPABASE_URL='https://apidhmrlawbjvisnadht.supabase.co', SUPABASE_ANON_KEY='public-test'))
     requests = []
     transport = httpx.MockTransport(lambda request: (requests.append(request) or httpx.Response(200, json=[])))
     original = httpx.Client
@@ -288,7 +288,7 @@ def test_remote_storage_conflicts_and_failures_are_sanitized(status,body,expecte
     import httpx
     from app.services import us_remote_plans as remote
     from types import SimpleNamespace
-    monkeypatch.setattr(remote, 'settings', SimpleNamespace(SUPABASE_URL='https://etwmtakotrqlwwzttekc.supabase.co', SUPABASE_ANON_KEY='public-test'))
+    monkeypatch.setattr(remote, 'settings', SimpleNamespace(SUPABASE_URL='https://apidhmrlawbjvisnadht.supabase.co', SUPABASE_ANON_KEY='public-test'))
     transport = httpx.MockTransport(lambda request: httpx.Response(status, json=body))
     original = httpx.Client
     with patch.object(remote.httpx, 'Client', lambda **kwargs: original(transport=transport, **kwargs)):
@@ -311,7 +311,7 @@ def test_remote_save_requires_exact_identity_revision_and_source(change,monkeypa
     source={'market':'US','currency':'USD','setup_id':'setup','package_id':'a'*64,
         'setup_version':'b'*64,'source_snapshot_id':'c'*64,'symbol':'AAPL','direction':'BULL','provider_asset_id':'asset'}
     response={**source,'id':key,'revision':2,'updated_at':'2026-10-26T00:00:00Z',**change}
-    monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://etwmtakotrqlwwzttekc.supabase.co',SUPABASE_ANON_KEY='public-test'))
+    monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://apidhmrlawbjvisnadht.supabase.co',SUPABASE_ANON_KEY='public-test'))
     original=httpx.Client
     transport=httpx.MockTransport(lambda request:httpx.Response(200,json=response))
     with patch.object(remote.httpx,'Client',lambda **kwargs:original(transport=transport,**kwargs)):
@@ -343,7 +343,7 @@ def test_remote_save_acknowledgement_matches_all_plan_content(monkeypatch,change
             'notes':'Original private notes','trigger':100.0,'stop':90.0,'capital':10000.0,
             'quantity':1,'state':'draft','sizing':{'quantity':1,'risk_budget_usd':100}}
     row={**values,'id':key,'revision':1,'updated_at':'2026-10-26T00:00:00Z',**change}
-    monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://etwmtakotrqlwwzttekc.supabase.co',SUPABASE_ANON_KEY='public-test'))
+    monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://apidhmrlawbjvisnadht.supabase.co',SUPABASE_ANON_KEY='public-test'))
     original=httpx.Client
     transport=httpx.MockTransport(lambda request:httpx.Response(200,json=row))
     with patch.object(remote.httpx,'Client',lambda **kwargs:original(transport=transport,**kwargs)):
@@ -415,7 +415,7 @@ def test_remote_export_rejects_duplicate_or_gapped_history_before_download(monke
     from app.services import us_remote_plans as remote
     key='11111111-1111-4111-8111-111111111111'
     rows=[{'id':key,'revision':revision,'market':'US','currency':'USD','notes':'Private synthetic notes','updated_at':'2026-10-26T00:00:00Z'} for revision in revisions]
-    monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://etwmtakotrqlwwzttekc.supabase.co',SUPABASE_ANON_KEY='public-test'))
+    monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://apidhmrlawbjvisnadht.supabase.co',SUPABASE_ANON_KEY='public-test'))
     original=httpx.Client
     transport=httpx.MockTransport(lambda request:httpx.Response(200,json=rows))
     with patch.object(remote.httpx,'Client',lambda **kwargs:original(transport=transport,**kwargs)):
@@ -473,7 +473,7 @@ def test_remote_plan_unverifiable_saved_time_never_confirms_record(monkeypatch,s
     values={'market':'US','currency':'USD','notes':'Synthetic thesis'}
     row={**values,'id':key,'revision':1,'updated_at':stamp}
     result=[row] if operation=='export' else row
-    monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://etwmtakotrqlwwzttekc.supabase.co',SUPABASE_ANON_KEY='synthetic-public-key'))
+    monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://apidhmrlawbjvisnadht.supabase.co',SUPABASE_ANON_KEY='synthetic-public-key'))
     original=httpx.Client
     transport=httpx.MockTransport(lambda request:httpx.Response(200,json=result))
     function,args={'save':(repo.save_plan,('owner',key,0,values)),

@@ -6,7 +6,7 @@ from app.services import us_readiness as ready
 
 
 def environment(root):
-    return {'SUPABASE_URL':'https://etwmtakotrqlwwzttekc.supabase.co','SUPABASE_ANON_KEY':'private-test-key',
+    return {'SUPABASE_URL':'https://apidhmrlawbjvisnadht.supabase.co','SUPABASE_ANON_KEY':'private-test-key',
             'US_INVITED_USER_IDS':'11111111-1111-4111-8111-111111111111',
             'ALPACA_API_KEY':'private-alpaca-key','ALPACA_SECRET_KEY':'private-alpaca-secret',
             'SEC_USER_AGENT':'private-operator-contact','DATA_DIR':str(root)}
@@ -116,9 +116,9 @@ def test_any_local_repository_still_requires_an_absolute_directory(tmp_path,mode
 
 @pytest.mark.parametrize('origin',[
     'https://another-project.supabase.co',
-    'https://etwmtakotrqlwwzttekc.supabase.co.attacker.example',
-    'https://attacker-etwmtakotrqlwwzttekc.supabase.co',
-    'https://etwmtakotrqlwwzttekc.supabase.co:444',
+    'https://apidhmrlawbjvisnadht.supabase.co.attacker.example',
+    'https://attacker-apidhmrlawbjvisnadht.supabase.co',
+    'https://apidhmrlawbjvisnadht.supabase.co:444',
     'https://us.example',
 ])
 @pytest.mark.parametrize('remote',[False,True])
