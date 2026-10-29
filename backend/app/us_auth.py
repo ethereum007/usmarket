@@ -5,6 +5,7 @@ local user. The explicit loopback preview harness owns its test override.
 """
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime
 import os
 from uuid import UUID
@@ -14,6 +15,8 @@ from fastapi import HTTPException, Request
 from app.config import settings
 from app.services.us_target import dedicated_supabase_origin
 
+
+AUTH_DEADLINE_SECONDS = 5.0
 
 def unauthorized():
     return HTTPException(401, 'Sign in to the US workspace', headers={'WWW-Authenticate':'Bearer'})
@@ -34,12 +37,15 @@ async def verify_us_token(token: str) -> dict:
         raise HTTPException(503, 'US authentication is not configured')
     origin = origin.rstrip('/')
     try:
-        async with httpx.AsyncClient(timeout=5.0, follow_redirects=False) as client:
-            response = await client.get(origin + '/auth/v1/user', headers={
-                'Authorization':'Bearer ' + token,
-                'apikey':public_key,
-            })
-    except httpx.HTTPError:
+        # HTTPX read timeouts apply between chunks; bound the whole verification
+        # request as well so a slow provider cannot hold private API requests open.
+        async with asyncio.timeout(AUTH_DEADLINE_SECONDS):
+            async with httpx.AsyncClient(timeout=5.0, follow_redirects=False) as client:
+                response = await client.get(origin + '/auth/v1/user', headers={
+                    'Authorization':'Bearer ' + token,
+                    'apikey':public_key,
+                })
+    except (httpx.HTTPError, TimeoutError):
         raise HTTPException(503, 'US authentication is temporarily unavailable') from None
     if response.status_code in {401,403}:
         raise unauthorized()

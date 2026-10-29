@@ -180,3 +180,54 @@ def test_wrong_project_never_receives_auth_or_storage_bearers(origin):
         assert error.value.status_code==503
         assert origin not in error.value.detail and 'synthetic-private-token' not in error.value.detail
         storage_client.assert_not_called()
+
+
+@pytest.mark.parametrize('stage',['enter','request'])
+def test_total_auth_deadline_cancels_stalled_provider_and_allows_later_verification(stage):
+    import asyncio
+    from fastapi import HTTPException
+    config=SimpleNamespace(SUPABASE_URL='https://apidhmrlawbjvisnadht.supabase.co',SUPABASE_ANON_KEY='test-public-key')
+    cancelled=[]
+    class Stalled:
+        def __init__(self,*args,**kwargs):pass
+        async def wait(self):
+            try:await asyncio.Event().wait()
+            finally:cancelled.append(stage)
+        async def __aenter__(self):
+            if stage=='enter':await self.wait()
+            return self
+        async def __aexit__(self,*args):return False
+        async def get(self,*args,**kwargs):await self.wait()
+    async def exercise():
+        with patch.object(us_auth,'settings',config),patch.object(us_auth,'AUTH_DEADLINE_SECONDS',0.01),patch.object(us_auth.httpx,'AsyncClient',Stalled):
+            with pytest.raises(HTTPException) as failure:
+                await asyncio.wait_for(us_auth.verify_us_token('synthetic-secret'),1)
+        assert failure.value.status_code==503
+        assert failure.value.detail=='US authentication is temporarily unavailable'
+        assert cancelled==[stage]
+        identity='11111111-1111-4111-8111-111111111111'
+        body={'id':identity,'email':'owner@example.com','email_confirmed_at':'2026-01-01T00:00:00Z'}
+        with patch.object(us_auth,'settings',config),patch.dict(us_auth.os.environ,{'US_INVITED_USER_IDS':identity}),patch.object(us_auth.httpx,'AsyncClient',provider_client(httpx.Response(200,json=body))):
+            assert (await us_auth.verify_us_token('test-session'))['id']==identity
+    asyncio.run(exercise())
+
+
+def test_caller_cancellation_is_not_converted_to_auth_outage():
+    import asyncio
+    config=SimpleNamespace(SUPABASE_URL='https://apidhmrlawbjvisnadht.supabase.co',SUPABASE_ANON_KEY='test-public-key')
+    async def exercise():
+        started=asyncio.Event();cancelled=asyncio.Event()
+        class Stalled:
+            def __init__(self,*args,**kwargs):pass
+            async def __aenter__(self):return self
+            async def __aexit__(self,*args):return False
+            async def get(self,*args,**kwargs):
+                started.set()
+                try:await asyncio.Event().wait()
+                finally:cancelled.set()
+        with patch.object(us_auth,'settings',config),patch.object(us_auth.httpx,'AsyncClient',Stalled):
+            task=asyncio.create_task(us_auth.verify_us_token('synthetic-secret'))
+            await asyncio.wait_for(started.wait(),1);task.cancel()
+            with pytest.raises(asyncio.CancelledError):await task
+            assert cancelled.is_set()
+    asyncio.run(exercise())
