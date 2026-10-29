@@ -1,6 +1,6 @@
-# US Supabase plan storage (not activated)
+# US Supabase storage — schema applied; runtime activation pending
 
-Target supplied by user: apidhmrlawbjvisnadht, under US Markets. Source migration: supabase/migrations/202610200001_us_plan_revisions.sql. No SQL has been applied by this increment.
+Target supplied by user: apidhmrlawbjvisnadht, under US Markets. Source migration: supabase/migrations/202610200001_us_plan_revisions.sql. The reviewed six-file bundle was applied to this replacement project on 29 October 2026; all nine structural security checks passed. Earlier increment sections below retain their historical status. See docs/SUPABASE-ACTIVATION-REVIEW.md for application evidence; runtime flags and hosted acceptance remain pending.
 
 The optional US_PLAN_STORE=supabase adapter uses the existing SUPABASE_URL/public key and each verified user's bearer token, never a service role key. Leave the flag unset until migration and real acceptance pass. Unknown modes fail closed; remote failures do not fall back to SQLite. SQLite remains the default for existing local tests/previews.
 

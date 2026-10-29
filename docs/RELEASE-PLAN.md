@@ -6,7 +6,7 @@ Owner: Kiran Dutta. Repository: ethereum007/usmarket. Target: US Thanksgiving, T
 
 Private hosted MVP for invited users by Sunday, 25 October 2026, confirmed by the user on 20 October. Execute docs/WEEKEND-MVP.md before adding broader features. Private access and actual display permissions still apply; source tests alone do not satisfy hosted acceptance.
 
-The 25 October target was missed without hosted acceptance. The gate remains failed; no revised private-MVP deadline is assigned. The user supplied replacement project apidhmrlawbjvisnadht on 29 October after the old project was inaccessible. Prior migration approval covered the old target only; replacement-target verification, approval and application remain pending. Continue independent source work. See docs/SUPABASE-ACTIVATION-REVIEW.md; approval does not enable storage flags or establish hosted acceptance.
+The 25 October target was missed without hosted acceptance. The gate remains failed; no revised private-MVP deadline is assigned. The user supplied replacement project apidhmrlawbjvisnadht on 29 October after the old project was inaccessible. The user approved the replacement bundle on 29 October; all six migrations were applied in one transaction and all nine structural security checks passed. Runtime flags remain unchanged; real-account and hosted persistence acceptance remain pending. Continue independent source work. See docs/SUPABASE-ACTIVATION-REVIEW.md; approval does not enable storage flags or establish hosted acceptance.
 
 ## Product promise
 
