@@ -195,3 +195,8 @@ Remote plan records now require updated_at to be an ISO timestamp with a timezon
 ## Refresh history integrity
 
 The remote job adapter rejects duplicate job identities and more than one queued/running observation in an owner history. These responses contradict immutable job identity or the approved active-owner uniqueness contract; they return sanitized unavailable feedback instead of presenting ambiguous recovery choices or guessing which job is active. Empty history, distinct terminal jobs and one active job with terminal history remain valid. Synthetic transport tests cover these boundaries. This does not prove hosted schema activation or cross-host behavior; the approved six-migration fingerprint and all storage flags remain unchanged.
+
+
+## Saved-evidence editor replacement guard
+
+Opening saved evidence checks the current editor immediately before replacement, after the asynchronous evidence read. Unsaved changes require an explicit discard confirmation; a pending save blocks replacement. Returning from a saved revision to a new plan uses the same guard. Failed saves retain the dirty guard and successful saves clear it. Tests cover cancellation, confirmation, pending/failed saves and edits made while evidence loads. This guard does not intercept changing the selected research setup for an unsaved new plan or leaving through in-app navigation; the existing save-before-changing warning still applies there. No hosted flags or account configuration changed; real-account and restart acceptance remain pending.

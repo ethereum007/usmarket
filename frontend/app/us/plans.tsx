@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type RefObject } from "react";
 import dynamic from "next/dynamic";
 import { useTheme } from "../lib/theme";
 import PlanHistory from "./plan-history";
@@ -23,6 +23,12 @@ export default function USPlans({ data, setup }: { data: USPackage | null; setup
   const [savedMessage, setSavedMessage] = useState("");
   const request = useRef(0);
   const reviewRequest = useRef(0);
+  const replacementGuard = useRef<(() => boolean) | null>(null);
+  function mayReplaceEditor() {
+    if (!replacementGuard.current || replacementGuard.current()) return true;
+    setError("Plan replacement cancelled. Keep editing, or wait for the current save to finish");
+    return false;
+  }
   useEffect(() => {
     void refresh();
     return () => { request.current++; reviewRequest.current++; };
@@ -47,7 +53,7 @@ export default function USPlans({ data, setup }: { data: USPackage | null; setup
     setSavedMessage("");
     try {
       const result = await loadUSPlan(plan);
-      if (version === reviewRequest.current) setEditing(result);
+      if (version === reviewRequest.current && mayReplaceEditor()) setEditing(result);
     } catch (cause) {
       if (version === reviewRequest.current) setError(cause instanceof Error ? cause.message : "Original plan evidence is unavailable");
     } finally {
@@ -81,20 +87,20 @@ export default function USPlans({ data, setup }: { data: USPackage | null; setup
         <button className="workspace-button mt-2" type="button" disabled={opening} onClick={() => void review(plan)}>Open saved evidence / revise {plan.symbol}</button>
       </li>)}</ul>
       {opening && <p role="status">Checking original research and saved revision…</p>}
-      {editing && <div className="text-sm"><p>Editing saved {editing.plan.symbol} revision {editing.plan.revision} from {editing.data.session}. This stays bound to its original setup when you browse other stocks.</p><button className="workspace-button mt-2" type="button" disabled={opening} onClick={() => { reviewRequest.current++; setEditing(null); setSavedMessage(""); }}>Start a new plan for the selected setup</button></div>}
+      {editing && <div className="text-sm"><p>Editing saved {editing.plan.symbol} revision {editing.plan.revision} from {editing.data.session}. This stays bound to its original setup when you browse other stocks.</p><button className="workspace-button mt-2" type="button" disabled={opening} onClick={() => { if (!mayReplaceEditor()) return; reviewRequest.current++; setEditing(null); setSavedMessage(""); }}>Start a new plan for the selected setup</button></div>}
       {editing && <PlanHistory key={`${editing.plan.id}:${editing.plan.revision}`} plan={editing.plan} />}
       {editing && <details><summary>Original saved research · {editing.setup.symbol} · {editing.data.session}</summary>
         <p className="my-2 text-sm">{editing.setup.strategy} · {editing.data.benchmark} benchmark · {editing.data.feed.toUpperCase()} · Original snapshot {editing.plan.source_snapshot_id}</p>
         <Chart appearance={theme} data={editing.data.source_bars[editing.plan.symbol] || []} symbol={editing.plan.symbol} height={280} priceLevels={[{ price: editing.plan.trigger, title: "Saved trigger", color: "#3b82f6" }, { price: editing.plan.stop, title: "Saved stop", color: "#ef4444" }]} />
         <p className="text-sm">{editing.setup.notes}</p><p className="text-xs text-text-secondary">Historical source evidence; no later prices or fill outcomes are inferred.</p>
       </details>}
-      {source && thesis && source.state === "final" ? <USPlanEditor key={`${editing?.plan.id || source.id}:${thesis.setup_version}:${editing?.plan.revision || 0}`} data={source} setup={thesis} existing={editing?.plan || null} onSaved={saved} /> : <p>Select a detected setup in a final US research package to create a plan. Partial research cannot back a saved plan.</p>}
+      {source && thesis && source.state === "final" ? <USPlanEditor key={`${editing?.plan.id || source.id}:${thesis.setup_version}:${editing?.plan.revision || 0}`} data={source} setup={thesis} existing={editing?.plan || null} onSaved={saved} replacementGuard={replacementGuard} /> : <p>Select a detected setup in a final US research package to create a plan. Partial research cannot back a saved plan.</p>}
     </section>
   );
 }
 
 // Adapted from the imported swing PlanEditor; US identity, currency and event policy are explicit.
-export function USPlanEditor({ data, setup, existing, onSaved }: { data: USPackage; setup: ResearchSetup; existing: USPlan | null; onSaved: (plan: USPlan) => void }) {
+export function USPlanEditor({ data, setup, existing, onSaved, replacementGuard }: { data: USPackage; setup: ResearchSetup; existing: USPlan | null; onSaved: (plan: USPlan) => void; replacementGuard?: RefObject<(() => boolean) | null> }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [sizing, setSizing] = useState<USSizing | null>(null);
@@ -119,6 +125,13 @@ export function USPlanEditor({ data, setup, existing, onSaved }: { data: USPacka
     window.addEventListener("beforeunload", beforeLeave);
     return () => window.removeEventListener("beforeunload", beforeLeave);
   }, []);
+  useEffect(() => {
+    if (!replacementGuard) return;
+    // Read current refs at replacement time, including edits made during evidence loading.
+    const allow = () => !pending.current && (!dirty.current || window.confirm("Discard unsaved plan edits and replace this editor?"));
+    replacementGuard.current = allow;
+    return () => { if (replacementGuard.current === allow) replacementGuard.current = null; };
+  }, [replacementGuard]);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (pending.current) return;

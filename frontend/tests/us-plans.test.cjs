@@ -49,7 +49,7 @@ for (const badSetup of [{ ...setup, source_snapshot_id: 'wrong' }, { ...setup, s
   const lib = compile('lib/us-plans.ts', { './api': { fetchAPI: async url => url.includes('/research/') ? { package: { ...data, setups: [badSetup] } } : { plan } } });
   await assert.rejects(lib.loadUSPlan(plan), /could not be verified/);
 });
-function editorFixture(save, existing = null, preview = async () => ({ sizing: { quantity: 20 } }), browser) {
+function editorFixture(save, existing = null, preview = async () => ({ sizing: { quantity: 20 } }), browser, replacementGuard) {
   const updates = [], saved = [], effects = [];
   let uuids = 0;
   const react = { ...React, useState: value => [value, next => updates.push(next)], useRef: value => ({ current: value }), useEffect: effect => effects.push(effect) };
@@ -58,7 +58,7 @@ function editorFixture(save, existing = null, preview = async () => ({ sizing: {
     '../lib/theme': { useTheme: () => ({ theme: 'dark' }) },
     '../lib/us-plans': { saveUSPlan: save, previewUSPlanSizing: preview }, '../lib/us-research': { usd: value => `$${value}` },
   }, { ...(browser ? { window: browser } : {}), FormData: class { constructor() { return fields(); } }, crypto: { randomUUID: () => `new-${++uuids}` } });
-  const element = lib.USPlanEditor({ data, setup, existing, onSaved: item => saved.push(item) });
+  const element = lib.USPlanEditor({ data, setup, existing, onSaved: item => saved.push(item), replacementGuard });
   const cleanups = effects.map(fn => fn());
   return { element, updates, saved, cleanups };
 }
@@ -183,4 +183,37 @@ test('pending save warns on departure and late failure cannot update unmounted e
   f.cleanups.forEach(cleanup=>cleanup?.());
   const before=f.updates.length;reject(Error('Synthetic late failure'));await pending;
   assert.equal(f.updates.length,before);assert.equal(f.listeners.size,0);
+});
+
+
+test('replacement guard confirms current edits and blocks pending saves',async()=>{
+  let confirmed=false, prompts=0, finish;
+  const guard={current:null};
+  const f=editorFixture(()=>new Promise(resolve=>finish=resolve),null,undefined,{confirm:()=>{prompts++;return confirmed;},addEventListener(){},removeEventListener(){}},guard);
+  assert.equal(guard.current(),true);
+  f.element.props.onChange();assert.equal(guard.current(),false);assert.equal(prompts,1);
+  confirmed=true;assert.equal(guard.current(),true);
+  const pending=f.element.props.onSubmit({preventDefault(){},currentTarget:{}});
+  const before=prompts;assert.equal(guard.current(),false);assert.equal(prompts,before);
+  finish({plan});await pending;assert.equal(guard.current(),true);assert.equal(prompts,before);
+  f.cleanups.forEach(fn=>fn?.());assert.equal(guard.current,null);
+});
+test('failed save keeps replacement confirmation required',async()=>{
+  const guard={current:null};let prompts=0;
+  const f=editorFixture(async()=>{throw Error('unconfirmed');},null,undefined,{confirm:()=>{prompts++;return false;},addEventListener(){},removeEventListener(){}},guard);
+  f.element.props.onChange();await f.element.props.onSubmit({preventDefault(){},currentTarget:{}});
+  assert.equal(guard.current(),false);assert.equal(prompts,1);assert.equal(f.saved.length,0);
+});
+
+
+test('evidence finishing after edits checks replacement guard before replacing editor',async()=>{
+  let complete, stateIndex=0;const refs=[], updates=[];
+  const react={...React,useState:value=>{const index=stateIndex++;return [index===0?[plan]:value,next=>updates.push({index,next})];},useRef:value=>{const ref={current:value};refs.push(ref);return ref;},useEffect(){}};
+  const lib=compile('us/plans.tsx',{react,'next/dynamic':{default:()=>()=>null},'../lib/theme':{useTheme:()=>({theme:'dark'})},'../lib/us-plans':{loadUSPlan:()=>new Promise(resolve=>complete=resolve)},'../lib/us-research':{usd:value=>`$${value}`}});
+  const tree=lib.default({data,setup});let open;
+  function walk(node){if(!node||typeof node!=='object')return;if(node.type==='button'&&String(node.props.children).startsWith('Open saved evidence'))open=node;React.Children.forEach(node.props?.children,walk);}walk(tree);
+  open.props.onClick();let checks=0;refs[2].current=()=>{checks++;return false;};
+  complete({plan,data,setup});await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(checks,1);assert.equal(updates.some(row=>row.index===3),false);
+  assert.ok(updates.some(row=>row.index===2&&String(row.next).includes('replacement cancelled')));
 });
