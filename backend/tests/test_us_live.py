@@ -219,3 +219,46 @@ def test_provider_failure_is_sanitized_and_expired_cache_can_recover(live_cache,
         monkeypatch.setattr(live_cache,'snapshot',AsyncMock(return_value={'state':'connected','feed':'iex'}))
         assert (await live_cache.cached_snapshot(['AAPL'],'iex'))['state']=='connected'
     asyncio.run(run())
+
+
+
+def test_live_deadline_cancels_all_provider_requests_and_releases_shared_capacity(live_cache,monkeypatch):
+    service=live_cache;cancelled=[]
+    class Client:
+        def __init__(self,*args,**kwargs):pass
+        async def __aenter__(self):return self
+        async def __aexit__(self,*args):return False
+        async def get(self,url,params):
+            try:await asyncio.Event().wait()
+            finally:cancelled.append(url)
+    monkeypatch.setenv('ALPACA_API_KEY','synthetic-key');monkeypatch.setenv('ALPACA_SECRET_KEY','synthetic-secret')
+    monkeypatch.setattr(service.httpx,'AsyncClient',Client)
+    monkeypatch.setattr(service,'OBSERVATION_DEADLINE_SECONDS',0.02)
+    monkeypatch.setattr(service,'_MAX_INFLIGHT',1)
+    async def run():
+        result=await asyncio.wait_for(service.cached_snapshot(['AAPL'],'sip'),1)
+        assert result['state']=='unavailable' and result['feed']=='sip'
+        assert result['error']=='Live provider observation unavailable'
+        assert not service._INFLIGHT and len(cancelled)==3
+        # Another key can use the released slot; no feed fallback or automatic retry.
+        again=await asyncio.wait_for(service.cached_snapshot(['MSFT'],'iex'),1)
+        assert again['state']=='unavailable' and again['feed']=='iex'
+        assert not service._INFLIGHT and len(cancelled)==6
+    asyncio.run(run())
+
+
+def test_live_observation_caller_cancellation_reaches_pending_provider_requests(monkeypatch):
+    from app.services import us_live as service
+    async def run():
+        entered=asyncio.Event();started=[];cancelled=[]
+        class Client:
+            async def get(self,url,params):
+                started.append(url)
+                if len(started)==3:entered.set()
+                try:await asyncio.Event().wait()
+                finally:cancelled.append(url)
+        task=asyncio.create_task(service.snapshot(['AAPL'],'iex',Client()))
+        await asyncio.wait_for(entered.wait(),1);task.cancel()
+        with pytest.raises(asyncio.CancelledError):await task
+        assert len(cancelled)==3
+    asyncio.run(run())

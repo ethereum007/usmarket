@@ -45,3 +45,8 @@ US historical normalization rejects boolean open/high/low/close/volume values be
 ## Historical OHLCV JSON types
 
 US history normalization accepts only JSON number values for open/high/low/close/volume. Numeric strings, booleans, nulls and containers remain rejected bars, not coerced observations. Existing finite/range/calendar checks still apply; actual zero volume remains valid. Tests cover every field and verify malformed stock evidence leaves partial coverage with no setups, while missing benchmark evidence blocks research. This changes no provider feed, source revision, hosted storage mode or data-display entitlement. Hosted and real-account acceptance remain open.
+
+
+## Bounded live diagnostic observation
+
+Live snapshots now have a twenty-second total asynchronous deadline covering client entry and the concurrent clock/quote/trade requests, alongside HTTPX operation timeouts. Expiry cancels pending provider requests; the shared cache returns sanitized unavailable feedback and releases its in-flight slot. It does not downgrade the feed or invent market/price observations. Tests cover all three request cancellations, subsequent use of the released capacity and caller cancellation propagation. Existing disconnected-waiter shielding remains in place. This bounds asynchronous I/O, not synchronous parsing, and is not evidence of actual market-open reliability. No provider subscription, hosted storage flag or completed research package changed.

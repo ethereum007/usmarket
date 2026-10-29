@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 _CACHE: dict[tuple, tuple[float, dict]] = {}
 _INFLIGHT: dict[tuple, asyncio.Task] = {}
 _MAX_INFLIGHT = 8
+OBSERVATION_DEADLINE_SECONDS = 20
 
 
 def number(value):
@@ -54,13 +55,19 @@ def quote_diagnostic(symbol, quote, trade, now):
 
 
 async def snapshot(symbols: list[str], feed: str = 'iex', client=None):
+    # Network-operation timeouts alone permit an indefinitely slow response.
+    async with asyncio.timeout(OBSERVATION_DEADLINE_SECONDS):
+        return await _snapshot(symbols, feed, client)
+
+
+async def _snapshot(symbols: list[str], feed: str = 'iex', client=None):
     load_dotenv(Path(__file__).resolve().parents[2] / '.env.us.local', override=False)
     key, secret = os.getenv('ALPACA_API_KEY'), os.getenv('ALPACA_SECRET_KEY')
     if client is None:
         if not key or not secret:
             return {'state':'unavailable','feed':feed,'error':'Local Alpaca data credentials are missing'}
         async with httpx.AsyncClient(headers={'APCA-API-KEY-ID':key,'APCA-API-SECRET-KEY':secret},timeout=15) as owned:
-            return await snapshot(symbols, feed, owned)
+            return await _snapshot(symbols, feed, owned)
     requests = [
         ('clock', 'https://paper-api.alpaca.markets/v2/clock', {}),
         ('quotes', 'https://data.alpaca.markets/v2/stocks/quotes/latest', {'symbols':','.join(symbols),'feed':feed}),
