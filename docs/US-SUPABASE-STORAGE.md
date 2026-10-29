@@ -215,3 +215,6 @@ Remote job list/read/save, atomic publication and interruption acknowledgements 
 ## Browser refresh-history validation
 
 The history panel and active-job restoration now share validation before accepting a fetched list. Non-arrays, more than 20 entries, missing/duplicate IDs, unknown states, multiple active observations, invalid completed-package identities and non-string display fields fail with sanitized unavailable feedback. Invalid history cannot enable recovery controls. This avoids rendering malformed payloads or choosing guessed active work; valid empty history remains distinct from failure. Synthetic component tests exercise malformed responses and confirm no records or interruption capability are accepted. No hosted settings or flags changed; real-account acceptance still needs the requested account/frontend inputs.
+
+
+Interruption recovery now validates its returned observation with the same browser history boundary before replacing a recorded row. Completed race outcomes require an exact package identity; malformed display fields remain unconfirmed, preserving the prior observation and sanitized retry guidance. Component regressions cover malformed completion and private object payloads. No hosted flag or access change is included.

@@ -36,8 +36,9 @@ export default function RefreshHistory({ onOpen, revision }: { onOpen: (id: stri
     try {
       const result = await postAPI<{ job: Job }>(`/api/us/research/jobs/${encodeURIComponent(id)}/interrupt`, {});
       if (result.job?.id !== id || !["interrupted", "completed", "failed"].includes(result.job.state)) throw new Error("Unconfirmed interruption");
+      const [observation] = validateRefreshHistory([result.job]);
       if (current.active && generation === current.generation) {
-        setJobs(rows => rows.map(row => row.id === id ? result.job : row));
+        setJobs(rows => rows.map(row => row.id === id ? observation : row));
         setConfirm("");
       }
     } catch {

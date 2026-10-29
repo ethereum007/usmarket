@@ -146,3 +146,14 @@ test('malformed loaded history is unavailable rather than rendered '+JSON.string
   assert.equal(f.updates.some(([slot,value])=>slot===4&&value===true),false);
   assert.ok(f.updates.some(([slot,value])=>slot===2&&value.includes('history is unavailable')));
 });
+
+
+for(const job of [{id:'one',state:'completed'}, {id:'one',state:'completed',package_id:'../wrong'},
+  {id:'one',state:'failed',error:{private:'provider payload'}}, {id:'one',state:'interrupted',updated_at:{private:'provider payload'}}])
+test('malformed interruption acknowledgement preserves recorded status '+JSON.stringify(job),async()=>{
+  const f=load([[{id:'one',state:'running'}],false,'',0,true,'','one'],undefined,async()=>({job}));
+  await buttons(f.element).find(button=>button.props.children==='Confirm interruption').props.onClick();
+  assert.equal(f.updates.some(([slot])=>slot===0),false);
+  const failure=f.updates.find(([slot,value])=>slot===2&&value);
+  assert.match(failure[1],/not confirmed/);assert.doesNotMatch(failure[1],/private|payload/);
+});
