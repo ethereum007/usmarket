@@ -27,13 +27,12 @@ def public_observation(row, expected_id=None):
     if row.get('state') not in {'queued','running','completed','failed','interrupted'}:
         raise ValueError('Invalid job state')
     result = {key:row[key] for key in ('id','state','updated_at') if key in row}
-    if 'updated_at' in row:
-        if not isinstance(row['updated_at'], str):
-            raise ValueError('Invalid observation time')
-        observed = datetime.fromisoformat(row['updated_at'].replace('Z', '+00:00'))
-        if observed.utcoffset() is None:
-            raise ValueError('Unzoned observation time')
-        result['updated_at'] = observed.astimezone(timezone.utc).isoformat()
+    if not isinstance(row.get('updated_at'), str):
+        raise ValueError('Missing observation time')
+    observed = datetime.fromisoformat(row['updated_at'].replace('Z', '+00:00'))
+    if observed.utcoffset() is None:
+        raise ValueError('Unzoned observation time')
+    result['updated_at'] = observed.astimezone(timezone.utc).isoformat()
     if row['state'] == 'completed':
         if not isinstance(row.get('package_id'), str) or not re.fullmatch('[a-f0-9]{64}', row['package_id']):
             raise ValueError('Invalid package identity')
@@ -104,5 +103,5 @@ def execute(action, token, job_id=None, payload=None):
             if payload['state'] == 'completed' and observation['package_id'] != payload.get('package_id'):
                 raise ValueError('Unconfirmed completion identity')
         return observation
-    except (httpx.HTTPError, ValueError, TypeError):
+    except (httpx.HTTPError, ValueError, TypeError, OverflowError):
         raise HTTPException(503, 'Refresh status storage is temporarily unavailable') from None

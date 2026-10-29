@@ -205,3 +205,8 @@ Opening saved evidence checks the current editor immediately before replacement,
 ## Bounded identity verification
 
 Every hosted private request now gives the dedicated Supabase identity request a five-second total asynchronous deadline, in addition to HTTPX network-operation timeouts. A provider that keeps a connection or response pending cannot extend verification indefinitely by making intermittent progress. Deadline expiry cancels the pending request and returns the existing sanitized authentication-unavailable 503; caller cancellation propagates. Tests cover a stalled client entry/request, cancellation cleanup and a subsequent valid invited identity. This bounds asynchronous verification I/O, not synchronous response parsing, and changes no credentials, invitations or storage flags. Real hosted sign-in and isolation acceptance remain outstanding.
+
+
+## Required refresh observation time
+
+Remote job list/read/save, atomic publication and interruption acknowledgements now require a valid zoned updated_at. Missing, null, boolean, malformed, date-only and naive values return sanitized storage-unavailable feedback, with no current-clock substitution or local fallback. Valid offsets retain the recorded instant when normalized to UTC. The applied SQL already supplies these server timestamps; no migration changed or replayed. Synthetic transport regressions exercise all five acknowledgement paths and preserve earlier state/package mismatch checks. This is response validation, not hosted persistence or clock-correctness acceptance; runtime flags remain off.

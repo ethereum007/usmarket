@@ -439,7 +439,7 @@ def test_remote_job_transport_strips_identity_credentials_and_arbitrary_errors(m
     monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://apidhmrlawbjvisnadht.supabase.co',SUPABASE_ANON_KEY='public-test'))
     requests=[]
     original=httpx.Client
-    transport=httpx.MockTransport(lambda request: (requests.append(request) or httpx.Response(200,json={'id':'one','state':'queued'})))
+    transport=httpx.MockTransport(lambda request: (requests.append(request) or httpx.Response(200,json={'id':'one','state':'queued','updated_at':'2026-10-29T09:00:00Z'})))
     payload={'id':'one','state':'queued','owner':'foreign','_access_token':'secret','error':'provider secret'}
     with patch.object(remote.httpx,'Client',lambda **kwargs:original(transport=transport,**kwargs)):
         remote.execute('save','verified-token','one',payload)
@@ -511,9 +511,9 @@ def test_remote_job_read_rejects_wrong_identity_or_unverifiable_completion(row,m
 
 def test_remote_observation_drops_unapproved_fields_and_sanitizes_error():
     from app.services.us_remote_jobs import public_observation
-    result=public_observation({'id':'one','state':'failed','owner':'private-owner',
+    result=public_observation({'id':'one','state':'failed','updated_at':'2026-10-29T09:00:00Z','owner':'private-owner',
         '_access_token':'private-token','error':'private provider body','package_id':'a'*64},'one')
-    assert result=={'id':'one','state':'failed','error':'Research refresh failed; saved research remains available'}
+    assert result=={'id':'one','state':'failed','updated_at':'2026-10-29T09:00:00+00:00','error':'Research refresh failed; saved research remains available'}
     assert 'private' not in json.dumps(result)
 
 
@@ -581,7 +581,7 @@ def test_remote_job_save_requires_exact_transition_acknowledgement(monkeypatch,r
     from app.services import us_remote_jobs as remote
     monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://apidhmrlawbjvisnadht.supabase.co',SUPABASE_ANON_KEY='public-test'))
     original=httpx.Client
-    transport=httpx.MockTransport(lambda request:httpx.Response(200,json={'id':'one',**reply}))
+    transport=httpx.MockTransport(lambda request:httpx.Response(200,json={'id':'one','updated_at':'2026-10-29T09:00:00Z',**reply}))
     with patch.object(remote.httpx,'Client',lambda **kwargs:original(transport=transport,**kwargs)):
         with pytest.raises(HTTPException) as error:
             remote.execute('save','private-token','one',{'id':'one',**requested})
@@ -615,7 +615,7 @@ def test_atomic_publication_transport_validates_both_records(monkeypatch,change)
     monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://apidhmrlawbjvisnadht.supabase.co',SUPABASE_ANON_KEY='public-test'))
     package={'id':'a'*64,'universe':'us-test','market':'US','currency':'USD','state':'final',
              'session':'2026-10-23','computed_at':'2026-10-24T00:00:00Z'}
-    result={'package':dict(package),'job':{'id':'one','state':'completed','package_id':package['id']}}
+    result={'package':dict(package),'job':{'id':'one','state':'completed','package_id':package['id'],'updated_at':'2026-10-29T09:00:00Z'}}
     if change=='package':result['package']['state']='partial'
     if change=='job':result['job']['package_id']='b'*64
     requests=[]; original=httpx.Client
@@ -631,7 +631,7 @@ def test_atomic_publication_transport_validates_both_records(monkeypatch,change)
 
 def test_remote_interrupted_observation_retains_unknown_and_drops_private_fields():
     from app.services.us_remote_jobs import public_observation
-    result=public_observation({'id':'one','state':'interrupted','completion_unknown':False,
+    result=public_observation({'id':'one','state':'interrupted','updated_at':'2026-10-29T09:00:00Z','completion_unknown':False,
         'error':'private worker body','package_id':'a'*64,'owner':'private-owner'})
     assert result['completion_unknown'] is True
     assert 'private' not in json.dumps(result)
@@ -666,7 +666,7 @@ def test_interruption_transport_requires_terminal_acknowledgement(monkeypatch,st
     from fastapi import HTTPException
     from app.services import us_remote_jobs as remote
     monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://apidhmrlawbjvisnadht.supabase.co',SUPABASE_ANON_KEY='public-test'))
-    row={'id':'one','state':state,'package_id':'a'*64}
+    row={'id':'one','state':state,'package_id':'a'*64,'updated_at':'2026-10-29T09:00:00Z'}
     requests=[]; original=httpx.Client
     transport=httpx.MockTransport(lambda request:(requests.append(request) or httpx.Response(200,json=row)))
     with patch.object(remote.httpx,'Client',lambda **kwargs:original(transport=transport,**kwargs)):
@@ -728,7 +728,7 @@ def test_research_acknowledgement_preserves_nested_boolean_numeric_types(monkeyp
                'session':'2026-10-23','computed_at':'2026-10-24T00:00:00Z',
                'source_bars':{'AAPL':[{'volume':sent}]}}
     acknowledgement = {**package,'source_bars':{'AAPL':[{'volume':acknowledged}]}}
-    result = {'package':acknowledgement,'job':{'id':'one','state':'completed','package_id':package['id']}} if atomic else acknowledgement
+    result = {'package':acknowledgement,'job':{'id':'one','state':'completed','package_id':package['id'],'updated_at':'2026-10-29T09:00:00Z'}} if atomic else acknowledgement
     original = httpx.Client
     transport = httpx.MockTransport(lambda request:httpx.Response(200,json=result))
     with patch.object(remote.httpx,'Client',lambda **kwargs:original(transport=transport,**kwargs)):
@@ -788,3 +788,33 @@ def test_remote_admission_rejection_and_scheduling_failure_release_process_capac
                 api.refresh(api.RefreshRequest(symbols='AAPL'),tasks,{'id':'owner'})
         assert api._REMOTE_REFRESH_CAPACITY.acquire(blocking=False)
         api._REMOTE_REFRESH_CAPACITY.release()
+
+
+@pytest.mark.parametrize('action',['list','get','save','interrupt','publish'])
+@pytest.mark.parametrize('stamp',[{}, {'updated_at':None}, {'updated_at':True},
+    {'updated_at':''}, {'updated_at':'2026-10-29'}, {'updated_at':'2026-10-29T09:00:00'},
+    {'updated_at':'private-provider-value'}, {'updated_at':'0001-01-01T00:00:00+14:00'}])
+def test_remote_job_observation_time_is_required_for_every_acknowledgement(monkeypatch,action,stamp):
+    import httpx
+    from types import SimpleNamespace
+    from fastapi import HTTPException
+    from app.services import us_remote_jobs as remote
+    monkeypatch.setattr(remote,'settings',SimpleNamespace(SUPABASE_URL='https://apidhmrlawbjvisnadht.supabase.co',SUPABASE_ANON_KEY='public-test'))
+    package={'id':'a'*64,'universe':'us-test','market':'US','currency':'USD','state':'final',
+             'session':'2026-10-23','computed_at':'2026-10-24T00:00:00Z'}
+    row={'id':'one','state':'completed' if action=='publish' else 'interrupted' if action=='interrupt' else 'running','package_id':package['id'],**stamp}
+    result=[row] if action=='list' else {'package':package,'job':row} if action=='publish' else row
+    original=httpx.Client
+    transport=httpx.MockTransport(lambda request:httpx.Response(200,json=result))
+    with patch.object(remote.httpx,'Client',lambda **kwargs:original(transport=transport,**kwargs)):
+        with pytest.raises(HTTPException) as error:
+            remote.execute(action,'private-token','one',package if action=='publish' else {'id':'one','state':'running'})
+    assert error.value.status_code==503
+    assert error.value.detail=='Refresh status storage is temporarily unavailable'
+    assert 'private' not in str(error.value)
+
+
+def test_remote_job_observation_time_retains_recorded_instant_instead_of_current_clock():
+    from app.services.us_remote_jobs import public_observation
+    row={'id':'one','state':'running','updated_at':'2026-10-29T14:30:00+05:30'}
+    assert public_observation(row)['updated_at']=='2026-10-29T09:00:00+00:00'
