@@ -1,6 +1,6 @@
 # Dedicated Supabase activation review — replacement bundle applied; acceptance pending
 
-Current target: replacement US Markets project apidhmrlawbjvisnadht, supplied by the user on 29 October 2026. Dashboard access and Free plan verified on 29 October; schema presence inspection recorded below. Previous target: etwmtakotrqlwwzttekc. No paid resources. The original request covered three migrations; current source has six, including cross-host admission, atomic publication and fenced interruption. Review the full current bundle before any activation. The 27 October approval covered only the previous project; it does not authorize application to the replacement target. The SQL bundle is unchanged. New-target approval and application remain pending.
+Current target: replacement US Markets project apidhmrlawbjvisnadht, supplied by the user on 29 October 2026. Dashboard access and Free plan verified on 29 October; schema presence inspection recorded below. Previous target: etwmtakotrqlwwzttekc. No paid resources. The original request covered three migrations; current source has six, including cross-host admission, atomic publication and fenced interruption. Review the full current bundle before any activation. The 27 October approval covered only the previous project; it does not authorize application to the replacement target. The SQL bundle is unchanged. The user approved this replacement target on 29 October; all six migrations were applied once in a transaction and all nine structural security checks passed. See the application record below. Do not replay the bundle. Runtime flags and real-account hosted acceptance remain pending.
 
 Bundle fingerprint (canonical UTF-8/LF text): `6dd6e1ee11ca8e1ce214279b07d24a15f49c2da7ae5cfe4f17c9bae4c0ce323f`
 
@@ -22,7 +22,7 @@ Before any approved application, compare the latest manifest and Git revision to
 Approval, when provided, should identify this dedicated project and reviewed bundle. Applying SQL does not authorize enabling storage flags, creating identities, changing credentials, activating paid resources or publishing an incomplete service. Keep flags off until controlled real-account isolation, sign-in/research/save/reopen/restart and backup/restore acceptance. The private MVP target of 25 October was missed; no replacement deadline is assigned here.
 
 
-## Approval and application status — 27 October 2026
+## Historical approval and application status — 27 October 2026
 
 The user explicitly approved applying the reviewed six-migration bundle to US Markets project etwmtakotrqlwwzttekc on the Free plan. The source manifest was rechecked and matches bundle 6dd6e1ee11ca8e1ce214279b07d24a15f49c2da7ae5cfe4f17c9bae4c0ce323f. No additional migration or changed SQL is included.
 
@@ -34,12 +34,12 @@ Application has not occurred: the connected Supabase dashboard redirected to sig
 Use supabase/inspect_us_storage.sql in the confirmed dedicated project to inspect presence and structural security of the three tables, five exact RPC signatures and active-owner index. It reads PostgreSQL catalogs/privileges only, never payload rows or credentials, and changes nothing. Missing objects return false rather than triggering an attempted migration replay; present objects with false security_contract require investigation. The query checks RLS/direct client privileges, security-definer/empty search path and RPC role access, plus basic index validity/uniqueness/predicate presence. It does not certify function bodies, exact index predicate, configured invitations or real hosted persistence. Compare the approved source bundle and inspect differences before applying to an existing schema. This query is outside the approved migration inventory and does not modify its fingerprint. CI exercises passing structure, transactional permission drift and missing-object reporting in disposable PostgreSQL only.
 
 
-## Replacement project — 29 October 2026
+## Historical replacement target preparation — 29 October 2026
 
 The user supplied https://supabase.com/dashboard/project/apidhmrlawbjvisnadht after being unable to recover access to the previous target. Backend and frontend target restrictions and synthetic fixtures now use the replacement reference. The previous project must be rejected before forwarding credentials. No keys, runtime environments, hosted settings, migrations or flags are changed by this source update. Verify dashboard identity, Free plan and actual schema, then obtain action-time approval for this exact unchanged six-file bundle on the replacement project. Prior approval/status entries above describe the old project only. Hosted acceptance and the missed 25 October gate remain unresolved.
 
 
-## Replacement schema presence inspection — 29 October 2026
+## Historical pre-application schema inspection — 29 October 2026
 
 Through the signed-in Supabase SQL Editor at project apidhmrlawbjvisnadht, a catalog-only SELECT using to_regclass and pg_proc/pg_namespace returned false for all nine expected names: us_plan_revisions, us_research_packages, us_refresh_jobs, us_refresh_jobs_one_active_owner, us_plan_store, us_research_store, us_job_store, us_job_publish and us_job_interrupt. No payload or identity rows were read. The dashboard showed US Markets FREE. Query reference: 852228e0-c398-41d9-9414-1776f2550f15. This establishes absence of these named objects at inspection time, not absence of all database objects, migration activation, grant validation or hosted acceptance. No DDL, grants, credentials, accounts or flags were changed. The six-file source manifest still matches 6dd6e1ee11ca8e1ce214279b07d24a15f49c2da7ae5cfe4f17c9bae4c0ce323f. Applying this exact bundle to the replacement project remains subject to action-time approval. Recheck if intervening schema work occurs.
 
