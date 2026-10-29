@@ -23,3 +23,8 @@ TypeScript and optimized webpack build are included in GitHub CI, together with 
 - Owner-isolated durable plans/research remain issue #4. Authentication alone does not satisfy storage isolation.
 
 Local preview no longer grants frontend access merely because the hostname is localhost. The explicit backend loopback harness remains for API-only development; no frontend preview bypass was introduced.
+
+
+## Next controlled hosted rehearsal
+
+The replacement project's reviewed schema is applied; real-account and browser acceptance are still pending. Follow [US-HOSTED-ACCEPTANCE.md](US-HOSTED-ACCEPTANCE.md) for required account/frontend inputs, configuration review, isolated rehearsal and evidence. No account, invitation, credential destination or runtime flag is authorized by the checklist itself.
