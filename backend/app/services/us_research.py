@@ -33,8 +33,9 @@ def normalize_bars(raw: list[dict], sessions: list[str]) -> list[dict]:
             if stamp.tzinfo is None:
                 continue
             day = stamp.astimezone(NY).date().isoformat()
-            # bool is an int subclass in Python, but never provider OHLCV evidence.
-            if any(isinstance(bar.get(source), bool) for source in ('o','h','l','c','v')):
+            # Only JSON numbers are evidence: do not coerce strings, booleans,
+            # nulls or containers into provider prices/volume.
+            if any(type(bar.get(source)) not in (int, float) for source in ('o','h','l','c','v')):
                 continue
             values = {key: float(bar[source]) for key, source in
                       [('open','o'), ('high','h'), ('low','l'), ('close','c'), ('volume','v')]}

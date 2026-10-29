@@ -264,3 +264,26 @@ def test_provider_deadline_cancels_stalled_retrieval_closes_client_and_never_pub
     build.assert_not_called();publish.assert_not_called()
     assert capsys.readouterr().out=='' and list(tmp_path.iterdir())==[]
     assert 'synthetic-test-key' not in str(error.value) and 'synthetic-test-secret' not in str(error.value)
+
+
+@pytest.mark.parametrize('field',['o','h','l','c','v'])
+@pytest.mark.parametrize('value',['10','0',None,{},[]])
+def test_non_numeric_json_ohlcv_is_missing_evidence_not_coerced(field,value):
+    row=bar();row[field]=value
+    assert normalize_bars([row],['2026-07-01'])==[]
+
+
+def test_string_stock_bar_leaves_partial_coverage_and_no_setup_evidence():
+    row=bar();row['c']='10'
+    package=research_package(['AAPL'],{'SPY':[bar()],'AAPL':[row]},
+        [{'date':'2026-07-01','close':'16:00'}],datetime(2026,7,2,tzinfo=timezone.utc))
+    assert package['state']=='partial'
+    assert package['missing_symbols']==['AAPL']
+    assert package['setups']==[]
+
+
+def test_string_benchmark_bar_cannot_back_research():
+    row=bar();row['v']='100'
+    with pytest.raises(ValueError,match='Benchmark missing'):
+        research_package(['AAPL'],{'SPY':[row],'AAPL':[bar()]},
+            [{'date':'2026-07-01','close':'16:00'}],datetime(2026,7,2,tzinfo=timezone.utc))

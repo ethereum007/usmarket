@@ -40,3 +40,8 @@ Protect the US API and establish CI -> durable US packages/plans -> verified ear
 ## Historical OHLCV type boundary
 
 US historical normalization rejects boolean open/high/low/close/volume values before numeric conversion. Python boolean-to-number coercion is not market evidence. Rejected stock bars flow through existing missing-session checks: incomplete history is partial and affected setups are withheld. A missing benchmark session blocks publication. Genuine numeric zero volume remains valid; no replacement bar or volume is invented. This validation is independent of provider display rights and actual market-open acceptance, which remain release gates.
+
+
+## Historical OHLCV JSON types
+
+US history normalization accepts only JSON number values for open/high/low/close/volume. Numeric strings, booleans, nulls and containers remain rejected bars, not coerced observations. Existing finite/range/calendar checks still apply; actual zero volume remains valid. Tests cover every field and verify malformed stock evidence leaves partial coverage with no setups, while missing benchmark evidence blocks research. This changes no provider feed, source revision, hosted storage mode or data-display entitlement. Hosted and real-account acceptance remain open.
