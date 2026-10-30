@@ -11,7 +11,17 @@ const nextConfig: NextConfig = {
   // Set the backend origin explicitly in each deployment environment.
   async rewrites() {
     const upstream = process.env.ALPHA_API_PROXY_URL;
-    return upstream ? [{ source: "/api/:path*", destination: `${upstream}/api/:path*` }] : [];
+    if (!upstream) return [];
+    try {
+      if (upstream !== upstream.trim() || /[\\\s]/.test(upstream)) throw new Error();
+      const target = new URL(upstream);
+      const local = process.env.NODE_ENV !== "production" && target.protocol === "http:" && ["127.0.0.1", "localhost"].includes(target.hostname);
+      const hosted = target.protocol === "https:" && target.hostname === "usmarket.onrender.com" && !target.port;
+      if ((!local && !hosted) || target.username || target.password || target.search || target.hash || target.pathname !== "/") throw new Error();
+      return [{ source: "/api/:path*", destination: `${target.origin}/api/:path*` }];
+    } catch {
+      throw new Error("US API proxy target is invalid; use the dedicated US service or loopback development origin");
+    }
   },
   // Standalone US product: inherited page URLs stay inside the US workspace.
   async redirects() {

@@ -28,3 +28,8 @@ Backend target: SUPABASE_URL at the dedicated project origin and its public SUPA
 ## Evidence and exit
 
 Record date, exact source revision, approved targets/modes, check names and pass/fail, with sensitive output retained privately. Do not store emails, UUID lists, tokens, keys, notes or runtime market data in the public repository. A test failure leaves the gate open. Obtain a separate reviewed rollout decision after acceptance; this checklist does not authorize turning product flags on, opening signup or publishing an incomplete service. Issues #2, #4, #9 and #10 remain open until their own acceptance evidence is complete.
+
+
+## Frontend proxy destination boundary
+
+Source configuration now permits ALPHA_API_PROXY_URL only at the dedicated HTTPS usmarket.onrender.com origin (default port/443), or HTTP localhost/127.0.0.1 outside production mode for development. Production mode rejects loopback destinations. Trailing slash is normalized; credentials, paths, query/fragment, whitespace/backslash, lookalikes and unreviewed hosts fail with a sanitized configuration error before rewrites are produced. Missing configuration produces no proxy. Custom destinations require explicit source review; do not point this frontend at inherited Alpha Radar services. Tests exercise allowed and rejected destinations. No environment value or hosted deployment was changed, and this does not verify reachability, private access or hosted acceptance.
