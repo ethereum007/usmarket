@@ -28,3 +28,8 @@ Local preview no longer grants frontend access merely because the hostname is lo
 ## Next controlled hosted rehearsal
 
 The replacement project's reviewed schema is applied; real-account and browser acceptance are still pending. Follow [US-HOSTED-ACCEPTANCE.md](US-HOSTED-ACCEPTANCE.md) for required account/frontend inputs, configuration review, isolated rehearsal and evidence. No account, invitation, credential destination or runtime flag is authorized by the checklist itself.
+
+
+## Sign-in submission guard
+
+The sign-in handler now locks synchronously before authentication or anonymous-session sign-out begins. Rapid duplicate submits cannot create concurrent provider requests before the busy render commits. Unconfigured/loading submissions invoke neither sign-in nor sign-out, and a failed request releases the guard for an explicit retry with sanitized feedback. Synthetic handler tests cover these boundaries. This changes no account, provider setting, credential destination or hosted access grant; real hosted identity and browser acceptance remain pending.

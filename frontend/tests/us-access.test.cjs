@@ -97,3 +97,42 @@ test('inherited auth URLs redirect exclusively to US auth screens', async () => 
   }
   assert.equal(redirects.some(item => item.source.startsWith('/us/')), false);
 });
+
+
+function loginSubmitFixture(auth,configured=true){
+  const updates=[];
+  const context={exports:{},require(name){
+    if(name==='react')return {...React,useEffect(){},useRef:value=>({current:value}),useState:value=>[value,next=>updates.push(next)]};
+    if(name==='next/navigation')return {useRouter:()=>({replace(){}})};
+    if(name.endsWith('AuthContext'))return {useAuth:()=>auth};
+    if(name.endsWith('us-signup'))return {US_SIGNUP_ENABLED:false};
+    if(name.endsWith('supabase'))return {supabase:configured?{}:null};
+    return require(name);
+  }};
+  vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(__dirname,'../app/us/login/page.tsx'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText,context);
+  const tree=context.exports.default();let form;
+  function walk(node){if(!node||typeof node!=='object')return;if(node.type==='form')form=node;React.Children.forEach(node.props?.children,walk);}walk(tree);
+  return {submit:()=>form.props.onSubmit({preventDefault(){}}),updates};
+}
+
+test('rapid duplicate sign-in sends once and failure permits an explicit retry',async()=>{
+  let calls=0,fail;
+  const f=loginSubmitFixture({loading:false,user:null,signIn:()=>{calls++;return new Promise((resolve,reject)=>fail=reject);}});
+  const first=f.submit();await f.submit();assert.equal(calls,1);
+  fail(Error('private provider payload'));await first;
+  assert.ok(f.updates.includes('The sign-in service is unavailable. Please try again.'));
+  assert.equal(f.updates.some(value=>typeof value==='string'&&value.includes('private')),false);
+  const retry=f.submit();assert.equal(calls,2);fail(Error('unavailable'));await retry;
+});
+
+for(const [configured,loading] of [[false,false],[true,true]])test('disabled sign-in cannot invoke auth '+configured+'/'+loading,async()=>{
+  let calls=0;const f=loginSubmitFixture({loading,user:{is_anonymous:true},signIn:()=>calls++,signOut:()=>calls++},configured);
+  await f.submit();assert.equal(calls,0);
+});
+
+test('duplicate anonymous sign-in waits for one sign-out before one sign-in',async()=>{
+  let release,logouts=0,logins=0;
+  const f=loginSubmitFixture({loading:false,user:{is_anonymous:true},signOut:()=>{logouts++;return new Promise(resolve=>release=resolve);},signIn:async()=>{logins++;return {error:null};}});
+  const first=f.submit();await f.submit();assert.equal(logouts,1);assert.equal(logins,0);
+  release();await first;assert.equal(logins,1);
+});

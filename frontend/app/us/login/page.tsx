@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../contexts/AuthContext";
@@ -13,13 +13,15 @@ export default function USLoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const pending = useRef(false);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     if (!loading && user && !user.is_anonymous && (user.email_confirmed_at || recoverySession)) router.replace(recoverySession ? "/us/recover" : "/us");
   }, [loading, user, recoverySession, router]);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy) return;
+    if (pending.current || !supabase || loading) return;
+    pending.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -29,6 +31,7 @@ export default function USLoginPage() {
     } catch {
       setError("The sign-in service is unavailable. Please try again.");
     } finally {
+      pending.current = false;
       setBusy(false);
     }
   }
