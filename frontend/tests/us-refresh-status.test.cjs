@@ -77,3 +77,13 @@ test('verified completion preserves its exact package instead of choosing catalo
   fixture.start({id:'one',state:'running'});await fixture.timers[0]();
   assert.equal(fixture.statuses[0].package_id,id);assert.equal(fixture.errors.length,0);
 });
+
+
+for(const job of [{id:'one',state:'failed',error:{private:'provider payload'}},
+  {id:'one',state:'running',updated_at:{private:'provider payload'}},null,[]])
+test('polling rejects malformed observation fields without changing outcome '+JSON.stringify(job),async()=>{
+  const f=load(async()=>({job}));const prior={id:'one',state:'running'};
+  f.start(prior);await f.timers[0]();
+  assert.equal(prior.state,'running');assert.equal(f.statuses.length,0);
+  assert.equal(f.errors.length,1);assert.doesNotMatch(f.errors[0],/private|payload/);
+});

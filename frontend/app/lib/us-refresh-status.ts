@@ -10,14 +10,9 @@ export function observeRefresh(job: RefreshJob | null, onStatus: (job: RefreshJo
   const timer = setTimeout(async () => {
     try {
       const result = await fetchAPI<{ job: RefreshJob }>(`/api/us/research/jobs/${encodeURIComponent(job.id)}`);
-      if (result.job.id !== job.id || !["queued", "running", "completed", "failed", "interrupted"].includes(result.job.state)) {
-        throw new Error("Unexpected refresh status");
-      }
-      if (result.job.state === "completed" &&
-          (typeof result.job.package_id !== "string" || !/^[a-f0-9]{64}$/.test(result.job.package_id))) {
-        throw new Error("Completion has no exact source identity");
-      }
-      if (active) onStatus(result.job);
+      const [observation] = validateRefreshHistory([result.job]);
+      if (observation.id !== job.id) throw new Error("Unexpected refresh identity");
+      if (active) onStatus(observation);
     } catch {
       if (active) onUnavailable("Refresh status could not be checked. The last recorded outcome is unchanged. Check again or inspect saved research.");
     }

@@ -231,3 +231,6 @@ Reopening also compares the selected plan's provider asset identity and source s
 ## Browser save acknowledgement identity
 
 The browser accepts a save acknowledgement only for the requested plan ID, exact next revision and selected package/setup/snapshot/security/session in US/USD. A mismatched acknowledgement throws unconfirmed-save feedback, preserving the editor's draft and retry identity instead of opening or claiming another saved revision. Synthetic regressions cover each identity field, stale/skipped revisions and a valid new-plan revision one. Server validation and ownership remain authoritative; this is not full payload or hosted persistence acceptance. No flags, credentials or SQL changed.
+
+
+Refresh polling now uses the same observation validator as history and interruption recovery before updating UI status. Null/array records and object-valued display fields remain unavailable rather than becoming a new recorded outcome or crashing rendering. Existing exact job/package checks and late-account cleanup remain covered. Four polling regressions verify unchanged prior status and sanitized feedback. No provider request, hosted access or storage flag changed.
