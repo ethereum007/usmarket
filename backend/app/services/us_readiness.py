@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import sqlite3
 import tempfile
+from app.services.us_filings import valid_operator_agent
 from app.services.us_origins import https_origin
 from app.services.us_target import dedicated_supabase_origin
 
@@ -54,6 +55,7 @@ def report(check_storage=False):
         'invited_user_ids_valid': invitations,
         'alpaca_credentials_present': all(os.environ.get(key, '').strip() for key in ('ALPACA_API_KEY','ALPACA_SECRET_KEY')),
         'sec_operator_contact_present': bool(os.environ.get('SEC_USER_AGENT', '').strip()),
+        'sec_operator_header_valid': valid_operator_agent(os.environ.get('SEC_USER_AGENT', '')),
         'data_directory_requirement_satisfied': all_remote or absolute,
     }
     probe = 'not_run'

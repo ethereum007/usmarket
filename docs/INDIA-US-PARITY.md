@@ -53,3 +53,8 @@ Live snapshots now have a twenty-second total asynchronous deadline covering cli
 
 
 Live bid/ask/trade price validation now also accepts only JSON numbers. Numeric strings remain unknown rather than being coerced into fresh prices or spreads. Invalid quote evidence degrades the snapshot while preserving a valid independent trade observation, and vice versa. Synthetic diagnostics and snapshot tests cover this boundary. This does not change the selected feed, provider access, completed research, hosted flags or the outstanding real-account/market-open release gates.
+
+
+## SEC configuration preflight consistency
+
+Operator readiness and the filings gateway now share validation for SEC_USER_AGENT: a present, bounded printable-ASCII header containing a contact marker. Controls, non-ASCII text, missing contact markers and oversized values fail configuration before constructing a provider client. Readiness exposes only booleans, never the configured contact. This is header safety and configuration evidence, not mailbox ownership, SEC access or filings coverage verification. Tests cover preflight failure and no-client runtime rejection. No contact value, provider setting, credential or hosted flag was changed.

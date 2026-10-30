@@ -9,7 +9,7 @@ def environment(root):
     return {'SUPABASE_URL':'https://apidhmrlawbjvisnadht.supabase.co','SUPABASE_ANON_KEY':'private-test-key',
             'US_INVITED_USER_IDS':'11111111-1111-4111-8111-111111111111',
             'ALPACA_API_KEY':'private-alpaca-key','ALPACA_SECRET_KEY':'private-alpaca-secret',
-            'SEC_USER_AGENT':'private-operator-contact','DATA_DIR':str(root)}
+            'SEC_USER_AGENT':'USMarket private-operator@example.test','DATA_DIR':str(root)}
 
 
 def test_configured_probe_preserves_real_files_and_does_not_claim_hosted_readiness(tmp_path):
@@ -152,3 +152,14 @@ def test_migration_review_and_preflight_share_dedicated_project_reference():
     from app.services.us_target import PROJECT_REFERENCE
     assert manifest()['target_project_reference'] == PROJECT_REFERENCE
     assert ready.dedicated_supabase_origin('https://'+PROJECT_REFERENCE+'.supabase.co')
+
+
+@pytest.mark.parametrize('agent',['private-contact-without-email','private@example.test\nsecret',
+    'private@example.test\rsecret','private@example.test\tsecret',
+    'private@example.test \u00e9','private@example.test '+('x'*512)])
+def test_preflight_rejects_unusable_sec_header_without_echoing_contact(tmp_path,agent):
+    values=environment(tmp_path);values['SEC_USER_AGENT']=agent
+    with patch.dict(ready.os.environ,values,clear=True):result=ready.report()
+    assert not result['configuration_ready']
+    assert not result['checks']['sec_operator_header_valid']
+    assert 'private' not in json.dumps(result).replace('private_frontend_proxy_and_browser_journey','')

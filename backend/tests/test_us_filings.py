@@ -194,3 +194,16 @@ def test_hosted_route_requires_auth_and_validates_symbol():
             assert client.get("/api/us/filings?symbol=AAPL").status_code == 503
     finally:
         app.dependency_overrides.clear()
+
+
+@pytest.mark.parametrize('agent',['missing-contact','contact@example.test\nsecret','contact@example.test\tsecret',
+    'contact@example.test \u00e9','contact@example.test '+('x'*512)])
+def test_invalid_sec_operator_header_never_constructs_provider_client(monkeypatch,agent):
+    from unittest.mock import patch
+    from app.services import us_filings as filings
+    import asyncio
+    monkeypatch.setenv('SEC_USER_AGENT',agent)
+    with patch.object(filings.httpx,'AsyncClient') as client:
+        with pytest.raises(filings.FilingUnavailable,match='not configured'):
+            asyncio.run(filings.SecGateway().load('AAPL'))
+        client.assert_not_called()

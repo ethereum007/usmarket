@@ -10,6 +10,12 @@ import httpx
 REQUEST_DEADLINE_SECONDS = 20
 
 
+def valid_operator_agent(value):
+    # Header safety/configuration evidence only, not verification of mailbox ownership.
+    return (isinstance(value, str) and 1 <= len(value) <= 512 and "@" in value
+            and all(32 <= ord(character) <= 126 for character in value))
+
+
 class FilingUnavailable(ValueError):
     pass
 
@@ -133,7 +139,7 @@ class SecGateway:
             raise FilingUnavailable("Invalid US filing symbol")
         if client is None:
             agent = os.getenv("SEC_USER_AGENT", "")
-            if not agent or "@" not in agent or "\n" in agent or "\r" in agent:
+            if not valid_operator_agent(agent):
                 raise FilingUnavailable("SEC access is not configured for this service")
             async with httpx.AsyncClient(headers={"User-Agent": agent}, timeout=10, follow_redirects=False) as owned:
                 return await self._load(symbol, owned)
