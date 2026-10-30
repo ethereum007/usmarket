@@ -33,3 +33,16 @@ test('production proxy rejects loopback development configuration',async()=>{
   for(const origin of ['http://localhost:9018','http://127.0.0.1:9018'])await assert.rejects(()=>load(origin,'production').rewrites(),/proxy target is invalid/);
   assert.equal((await load('https://usmarket.onrender.com','production').rewrites())[0].destination,'https://usmarket.onrender.com/api/:path*');
 });
+
+
+for(const mode of ['development','production'])test('browser connection policy scopes Supabase to dedicated project in '+mode,async()=>{
+  const rows=await load(undefined,mode).headers();
+  const policy=rows[0].headers.find(row=>row.key==='Content-Security-Policy').value;
+  const connections=policy.split('; ').find(row=>row.startsWith('connect-src '));
+  assert.ok(connections.includes("'self'"));
+  assert.ok(connections.includes('https://apidhmrlawbjvisnadht.supabase.co'));
+  assert.ok(connections.includes('wss://apidhmrlawbjvisnadht.supabase.co'));
+  assert.doesNotMatch(connections,/\*|etwmtakotrqlwwzttekc/);
+  if(mode==='production')assert.doesNotMatch(connections,/localhost|127\.0\.0\.1|http:| ws:/);
+  else assert.ok(connections.includes('http://127.0.0.1:9000'));
+});

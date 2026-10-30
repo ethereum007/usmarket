@@ -34,6 +34,7 @@ const nextConfig: NextConfig = {
     ];
   },
   async headers() {
+    const developmentConnections = process.env.NODE_ENV === "production" ? "" : " http://localhost:9000 http://127.0.0.1:9000 ws://localhost:9000 ws://127.0.0.1:9000";
     const contentSecurityPolicy = [
       "default-src 'self'",
       "base-uri 'self'",
@@ -44,7 +45,7 @@ const nextConfig: NextConfig = {
       "font-src 'self' data:",
       "style-src 'self' 'unsafe-inline'",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-      "connect-src 'self' http://localhost:9000 http://127.0.0.1:9000 ws://localhost:9000 ws://127.0.0.1:9000 https://*.supabase.co wss://*.supabase.co",
+      `connect-src 'self' https://apidhmrlawbjvisnadht.supabase.co wss://apidhmrlawbjvisnadht.supabase.co${developmentConnections}`,
       "frame-src 'none'",
       "upgrade-insecure-requests",
     ].join("; ");
