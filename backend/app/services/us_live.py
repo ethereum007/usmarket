@@ -16,7 +16,7 @@ OBSERVATION_DEADLINE_SECONDS = 20
 
 
 def number(value):
-    if isinstance(value, bool):
+    if type(value) not in (int, float):
         return None
     try:
         result = float(value)

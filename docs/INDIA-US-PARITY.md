@@ -50,3 +50,6 @@ US history normalization accepts only JSON number values for open/high/low/close
 ## Bounded live diagnostic observation
 
 Live snapshots now have a twenty-second total asynchronous deadline covering client entry and the concurrent clock/quote/trade requests, alongside HTTPX operation timeouts. Expiry cancels pending provider requests; the shared cache returns sanitized unavailable feedback and releases its in-flight slot. It does not downgrade the feed or invent market/price observations. Tests cover all three request cancellations, subsequent use of the released capacity and caller cancellation propagation. Existing disconnected-waiter shielding remains in place. This bounds asynchronous I/O, not synchronous parsing, and is not evidence of actual market-open reliability. No provider subscription, hosted storage flag or completed research package changed.
+
+
+Live bid/ask/trade price validation now also accepts only JSON numbers. Numeric strings remain unknown rather than being coerced into fresh prices or spreads. Invalid quote evidence degrades the snapshot while preserving a valid independent trade observation, and vice versa. Synthetic diagnostics and snapshot tests cover this boundary. This does not change the selected feed, provider access, completed research, hosted flags or the outstanding real-account/market-open release gates.

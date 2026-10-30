@@ -262,3 +262,27 @@ def test_live_observation_caller_cancellation_reaches_pending_provider_requests(
         with pytest.raises(asyncio.CancelledError):await task
         assert len(cancelled)==3
     asyncio.run(run())
+
+
+@pytest.mark.parametrize('field',['bp','ap'])
+@pytest.mark.parametrize('value',['100','100.02','1e2',' 100 ',None])
+def test_numeric_strings_are_not_live_quote_evidence(field,value):
+    row=quote_diagnostic('AAPL',quote(**{field:value}),{'p':100,'t':NOW.isoformat()},NOW)
+    assert row['quote_status']=='invalid'
+    assert row['bid' if field=='bp' else 'ask'] is None
+    assert row['spread'] is None and row['spread_bps'] is None
+    assert row['trade_status']=='fresh'
+
+
+@pytest.mark.parametrize('value',['100','1e2',' 100 ',None])
+def test_numeric_strings_are_not_live_trade_evidence(value):
+    row=quote_diagnostic('AAPL',quote(),{'p':value,'t':NOW.isoformat()},NOW)
+    assert row['trade_status']=='invalid' and row['last_trade'] is None
+    assert row['quote_status']=='fresh'
+
+
+def test_string_provider_price_degrades_snapshot_without_concealing_valid_other_endpoint():
+    result=live_result({'quotes':{'quotes':{'AAPL':{'bp':'100','ap':101,'t':datetime.now(timezone.utc).isoformat()}}}})
+    assert result['state']=='degraded' and 'quotes' in result['errors']
+    assert result['rows'][0]['quote_status']=='invalid'
+    assert result['rows'][0]['trade_status']=='fresh'
