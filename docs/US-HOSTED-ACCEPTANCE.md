@@ -33,3 +33,10 @@ Record date, exact source revision, approved targets/modes, check names and pass
 ## Frontend proxy destination boundary
 
 Source configuration now permits ALPHA_API_PROXY_URL only at the dedicated HTTPS usmarket.onrender.com origin (default port/443), or HTTP localhost/127.0.0.1 outside production mode for development. Production mode rejects loopback destinations. Trailing slash is normalized; credentials, paths, query/fragment, whitespace/backslash, lookalikes and unreviewed hosts fail with a sanitized configuration error before rewrites are produced. Missing configuration produces no proxy. Custom destinations require explicit source review; do not point this frontend at inherited Alpha Radar services. Tests exercise allowed and rejected destinations. No environment value or hosted deployment was changed, and this does not verify reachability, private access or hosted acceptance.
+
+
+## Anonymous hosted boundary observation — 30 October 2026
+
+A credential-free headers-only GET observed health 200 and both /api/us/plans and /api/us/research/packages returning 401 with a Bearer challenge, private/no-store and Vary: Authorization. The initial twenty-second attempts were transport-unavailable; a subsequent retry passed. No cause or continuous availability is established by that retry. No response body, identity, market data or credential was read. Deployed source revision is unverified; this does not satisfy sign-in, two-account isolation, save/reopen/restart or backup/restore acceptance. Flags remain unchanged/off and the missed 25 October gate stays failed.
+
+Repeat deliberately from backend with python -m app.services.us_hosted_probe. The tool uses a fixed dedicated Render origin, sends no credentials, follows no redirects and never consumes response bodies. It reports only status/check booleans and observation time, returning failure for unavailable or mismatched boundaries. Synthetic CI tests intercept HTTP and verify denial/header failures, redirect rejection and unread private bodies; CI never runs this probe against the live service.
