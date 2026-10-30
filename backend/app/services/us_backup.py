@@ -9,9 +9,23 @@ import time
 
 REPOSITORY = Path(__file__).resolve().parents[3]
 DATABASES = {'plans':'us-plans.sqlite3', 'jobs':'us-refresh-jobs.sqlite3'}
+SCHEMAS = {'plans': ('conditional_plans', {'id','revision','owner','updated_at','payload'}),
+           'jobs': ('research_jobs', {'id','owner','updated_at','payload'})}
 
 
-def backup_database(source: Path, target: Path):
+def verify_kind(connection, kind):
+    table, columns = SCHEMAS[kind]
+    if connection.execute("SELECT type FROM sqlite_master WHERE name=?", (table,)).fetchone() != ('table',):
+        raise ValueError('Selected backup schema is missing')
+    # Names come only from the fixed mapping, never an operator identifier.
+    present = {row[1] for row in connection.execute('PRAGMA table_info(' + table + ')')}
+    if not columns <= present:
+        raise ValueError('Selected backup columns are missing')
+
+
+def backup_database(source: Path, target: Path, kind=None):
+    if kind is not None and kind not in SCHEMAS:
+        raise ValueError("Unsupported backup kind")
     source = source.resolve(strict=True)
     if target.is_symlink():
         raise ValueError('Backup destination cannot be a symbolic link')
@@ -33,6 +47,8 @@ def backup_database(source: Path, target: Path):
         with closing(sqlite3.connect(source.as_uri()+'?mode=ro', uri=True, timeout=5)) as reader:
             with closing(sqlite3.connect(target, timeout=5)) as destination:
                 reader.backup(destination, pages=128, progress=progress, sleep=0.1)
+                if kind is not None:
+                    verify_kind(destination, kind)
                 if destination.execute('PRAGMA integrity_check').fetchone()[0] != 'ok':
                     raise ValueError('Backup integrity check failed')
         with target.open('rb+') as handle:
@@ -55,7 +71,7 @@ def main():
         directory = Path(os.environ.get('DATA_DIR', ''))
         if not os.environ.get('DATA_DIR') or not directory.is_absolute() or not args.output.is_absolute():
             raise ValueError('Explicit absolute paths required')
-        backup_database(directory/DATABASES[args.kind], args.output)
+        backup_database(directory/DATABASES[args.kind], args.output, kind=args.kind)
     except (OSError, ValueError, sqlite3.Error, TimeoutError):
         print(json.dumps({'success':False,'kind':args.kind,'error':'Backup not confirmed; check private source, destination and storage access'}))
         return 1

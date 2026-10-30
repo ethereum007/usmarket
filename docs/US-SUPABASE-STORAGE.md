@@ -234,3 +234,8 @@ The browser accepts a save acknowledgement only for the requested plan ID, exact
 
 
 Refresh polling now uses the same observation validator as history and interruption recovery before updating UI status. Null/array records and object-valued display fields remain unavailable rather than becoming a new recorded outcome or crashing rendering. Existing exact job/package checks and late-account cleanup remain covered. Four polling regressions verify unchanged prior status and sanitized feedback. No provider request, hosted access or storage flag changed.
+
+
+## Local backup kind verification
+
+The SQLite backup CLI now checks that the copied database contains the selected plans/jobs table and required columns, as well as passing integrity_check, before reporting success. Empty, unrelated, view-only or incomplete schemas fail with sanitized feedback and remove only the newly created copy. Synthetic CLI tests verify both kinds, preserve source bytes and leave no misleading output. This is structural validation of a selected local backup, not record-level restore acceptance or a hosted Supabase backup. Remote modes remain rejected by this local tool; no runtime data or flags changed.

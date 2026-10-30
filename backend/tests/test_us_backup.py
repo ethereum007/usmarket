@@ -109,3 +109,21 @@ def test_cli_local_defaults_and_explicit_modes_still_back_up_requested_store(tmp
     assert json.loads(capsys.readouterr().out)['integrity']=='ok'
     with closing(sqlite3.connect(target)) as connection:
         assert connection.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
+
+
+@pytest.mark.parametrize('kind',['plans','jobs'])
+@pytest.mark.parametrize('schema',['empty','unrelated','view','missing_columns'])
+def test_cli_never_confirms_wrong_sqlite_schema(tmp_path,capsys,kind,schema):
+    source=tmp_path/backup.DATABASES[kind];target=tmp_path/'private-copy'
+    table=backup.SCHEMAS[kind][0]
+    with closing(sqlite3.connect(source)) as connection:
+        if schema=='unrelated':connection.execute('CREATE TABLE unrelated (id TEXT)')
+        if schema=='view':connection.execute('CREATE VIEW '+table+' AS SELECT 1 AS id')
+        if schema=='missing_columns':connection.execute('CREATE TABLE '+table+' (id TEXT)')
+        connection.commit()
+    before=source.read_bytes()
+    with patch.dict(backup.os.environ,{'DATA_DIR':str(tmp_path)},clear=True),patch('sys.argv',['backup','--kind',kind,'--output',str(target)]):
+        assert backup.main()==1
+    result=json.loads(capsys.readouterr().out)
+    assert result['success'] is False and 'schema' not in result['error']
+    assert not target.exists() and source.read_bytes()==before
