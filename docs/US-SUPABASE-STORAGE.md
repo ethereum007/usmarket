@@ -223,3 +223,6 @@ Interruption recovery now validates its returned observation with the same brows
 ## Selected-plan thesis verification on reopen
 
 The browser now compares the returned exact plan revision with the selected list record's immutable package, setup version, setup ID, source snapshot, symbol and direction, in addition to verifying the returned source against that plan. Internally consistent but rebound responses cannot silently open another thesis. Six transport regressions independently rebind each field while keeping the returned plan and package consistent; normal exact and historical reopening remain covered. This does not replace database immutability or constitute real hosted acceptance. No SQL, credentials or runtime flags changed.
+
+
+Reopening also compares the selected plan's provider asset identity and source session with the returned revision, then checks the returned setup asset and package session against it. Regressions cover internally consistent rebinding and direct source/revision mismatches. Optional legacy asset metadata remains unknown; this does not invent a historical mapping or change existing revisions. These are browser consistency checks, not hosted isolation acceptance.

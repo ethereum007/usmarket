@@ -13,9 +13,9 @@ function compile(file, mocks = {}, globals = {}) {
   }).outputText, context);
   return context.exports;
 }
-const setup = { symbol: 'AAPL', signal: 'BULL', setup_version: 'b'.repeat(64), setup_id: 'c'.repeat(64), source_snapshot_id: 'd'.repeat(64), entry_price: 100, stop_loss: 95 };
+const setup = { symbol: 'AAPL', signal: 'BULL', provider_asset_id: '11111111-1111-4111-8111-111111111111', setup_version: 'b'.repeat(64), setup_id: 'c'.repeat(64), source_snapshot_id: 'd'.repeat(64), entry_price: 100, stop_loss: 95 };
 const data = { id: 'a'.repeat(64), market: 'US', currency: 'USD', state: 'final', session: '2026-10-16', setups: [setup] };
-const plan = { id: 'plan-id', revision: 2, package_id: data.id, setup_version: setup.setup_version, setup_id: setup.setup_id, source_snapshot_id: setup.source_snapshot_id, symbol: 'AAPL', direction: 'BULL', notes: 'original' };
+const plan = { id: 'plan-id', revision: 2, session: data.session, provider_asset_id: setup.provider_asset_id, package_id: data.id, setup_version: setup.setup_version, setup_id: setup.setup_id, source_snapshot_id: setup.source_snapshot_id, symbol: 'AAPL', direction: 'BULL', notes: 'original' };
 const fields = () => new Map(Object.entries({ trigger: '100', stop: '95', expiry: '2026-11-25', capital: '10000', risk_pct: '1', allocation_cap_pct: '20', notes: 'Private thesis', exit_policy: 'Review invalidation', state: 'draft', owner: 'forged', filled: 'true', earnings_state: 'checked_no_event' }));
 test('US request uses exact source, expected revision and explicit fields only', async () => {
   let sent;
@@ -271,4 +271,26 @@ test('reopen rejects internally matching but rebound selected thesis: '+field,as
   const changedData={...data,id:saved.package_id,setups:[changedSetup]};
   const lib=compile('lib/us-plans.ts',{'./api':{fetchAPI:async url=>url.includes('/research/')?{package:changedData}:{plan:saved}}});
   await assert.rejects(()=>lib.loadUSPlan(plan),/could not be verified/);
+});
+
+
+for(const field of ['provider_asset_id','session'])test('reopen refuses changed selected asset/session '+field,async()=>{
+  const replacement=field==='session'?'2026-10-15':'22222222-2222-4222-8222-222222222222';
+  const saved={...plan,[field]:replacement};
+  const changedData={...data,session:saved.session,setups:[{...setup,provider_asset_id:saved.provider_asset_id}]};
+  const lib=compile('lib/us-plans.ts',{'./api':{fetchAPI:async url=>url.includes('/research/')?{package:changedData}:{plan:saved}}});
+  await assert.rejects(()=>lib.loadUSPlan(plan),/could not be verified/);
+});
+for(const change of [{session:'2026-10-15'},{setups:[{...setup,provider_asset_id:'22222222-2222-4222-8222-222222222222'}]}])
+test('reopened source must match saved asset/session '+JSON.stringify(change),async()=>{
+  const lib=compile('lib/us-plans.ts',{'./api':{fetchAPI:async url=>url.includes('/research/')?{package:{...data,...change}}:{plan}}});
+  await assert.rejects(()=>lib.loadUSPlan(plan),/could not be verified/);
+});
+
+
+test('legacy missing asset identity stays unknown without inventing a provider mapping',async()=>{
+  const oldPlan={...plan,provider_asset_id:null};const oldSetup={...setup};delete oldSetup.provider_asset_id;
+  const lib=compile('lib/us-plans.ts',{'./api':{fetchAPI:async url=>url.includes('/research/')?{package:{...data,setups:[oldSetup]}}:{plan:oldPlan}}});
+  const result=await lib.loadUSPlan(oldPlan);assert.equal(result.plan.provider_asset_id,null);
+  assert.equal(result.setup.provider_asset_id,undefined);
 });

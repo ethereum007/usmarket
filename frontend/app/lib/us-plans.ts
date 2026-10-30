@@ -4,7 +4,7 @@ import type { USPackage } from "./us-research";
 
 export type USPlan = Omit<ConditionalPlan, "earnings_state"> & {
   market: "US"; currency: "USD"; timezone: "America/New_York";
-  source_snapshot_id: string; updated_at: string;
+  source_snapshot_id: string; updated_at: string; provider_asset_id?: string | null;
   filled: false; execution_readiness: "PLANNING_ONLY";
   sizing?: USSizing;
 };
@@ -21,10 +21,13 @@ export async function loadUSPlan(plan: USPlan) {
       saved.plan.package_id !== plan.package_id || saved.plan.setup_version !== plan.setup_version ||
       saved.plan.setup_id !== plan.setup_id || saved.plan.source_snapshot_id !== plan.source_snapshot_id ||
       saved.plan.symbol !== plan.symbol || saved.plan.direction !== plan.direction ||
+      saved.plan.provider_asset_id !== plan.provider_asset_id || saved.plan.session !== plan.session ||
+      source.package.session !== saved.plan.session ||
       source.package.id !== saved.plan.package_id || source.package.market !== "US" ||
       source.package.currency !== "USD" || source.package.state !== "final" ||
       !setup || setup.setup_id !== saved.plan.setup_id || setup.source_snapshot_id !== saved.plan.source_snapshot_id ||
-      setup.symbol !== saved.plan.symbol || setup.signal !== saved.plan.direction) {
+      setup.symbol !== saved.plan.symbol || setup.signal !== saved.plan.direction ||
+      ((setup as ResearchSetup & { provider_asset_id?: string | null }).provider_asset_id ?? null) !== (saved.plan.provider_asset_id ?? null)) {
     throw new Error("Original US plan evidence could not be verified. No revision was opened.");
   }
   return { plan: saved.plan, data: source.package, setup };
