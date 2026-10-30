@@ -260,3 +260,15 @@ test('explicit new plan remounts editor even when selected source has not change
   const fresh=workspace.render();assert.equal(fresh.editor.props.data,data);
   assert.notEqual(fresh.editor.key,first.editor.key);assert.equal(fresh.start,undefined);
 });
+
+
+for(const field of ['package_id','setup_version','setup_id','source_snapshot_id','symbol','direction'])
+test('reopen rejects internally matching but rebound selected thesis: '+field,async()=>{
+  const replacement=field==='symbol'?'MSFT':field==='direction'?'BEAR':'e'.repeat(64);
+  const saved={...plan,[field]:replacement};
+  const changedSetup={...setup,setup_version:saved.setup_version,setup_id:saved.setup_id,
+    source_snapshot_id:saved.source_snapshot_id,symbol:saved.symbol,signal:saved.direction};
+  const changedData={...data,id:saved.package_id,setups:[changedSetup]};
+  const lib=compile('lib/us-plans.ts',{'./api':{fetchAPI:async url=>url.includes('/research/')?{package:changedData}:{plan:saved}}});
+  await assert.rejects(()=>lib.loadUSPlan(plan),/could not be verified/);
+});

@@ -218,3 +218,8 @@ The history panel and active-job restoration now share validation before accepti
 
 
 Interruption recovery now validates its returned observation with the same browser history boundary before replacing a recorded row. Completed race outcomes require an exact package identity; malformed display fields remain unconfirmed, preserving the prior observation and sanitized retry guidance. Component regressions cover malformed completion and private object payloads. No hosted flag or access change is included.
+
+
+## Selected-plan thesis verification on reopen
+
+The browser now compares the returned exact plan revision with the selected list record's immutable package, setup version, setup ID, source snapshot, symbol and direction, in addition to verifying the returned source against that plan. Internally consistent but rebound responses cannot silently open another thesis. Six transport regressions independently rebind each field while keeping the returned plan and package consistent; normal exact and historical reopening remain covered. This does not replace database immutability or constitute real hosted acceptance. No SQL, credentials or runtime flags changed.
