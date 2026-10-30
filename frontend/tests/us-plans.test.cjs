@@ -15,11 +15,11 @@ function compile(file, mocks = {}, globals = {}) {
 }
 const setup = { symbol: 'AAPL', signal: 'BULL', provider_asset_id: '11111111-1111-4111-8111-111111111111', setup_version: 'b'.repeat(64), setup_id: 'c'.repeat(64), source_snapshot_id: 'd'.repeat(64), entry_price: 100, stop_loss: 95 };
 const data = { id: 'a'.repeat(64), market: 'US', currency: 'USD', state: 'final', session: '2026-10-16', setups: [setup] };
-const plan = { id: 'plan-id', revision: 2, session: data.session, provider_asset_id: setup.provider_asset_id, package_id: data.id, setup_version: setup.setup_version, setup_id: setup.setup_id, source_snapshot_id: setup.source_snapshot_id, symbol: 'AAPL', direction: 'BULL', notes: 'original' };
+const plan = { id: 'plan-id', revision: 2, market: 'US', currency: 'USD', session: data.session, provider_asset_id: setup.provider_asset_id, package_id: data.id, setup_version: setup.setup_version, setup_id: setup.setup_id, source_snapshot_id: setup.source_snapshot_id, symbol: 'AAPL', direction: 'BULL', notes: 'original' };
 const fields = () => new Map(Object.entries({ trigger: '100', stop: '95', expiry: '2026-11-25', capital: '10000', risk_pct: '1', allocation_cap_pct: '20', notes: 'Private thesis', exit_policy: 'Review invalidation', state: 'draft', owner: 'forged', filled: 'true', earnings_state: 'checked_no_event' }));
 test('US request uses exact source, expected revision and explicit fields only', async () => {
   let sent;
-  const lib = compile('lib/us-plans.ts', { './api': { postAPI: async (url, body) => { sent = { url, body }; return { plan }; } } });
+  const lib = compile('lib/us-plans.ts', { './api': { postAPI: async (url, body) => { sent = { url, body }; return { plan: {...plan,revision:3} }; } } });
   await lib.saveUSPlan(plan.id, data, setup, plan, fields());
   assert.equal(sent.url, '/api/us/plans/plan-id');
   assert.equal(sent.body.expected_revision, 2);
@@ -293,4 +293,19 @@ test('legacy missing asset identity stays unknown without inventing a provider m
   const lib=compile('lib/us-plans.ts',{'./api':{fetchAPI:async url=>url.includes('/research/')?{package:{...data,setups:[oldSetup]}}:{plan:oldPlan}}});
   const result=await lib.loadUSPlan(oldPlan);assert.equal(result.plan.provider_asset_id,null);
   assert.equal(result.setup.provider_asset_id,undefined);
+});
+
+
+for(const change of [{id:'other'},{revision:2},{revision:4},{package_id:'e'.repeat(64)},
+  {setup_version:'e'.repeat(64)},{setup_id:'e'.repeat(64)},{source_snapshot_id:'e'.repeat(64)},
+  {symbol:'MSFT'},{direction:'BEAR'},{session:'2026-10-15'},
+  {provider_asset_id:'22222222-2222-4222-8222-222222222222'},{market:'NSE'},{currency:'INR'}])
+test('save acknowledgement must match requested next revision and source '+JSON.stringify(change),async()=>{
+  const lib=compile('lib/us-plans.ts',{'./api':{postAPI:async()=>({plan:{...plan,revision:3,...change}})}});
+  await assert.rejects(()=>lib.saveUSPlan(plan.id,data,setup,plan,fields()),/not confirmed/);
+});
+
+test('new-plan acknowledgement confirms revision one only',async()=>{
+  const lib=compile('lib/us-plans.ts',{'./api':{postAPI:async()=>({plan:{...plan,revision:1}})}});
+  assert.equal((await lib.saveUSPlan(plan.id,data,setup,null,fields())).plan.revision,1);
 });

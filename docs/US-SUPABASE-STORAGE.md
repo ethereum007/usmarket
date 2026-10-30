@@ -226,3 +226,8 @@ The browser now compares the returned exact plan revision with the selected list
 
 
 Reopening also compares the selected plan's provider asset identity and source session with the returned revision, then checks the returned setup asset and package session against it. Regressions cover internally consistent rebinding and direct source/revision mismatches. Optional legacy asset metadata remains unknown; this does not invent a historical mapping or change existing revisions. These are browser consistency checks, not hosted isolation acceptance.
+
+
+## Browser save acknowledgement identity
+
+The browser accepts a save acknowledgement only for the requested plan ID, exact next revision and selected package/setup/snapshot/security/session in US/USD. A mismatched acknowledgement throws unconfirmed-save feedback, preserving the editor's draft and retry identity instead of opening or claiming another saved revision. Synthetic regressions cover each identity field, stale/skipped revisions and a valid new-plan revision one. Server validation and ownership remain authoritative; this is not full payload or hosted persistence acceptance. No flags, credentials or SQL changed.

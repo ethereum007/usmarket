@@ -47,6 +47,17 @@ export function saveUSPlan(id: string, data: USPackage, setup: ResearchSetup, ex
     trigger: Number(fields.get("trigger")), stop: Number(fields.get("stop")), expiry: fields.get("expiry"),
     capital: Number(fields.get("capital")), risk_pct: Number(fields.get("risk_pct")), allocation_cap_pct: Number(fields.get("allocation_cap_pct")),
     notes: fields.get("notes"), exit_policy: fields.get("exit_policy"), state: fields.get("state"),
+  }).then(result => {
+    const saved = result?.plan;
+    const asset = (setup as ResearchSetup & { provider_asset_id?: string | null }).provider_asset_id ?? null;
+    if (!saved || saved.id !== id || saved.revision !== (existing?.revision || 0) + 1 ||
+        saved.package_id !== data.id || saved.setup_version !== setup.setup_version ||
+        saved.setup_id !== setup.setup_id || saved.source_snapshot_id !== setup.source_snapshot_id ||
+        saved.symbol !== setup.symbol || saved.direction !== setup.signal || saved.session !== data.session ||
+        (saved.provider_asset_id ?? null) !== asset || saved.market !== "US" || saved.currency !== "USD") {
+      throw new Error("Plan save was not confirmed for this revision and source. Reload saved plans before retrying.");
+    }
+    return result;
   });
 }
 
