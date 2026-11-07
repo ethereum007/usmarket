@@ -16,7 +16,12 @@ async def private_us_cache_policy(request, call_next):
         response.headers['Cache-Control'] = 'private, no-store'
         response.headers['Pragma'] = 'no-cache'
         response.headers['Expires'] = '0'
-        vary = [value.strip() for value in response.headers.get('Vary', '').split(',') if value.strip()]
+        vary = [
+            value.strip()
+            for header in response.headers.getlist('Vary')
+            for value in header.split(',')
+            if value.strip()
+        ]
         if not any(value.lower() in {'authorization', '*'} for value in vary):
             vary.append('Authorization')
         response.headers['Vary'] = ', '.join(vary)
