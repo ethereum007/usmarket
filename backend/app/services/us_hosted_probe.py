@@ -1,5 +1,6 @@
 """Read-only, credential-free hosted US HTTP boundary probe. Never reads bodies."""
 import asyncio
+from contextlib import aclosing
 from datetime import datetime, timezone
 import json
 import httpx
@@ -17,7 +18,10 @@ async def report(client=None):
     for path in PATHS:
         try:
             async with asyncio.timeout(REQUEST_DEADLINE_SECONDS):
-                async with client.stream('GET', ORIGIN + path) as response:
+                # Send a standalone request so client headers and cookies cannot leak into the probe.
+                request = httpx.Request('GET', ORIGIN + path)
+                response = await client.send(request, stream=True, auth=None, follow_redirects=False)
+                async with aclosing(response):
                     row = {'path': path, 'status': response.status_code}
                     if path == '/api/health':
                         row['passed'] = response.status_code == 200

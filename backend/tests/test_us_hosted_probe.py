@@ -15,9 +15,11 @@ def test_hosted_probe_checks_boundary_without_sending_credentials_or_reading_bod
     def gateway(request):
         requests.append(request)
         assert request.url.host=='usmarket.onrender.com'
-        assert 'authorization' not in request.headers and 'apikey' not in request.headers
+        assert not {'authorization', 'apikey', 'cookie'}.intersection(request.headers)
         status=200 if request.url.path=='/api/health' else 401
         headers={'cache-control':'private, no-store','vary':'Accept-Encoding, Authorization','www-authenticate':'Bearer'}
+        if request.url.path=='/api/health':
+            headers['set-cookie'] = 'session=synthetic; Path=/; Secure'
         if request.url.path=='/api/us/plans':
             if change=='transport':raise httpx.ConnectError('private transport detail')
             if change=='status':status=200
@@ -27,7 +29,10 @@ def test_hosted_probe_checks_boundary_without_sending_credentials_or_reading_bod
             if change=='redirect':status=302;headers['location']='https://private.example'
         return httpx.Response(status,headers=headers,stream=PrivateBody())
     async def run():
-        async with httpx.AsyncClient(transport=httpx.MockTransport(gateway),follow_redirects=False) as client:
+        async with httpx.AsyncClient(
+            transport=httpx.MockTransport(gateway), follow_redirects=True,
+            auth=('synthetic', 'synthetic'), headers={'apikey': 'synthetic'},
+        ) as client:
             return await probe.report(client)
     result=asyncio.run(run())
     assert result['passed'] is (change is None)
