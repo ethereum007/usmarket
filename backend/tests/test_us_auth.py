@@ -233,3 +233,17 @@ def test_caller_cancellation_is_not_converted_to_auth_outage():
             with pytest.raises(asyncio.CancelledError):await task
             assert cancelled.is_set()
     asyncio.run(exercise())
+
+
+@pytest.mark.parametrize('anonymous', [False, True, 'false', None, 0])
+def test_invited_identity_requires_boolean_anonymity_when_present(anonymous):
+    identity = '11111111-1111-4111-8111-111111111111'
+    body = {'id': identity, 'email': 'owner@example.com',
+            'email_confirmed_at': '2026-01-01T00:00:00Z', 'is_anonymous': anonymous}
+    config = SimpleNamespace(SUPABASE_URL='https://apidhmrlawbjvisnadht.supabase.co',
+                             SUPABASE_ANON_KEY='test-public-key')
+    with patch.dict(us_auth.os.environ, {'US_INVITED_USER_IDS': identity}), \
+         patch.object(us_auth, 'settings', config), \
+         patch.object(us_auth.httpx, 'AsyncClient', provider_client(httpx.Response(200, json=body))):
+        response = TestClient(auth_app()).get('/private', headers={'Authorization': 'Bearer test-session'})
+    assert response.status_code == (200 if anonymous is False else 401 if anonymous is True else 503)

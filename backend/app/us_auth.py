@@ -57,7 +57,10 @@ async def verify_us_token(token: str) -> dict:
         raise HTTPException(503, 'US authentication returned an invalid response') from None
     if not isinstance(user,dict) or not isinstance(user.get('id'),str) or not user['id'].strip():
         raise HTTPException(503, 'US authentication returned an invalid identity')
-    if user.get('is_anonymous') is True:
+    is_anonymous = user.get('is_anonymous', False)
+    if not isinstance(is_anonymous, bool):
+        raise HTTPException(503, 'US authentication returned an invalid identity')
+    if is_anonymous:
         raise unauthorized()
     if not isinstance(user.get('email'), str) or '@' not in user['email'] or not user.get('email_confirmed_at'):
         raise HTTPException(403, 'Confirm your US account email before accessing research')

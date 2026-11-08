@@ -51,3 +51,5 @@ The anonymous probe sends standalone requests with redirects and client authenti
 The US API cache middleware preserves repeated upstream Vary fields when applying private, no-store. Regression tests cover upstream negotiation fields, an existing Authorization token and wildcard variation. This source check leaves hosted acceptance pending.
 
 The US API rejects repeated Authorization headers and comma-joined credentials with a Bearer challenge before calling the identity provider. Synthetic request tests cover both forms. Hosted identity and persistence acceptance remain pending after the missed 25 October private MVP target.
+
+The identity verifier rejects explicitly malformed anonymity values, including null, numbers and strings. Boolean true remains denied, and an omitted field retains compatibility with existing provider responses. Synthetic invited-user tests cover these cases.
