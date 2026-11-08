@@ -80,8 +80,10 @@ async def verify_us_token(token: str) -> dict:
 
 
 async def require_us_user(request: Request) -> dict:
-    authorization = request.headers.get('Authorization','')
-    parts = authorization.split()
+    authorization = request.headers.getlist('Authorization')
+    if len(authorization) != 1 or ',' in authorization[0]:
+        raise unauthorized()
+    parts = authorization[0].split()
     if len(parts) != 2 or parts[0].lower() != 'bearer' or len(parts[1]) > 8192:
         raise unauthorized()
     return {**(await verify_us_token(parts[1])), '_access_token': parts[1]}

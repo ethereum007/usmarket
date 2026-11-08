@@ -23,6 +23,8 @@ def auth_app():
     {'X-Admin-Secret':'not-an-auth-token'},
     {'Authorization':'Basic anything'}, {'Authorization':'Bearer'},
     {'Authorization':'Bearer first second'},
+    {'Authorization':'Bearer first,second'},
+    [('Authorization', 'Bearer first'), ('authorization', 'Bearer second')],
 ])
 def test_no_header_or_spoofed_local_request_can_grant_access(headers):
     with patch.object(us_auth,'verify_us_token',AsyncMock()) as verifier:
