@@ -53,3 +53,5 @@ The US API cache middleware preserves repeated upstream Vary fields when applyin
 The US API rejects repeated Authorization headers and comma-joined credentials with a Bearer challenge before calling the identity provider. Synthetic request tests cover both forms. Hosted identity and persistence acceptance remain pending after the missed 25 October private MVP target.
 
 The identity verifier rejects explicitly malformed anonymity values, including null, numbers and strings. Boolean true remains denied, and an omitted field retains compatibility with existing provider responses. Synthetic invited-user tests cover these cases.
+
+The shared browser API client requests no-store and rejects redirects for private US calls, including same-account session retries. Synthetic GET and POST tests verify both attempts. Hosted account isolation and persistence acceptance remain pending.

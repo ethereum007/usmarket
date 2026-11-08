@@ -112,17 +112,18 @@ async function authHeaders(): Promise<Record<string, string>> {
 }
 
 async function fetchWithAuthRetry(path: string, init: RequestInit): Promise<Response> {
+  const usRequest = path.startsWith("/api/us/");
   // Recheck after the caller awaited headers: an auth event can run in that gap.
-  if (path.startsWith("/api/us/")) {
+  if (usRequest) {
     const preparedToken = new Headers(init.headers).get("Authorization")?.replace(/^Bearer /i, "") || null;
     if (preparedToken !== cachedAccessToken && (!tokenSubject(preparedToken) || tokenSubject(preparedToken) !== tokenSubject(cachedAccessToken))) {
       throw new Error("Account changed while preparing the request. Review the current account before retrying.");
     }
   }
-  const response = await fetchWithTimeout(path, init);
+  const requestInit: RequestInit = usRequest ? { ...init, cache: "no-store", redirect: "error" } : init;
+  const response = await fetchWithTimeout(path, requestInit);
   if (!(await isExpiredAppSession(path, response))) return response;
 
-  const usRequest = path.startsWith("/api/us/");
   const originalSubject = usRequest ? tokenSubject(new Headers(init.headers).get("Authorization")?.replace(/^Bearer /i, "") || null) : null;
   if (usRequest && (!originalSubject || originalSubject !== tokenSubject(cachedAccessToken))) return response;
 
@@ -131,7 +132,7 @@ async function fetchWithAuthRetry(path: string, init: RequestInit): Promise<Resp
 
   const headers = new Headers(init.headers);
   headers.set("Authorization", `Bearer ${accessToken}`);
-  return fetchWithTimeout(path, { ...init, headers });
+  return fetchWithTimeout(path, { ...requestInit, headers });
 }
 
 // Unverified JWT subject is used only to prevent cross-account replay, never to grant access.

@@ -29,6 +29,10 @@ for (const method of ['GET','POST']) test(`US ${method} retries once with refres
   else await f.api.fetchAPI('/api/us/research/packages');
   assert.equal(f.refreshed(),1);
   assert.equal(f.calls.length,2);
+  for (const { init } of f.calls) {
+    assert.equal(init.cache, "no-store");
+    assert.equal(init.redirect, "error");
+  }
   assert.equal(new Headers(f.calls[1].init.headers).get('Authorization'),`Bearer ${token(A,'new')}`);
   assert.equal(f.calls[1].init.body,f.calls[0].init.body);
   assert.equal(f.calls[1].init.method,f.calls[0].init.method);
