@@ -5,7 +5,7 @@ import pytest
 from app.services import us_hosted_probe as probe
 
 
-@pytest.mark.parametrize('change',[None,'status','cache','vary','challenge','redirect','transport'])
+@pytest.mark.parametrize('change',[None,'access_open','status','cache','vary','challenge','redirect','transport'])
 def test_hosted_probe_checks_boundary_without_sending_credentials_or_reading_bodies(change):
     requests=[];read=[]
     class PrivateBody(httpx.AsyncByteStream):
@@ -20,6 +20,8 @@ def test_hosted_probe_checks_boundary_without_sending_credentials_or_reading_bod
         headers={'cache-control':'private, no-store','vary':'Accept-Encoding, Authorization','www-authenticate':'Bearer'}
         if request.url.path=='/api/health':
             headers['set-cookie'] = 'session=synthetic; Path=/; Secure'
+        if request.url.path == '/api/us/research/access' and change == 'access_open':
+            status = 200
         if request.url.path=='/api/us/plans':
             if change=='transport':raise httpx.ConnectError('private transport detail')
             if change=='status':status=200
@@ -36,7 +38,10 @@ def test_hosted_probe_checks_boundary_without_sending_credentials_or_reading_bod
             return await probe.report(client)
     result=asyncio.run(run())
     assert result['passed'] is (change is None)
-    assert len(requests)==3 and read==[]
+    assert [request.url.path for request in requests] == [
+        '/api/health', '/api/us/research/access', '/api/us/plans', '/api/us/research/packages',
+    ]
+    assert read == []
     assert 'private runtime' not in json.dumps(result) and 'private transport' not in json.dumps(result)
     assert 'private.example' not in json.dumps(result)
 

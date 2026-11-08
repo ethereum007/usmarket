@@ -55,3 +55,5 @@ The US API rejects repeated Authorization headers and comma-joined credentials w
 The identity verifier rejects explicitly malformed anonymity values, including null, numbers and strings. Boolean true remains denied, and an omitted field retains compatibility with existing provider responses. Synthetic invited-user tests cover these cases.
 
 The shared browser API client requests no-store and rejects redirects for private US calls, including same-account session retries. Synthetic GET and POST tests verify both attempts. Hosted account isolation and persistence acceptance remain pending.
+
+The anonymous probe now also checks the browser's workspace access endpoint (/api/us/research/access) for a 401 Bearer challenge and private cache headers. A synthetic 200 response on that endpoint fails the probe. This extends probe coverage beyond the historical hosted observation above.
