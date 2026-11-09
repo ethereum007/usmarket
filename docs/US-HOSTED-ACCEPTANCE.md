@@ -57,3 +57,5 @@ The identity verifier rejects explicitly malformed anonymity values, including n
 The shared browser API client requests no-store and rejects redirects for private US calls, including same-account session retries. Synthetic GET and POST tests verify both attempts. Hosted account isolation and persistence acceptance remain pending.
 
 The anonymous probe now also checks the browser's workspace access endpoint (/api/us/research/access) for a 401 Bearer challenge and private cache headers. A synthetic 200 response on that endpoint fails the probe. This extends probe coverage beyond the historical hosted observation above.
+
+On 9 November 2026 the expanded headers-only probe at source 7cc1fbeddee3d68a3ea032f3e2120cd663c122e5 reported transport unavailable for health and workspace access at 02:31:53 UTC. Plans and packages passed. At 02:32:02 UTC a single retry passed all four checks, with health 200 and all private paths returning 401 with Bearer, private/no-store and Vary: Authorization. Cause and deployed revision remain unknown. The missed 25 October target and hosted acceptance gates remain open.
