@@ -3,6 +3,7 @@ import asyncio
 from contextlib import aclosing
 from datetime import datetime, timezone
 import json
+import re
 import httpx
 
 ORIGIN = 'https://usmarket.onrender.com'
@@ -25,6 +26,8 @@ async def report(client=None):
                     row = {'path': path, 'status': response.status_code}
                     if path == '/api/health':
                         row['passed'] = response.status_code == 200
+                        revision = response.headers.get('x-us-source-revision', '')
+                        row['source_revision'] = revision if re.fullmatch(r'[0-9a-f]{40}', revision) else None
                     else:
                         cache = {part.strip().lower() for part in response.headers.get('cache-control', '').split(',')}
                         vary = {part.strip().lower() for part in response.headers.get('vary', '').split(',')}
@@ -37,7 +40,7 @@ async def report(client=None):
             checks.append({'path': path, 'passed': False, 'result': 'transport_unavailable'})
     return {'passed': all(row['passed'] for row in checks), 'checks': checks,
             'observed_at': datetime.now(timezone.utc).isoformat(),
-            'scope': 'Anonymous HTTP status and cache headers only; deployed revision, sign-in, isolation and persistence unverified'}
+            'scope': 'Anonymous HTTP status and cache headers only; reported revision is informational; sign-in, isolation and persistence unverified'}
 
 
 def main():

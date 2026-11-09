@@ -3,7 +3,10 @@
 Run: uvicorn app.us_main:app --host 127.0.0.1 --port 9018
 The explicit loopback development harness is tests/serve_us_preview.py.
 """
-from fastapi import FastAPI
+import os
+import re
+
+from fastapi import FastAPI, Response
 from app.routes.us_research import router
 from app.routes.us_plans import router as plans_router
 from app.routes.us_filings import router as filings_router
@@ -33,5 +36,8 @@ app.include_router(plans_router)
 app.include_router(filings_router)
 
 @app.get('/api/health')
-def health():
+def health(response: Response):
+    revision = os.getenv("RENDER_GIT_COMMIT", "")
+    if re.fullmatch(r"[0-9a-f]{40}", revision):
+        response.headers["X-US-Source-Revision"] = revision
     return {'status':'ok','product':'usmarket','market':'US','research_only':True}

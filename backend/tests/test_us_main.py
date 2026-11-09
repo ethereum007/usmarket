@@ -52,3 +52,9 @@ def test_private_cache_policy_preserves_existing_vary_and_replaces_public_cache(
     response = TestClient(isolated).get('/api/us/test')
     assert response.headers['vary'] == 'Accept-Encoding, Authorization'
     assert response.headers['cache-control'] == 'private, no-store'
+
+def test_health_reports_only_a_valid_source_revision(monkeypatch):
+    client = TestClient(app)
+    for revision, expected in [('a' * 40, 'a' * 40), ('invalid', None)]:
+        monkeypatch.setenv('RENDER_GIT_COMMIT', revision)
+        assert client.get('/api/health').headers.get('x-us-source-revision') == expected
