@@ -37,6 +37,7 @@ app.include_router(filings_router)
 
 @app.get('/api/health')
 def health(response: Response):
+    response.headers["Cache-Control"] = "no-store"
     revision = os.getenv("RENDER_GIT_COMMIT", "")
     if re.fullmatch(r"[0-9a-f]{40}", revision):
         response.headers["X-US-Source-Revision"] = revision

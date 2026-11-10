@@ -61,3 +61,5 @@ The anonymous probe now also checks the browser's workspace access endpoint (/ap
 On 9 November 2026 the expanded headers-only probe at source 7cc1fbeddee3d68a3ea032f3e2120cd663c122e5 reported transport unavailable for health and workspace access at 02:31:53 UTC. Plans and packages passed. At 02:32:02 UTC a single retry passed all four checks, with health 200 and all private paths returning 401 with Bearer, private/no-store and Vary: Authorization. Cause and deployed revision remain unknown. The missed 25 October target and hosted acceptance gates remain open.
 
 The health endpoint can report a full lowercase Git SHA from Render in X-US-Source-Revision. The anonymous probe records a valid value or null. This is host-reported evidence and does not establish hosted acceptance.
+
+The health endpoint sends Cache-Control: no-store so caches do not retain its deployment revision response.

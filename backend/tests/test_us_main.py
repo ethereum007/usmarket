@@ -34,7 +34,7 @@ def test_private_cache_policy_covers_success_denial_and_missing_routes():
         assert response.headers['expires'] == '0'
         assert 'authorization' in response.headers['vary'].lower()
         assert 'owner-a' not in response.text
-    assert 'cache-control' not in client.get('/api/health').headers
+    assert 'vary' not in client.get('/api/health').headers
 
 
 def test_private_cache_policy_preserves_existing_vary_and_replaces_public_cache():
@@ -57,4 +57,6 @@ def test_health_reports_only_a_valid_source_revision(monkeypatch):
     client = TestClient(app)
     for revision, expected in [('a' * 40, 'a' * 40), ('invalid', None)]:
         monkeypatch.setenv('RENDER_GIT_COMMIT', revision)
-        assert client.get('/api/health').headers.get('x-us-source-revision') == expected
+        response = client.get('/api/health')
+        assert response.headers.get('x-us-source-revision') == expected
+        assert response.headers['cache-control'] == 'no-store'
