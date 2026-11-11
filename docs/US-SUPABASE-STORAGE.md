@@ -239,3 +239,5 @@ Refresh polling now uses the same observation validator as history and interrupt
 ## Local backup kind verification
 
 The SQLite backup CLI now checks that the copied database contains the selected plans/jobs table and required columns, as well as passing integrity_check, before reporting success. Empty, unrelated, view-only or incomplete schemas fail with sanitized feedback and remove only the newly created copy. Synthetic CLI tests verify both kinds, preserve source bytes and leave no misleading output. This is structural validation of a selected local backup, not record-level restore acceptance or a hosted Supabase backup. Remote modes remain rejected by this local tool; no runtime data or flags changed.
+
+The disposable PostgreSQL restore check also compares the active-owner admission index definition with the source and requires a valid unique index. This checks that a restored schema retains the one-active-refresh-per-owner constraint. Hosted restore acceptance remains open following the missed 25 October private MVP target. Refs #4.

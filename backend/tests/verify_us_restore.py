@@ -27,6 +27,14 @@ def verify(source_dsn, restored_dsn):
         assert records(source)==records(restored), 'Restored records differ'
         original=definitions(source)
         assert len(original)==len(FUNCTIONS) and original==definitions(restored), 'Restored RPC definitions differ'
+        index_query = (
+            "select pg_get_indexdef(indexrelid), indisvalid, indisunique "
+            "from pg_index where indexrelid = "
+            "'public.us_refresh_jobs_one_active_owner'::regclass"
+        )
+        original_index = source.execute(index_query).fetchone()
+        assert original_index and original_index[1:] == (True, True), 'Source admission index is invalid'
+        assert restored.execute(index_query).fetchone() == original_index, 'Restored admission index differs'
         for table in TABLES:
             assert restored.execute("select relrowsecurity from pg_class where oid=%s::regclass",('public.'+table,)).fetchone()==(True,)
         # Read the same owner through restored RPCs, using a real saved fixture identity.
@@ -58,4 +66,4 @@ if __name__=='__main__':
         verify(os.environ['US_TEST_POSTGRES_DSN'],os.environ['US_TEST_POSTGRES_RESTORE_DSN'])
     except Exception:
         raise SystemExit('Disposable PostgreSQL restore verification failed; no stored content printed') from None
-    print('Disposable PostgreSQL restore verified: exact records, RPCs, owner reads, RLS and access restrictions')
+    print('Disposable PostgreSQL restore verified: exact records, RPCs, owner reads, admission index, RLS and access restrictions')
