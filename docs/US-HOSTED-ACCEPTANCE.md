@@ -65,3 +65,5 @@ The health endpoint can report a full lowercase Git SHA from Render in X-US-Sour
 The health endpoint sends Cache-Control: no-store so caches do not retain its deployment revision response.
 
 The anonymous probe requires HTTP 200 and Cache-Control no-store on health. A missing directive fails the check, including on older deployments.
+
+On 11 November 2026 at 05:02:32 UTC, Render health returned transport unavailable while all three private routes passed. At 05:02:39 UTC the retry passed all four checks. Health returned HTTP 200 with no-store and reported source revision 18b40aee74af2201e244cb9583fbace3b5e63c79. Each private route returned 401 with a Bearer challenge and the expected cache headers. The initial timeout cause is unknown. Hosted sign-in, account isolation, restart persistence and backup restoration still await acceptance following the missed 25 October target.
