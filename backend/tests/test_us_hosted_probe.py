@@ -5,7 +5,7 @@ import pytest
 from app.services import us_hosted_probe as probe
 
 
-@pytest.mark.parametrize('change',[None,'access_open','status','cache','vary','challenge','redirect','transport'])
+@pytest.mark.parametrize('change',[None,'health_cache','access_open','status','cache','vary','challenge','redirect','transport'])
 def test_hosted_probe_checks_boundary_without_sending_credentials_or_reading_bodies(change):
     requests=[];read=[]
     class PrivateBody(httpx.AsyncByteStream):
@@ -19,6 +19,8 @@ def test_hosted_probe_checks_boundary_without_sending_credentials_or_reading_bod
         status=200 if request.url.path=='/api/health' else 401
         headers={'cache-control':'private, no-store','vary':'Accept-Encoding, Authorization','www-authenticate':'Bearer'}
         if request.url.path=='/api/health':
+            if change == 'health_cache':
+                headers.pop('cache-control')
             headers['set-cookie'] = 'session=synthetic; Path=/; Secure'
         if request.url.path == '/api/us/research/access' and change == 'access_open':
             status = 200

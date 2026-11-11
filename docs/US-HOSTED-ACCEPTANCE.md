@@ -63,3 +63,5 @@ On 9 November 2026 the expanded headers-only probe at source 7cc1fbeddee3d68a3ea
 The health endpoint can report a full lowercase Git SHA from Render in X-US-Source-Revision. The anonymous probe records a valid value or null. This is host-reported evidence and does not establish hosted acceptance.
 
 The health endpoint sends Cache-Control: no-store so caches do not retain its deployment revision response.
+
+The anonymous probe requires HTTP 200 and Cache-Control no-store on health. A missing directive fails the check, including on older deployments.

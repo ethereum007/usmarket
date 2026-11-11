@@ -24,12 +24,13 @@ async def report(client=None):
                 response = await client.send(request, stream=True, auth=None, follow_redirects=False)
                 async with aclosing(response):
                     row = {'path': path, 'status': response.status_code}
+                    cache = {part.strip().lower() for part in response.headers.get('cache-control', '').split(',')}
                     if path == '/api/health':
-                        row['passed'] = response.status_code == 200
+                        row['no_store'] = 'no-store' in cache
+                        row['passed'] = response.status_code == 200 and row['no_store']
                         revision = response.headers.get('x-us-source-revision', '')
                         row['source_revision'] = revision if re.fullmatch(r'[0-9a-f]{40}', revision) else None
                     else:
-                        cache = {part.strip().lower() for part in response.headers.get('cache-control', '').split(',')}
                         vary = {part.strip().lower() for part in response.headers.get('vary', '').split(',')}
                         row.update(private_no_store={'private', 'no-store'} <= cache,
                                    vary_authorization='authorization' in vary,
