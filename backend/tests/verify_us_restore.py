@@ -37,13 +37,20 @@ def verify(source_dsn, restored_dsn):
         assert restored.execute(index_query).fetchone() == original_index, 'Restored admission index differs'
         for table in TABLES:
             assert restored.execute("select relrowsecurity from pg_class where oid=%s::regclass",('public.'+table,)).fetchone()==(True,)
-        # Read the same owner through restored RPCs, using a real saved fixture identity.
-        owner=source.execute('select id::text from auth.users order by id limit 1').fetchone()[0]
-        for connection in (source,restored):
-            connection.execute("select set_config('request.jwt.claim.sub',%s,true)",(owner,))
+        owners_query = 'select id::text from auth.users order by id'
+        owners = source.execute(owners_query).fetchall()
+        assert len(owners) >= 2, 'Missing synthetic account fixtures'
+        assert restored.execute(owners_query).fetchall() == owners, 'Restored account fixtures differ'
+        for connection in (source, restored):
             connection.execute('set local role authenticated')
-        for function in ('us_plan_store','us_research_store','us_job_store'):
-            assert source.execute('select public.'+function+"('list')").fetchone()==restored.execute('select public.'+function+"('list')").fetchone(), 'Restored owner RPC differs'
+        for (owner,) in owners:
+            for connection in (source, restored):
+                connection.execute("select set_config('request.jwt.claim.sub', %s, true)", (owner,))
+            for function in ('us_plan_store', 'us_research_store', 'us_job_store'):
+                query = 'select public.' + function + "('list')"
+                assert source.execute(query).fetchone() == restored.execute(query).fetchone(), (
+                    'Restored owner RPC differs'
+                )
     for role in ('anon','authenticated'):
         for table in TABLES:
             with psycopg.connect(restored_dsn) as connection:
