@@ -26,6 +26,7 @@ with roles as (
  union all
  select 'index','us_refresh_jobs_one_active_owner',i.indexrelid is not null,
    coalesce(i.indisunique and i.indisvalid and i.indpred is not null
+    and i.indnkeyatts=1 and pg_get_indexdef(i.indexrelid,1,true)='owner'
     and i.indrelid=to_regclass('public.us_refresh_jobs'),false)
  from roles r left join pg_index i on i.indexrelid=to_regclass('public.us_refresh_jobs_one_active_owner')
 )

@@ -563,3 +563,16 @@ def test_operator_inspection_reports_missing_objects_instead_of_failing(pg):
     missing=[row for row in rows if row[1].startswith('missing_')]
     assert len(missing)==2
     assert all(present is False and secure is False for _,_,present,secure in missing)
+
+
+def test_operator_inspection_rejects_wrong_admission_index_key(pg):
+    with pg.connect(DSN) as connection:
+        connection.execute('drop index public.us_refresh_jobs_one_active_owner')
+        connection.execute(
+            "create unique index us_refresh_jobs_one_active_owner "
+            "on public.us_refresh_jobs(id) where payload->>'state' in ('queued','running')"
+        )
+        assert ('index', 'us_refresh_jobs_one_active_owner', True, False) in (
+            connection.execute(inspection_sql()).fetchall()
+        )
+        connection.rollback()
