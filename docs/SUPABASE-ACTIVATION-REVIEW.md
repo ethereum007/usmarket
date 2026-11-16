@@ -59,3 +59,5 @@ The read-only inspection also verifies that each storage RPC is a volatile funct
 The read-only inspection checks the reviewed RPC argument names and default argument counts used for PostgREST request matching. Disposable regressions detect drift in either field. The inspection also verifies that each optional argument defaults to NULL of the declared type. A disposable regression changes the requested plan revision default from NULL to 1 while preserving the signature and default count. Refs #4.
 
 The reviewed empty search path is the sole function-level setting accepted by the read-only inspection. A disposable regression adds a row_security override and verifies the affected RPC fails inspection. Refs #4.
+
+The storage table checks require both client roles to exist and have neither SUPERUSER nor BYPASSRLS. Tests apply each attribute transactionally to the disposable authenticated role and verify all three table checks fail. Refs #4.

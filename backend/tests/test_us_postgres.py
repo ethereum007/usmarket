@@ -686,3 +686,15 @@ def test_operator_inspection_reports_extra_rpc_configuration(pg):
         assert ('function', 'us_job_interrupt(uuid)', True, False) in rows
         assert sum(not secure for _, _, _, secure in rows) == 1
         connection.rollback()
+
+
+
+@pytest.mark.parametrize("attribute", ["bypassrls", "superuser"])
+def test_operator_inspection_reports_client_role_rls_bypass(pg, attribute):
+    with pg.connect(DSN) as connection:
+        connection.execute(f'alter role authenticated {attribute}')
+        rows = connection.execute(inspection_sql()).fetchall()
+        tables = [row for row in rows if row[0] == 'table']
+        assert len(tables) == 3
+        assert all(present and not secure for _, _, present, secure in tables)
+        connection.rollback()

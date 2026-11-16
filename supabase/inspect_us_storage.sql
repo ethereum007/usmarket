@@ -2,7 +2,9 @@
 -- A passing result does not prove function-body identity or hosted acceptance.
 with roles as (
  select (select oid from pg_roles where rolname='anon') as anon,
-        (select oid from pg_roles where rolname='authenticated') as authenticated
+        (select oid from pg_roles where rolname='authenticated') as authenticated,
+        (select count(*)=2 and bool_and(not rolsuper and not rolbypassrls)
+         from pg_roles where rolname in ('anon','authenticated')) as client_roles_enforce_rls
 ), expected_tables(name) as (
  values ('us_plan_revisions'),('us_research_packages'),('us_refresh_jobs')
 ), expected_functions(signature, argument_names, optional_count) as (
@@ -14,7 +16,7 @@ with roles as (
         ('us_job_interrupt(uuid)',array['job_id'],0)
 ), checks as (
  select 'table' as object_kind, e.name as object_name, c.oid is not null as present,
-   coalesce(c.relkind='r' and c.relrowsecurity
+   coalesce(c.relkind='r' and c.relrowsecurity and r.client_roles_enforce_rls
     and not has_table_privilege(r.anon,c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
     and not has_table_privilege(r.authenticated,c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
     and not has_any_column_privilege(r.anon,c.oid,'SELECT,INSERT,UPDATE,REFERENCES')
