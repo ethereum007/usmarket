@@ -1,5 +1,7 @@
 """Compare disposable PostgreSQL backup/restore without printing stored content."""
 import os
+from pathlib import Path
+
 import psycopg
 
 TABLES = ('us_plan_revisions','us_research_packages','us_refresh_jobs')
@@ -24,6 +26,14 @@ def verify(source_dsn, restored_dsn):
     with psycopg.connect(source_dsn) as source, psycopg.connect(restored_dsn) as restored:
         assert source.info.dbname=='usmarket_contract_test'
         assert restored.info.dbname=='usmarket_contract_restore_test'
+        inspection = (Path(__file__).resolve().parents[2] / 'supabase' / 'inspect_us_storage.sql').read_text(
+            encoding='utf-8'
+        )
+        for connection in (source, restored):
+            checks = connection.execute(inspection).fetchall()
+            assert len(checks) == 9 and all(present and secure for _, _, present, secure in checks), (
+                'Storage structural inspection failed'
+            )
         assert records(source)==records(restored), 'Restored records differ'
         original=definitions(source)
         assert len(original)==len(FUNCTIONS) and original==definitions(restored), 'Restored RPC definitions differ'
@@ -73,4 +83,4 @@ if __name__=='__main__':
         verify(os.environ['US_TEST_POSTGRES_DSN'],os.environ['US_TEST_POSTGRES_RESTORE_DSN'])
     except Exception:
         raise SystemExit('Disposable PostgreSQL restore verification failed; no stored content printed') from None
-    print('Disposable PostgreSQL restore verified: exact records, RPCs, owner reads, admission index, RLS and access restrictions')
+    print('Disposable PostgreSQL restore verified: nine structural checks, exact records, RPCs, owner reads, admission index, RLS and access restrictions')

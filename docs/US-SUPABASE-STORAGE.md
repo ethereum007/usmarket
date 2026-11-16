@@ -243,3 +243,5 @@ The SQLite backup CLI now checks that the copied database contains the selected 
 The disposable PostgreSQL restore check also compares the active-owner admission index definition with the source and requires a valid unique index. This checks that a restored schema retains the one-active-refresh-per-owner constraint. Hosted restore acceptance remains open following the missed 25 October private MVP target. Refs #4.
 
 The disposable restore verifier compares the synthetic account identities and checks plan, research and job lists for every fixture account under the authenticated database role. Hosted acceptance remains open in issue #4.
+
+The disposable backup rehearsal now requires all nine checks in the read-only storage inspection to pass on both the source and the restored database. This ties restore verification to the reviewed storage contract, including the queued/running admission predicate, even when the two database definitions match. Hosted backup and restore acceptance remains open in issue #4.
