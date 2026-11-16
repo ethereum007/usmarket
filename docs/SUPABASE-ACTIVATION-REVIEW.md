@@ -63,3 +63,5 @@ The reviewed empty search path is the sole function-level setting accepted by th
 The storage table checks require both client roles to exist and have neither SUPERUSER nor BYPASSRLS. Tests apply each attribute transactionally to the disposable authenticated role and verify all three table checks fail. Refs #4.
 
 The inspection requires permanent, logged storage tables. A disposable regression converts the research table to UNLOGGED within a transaction and verifies that it fails inspection. This verifies table configuration for crash durability. Hosted backup and restore acceptance remains open in issue #4.
+
+The inspection verifies immediate composite primary keys for plan revisions, research packages and refresh jobs. A disposable regression drops the plan revision key and checks that inspection flags that table. Refs #4.

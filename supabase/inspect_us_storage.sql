@@ -5,8 +5,10 @@ with roles as (
         (select oid from pg_roles where rolname='authenticated') as authenticated,
         (select count(*)=2 and bool_and(not rolsuper and not rolbypassrls)
          from pg_roles where rolname in ('anon','authenticated')) as client_roles_enforce_rls
-), expected_tables(name) as (
- values ('us_plan_revisions'),('us_research_packages'),('us_refresh_jobs')
+), expected_tables(name, primary_key) as (
+ values ('us_plan_revisions','PRIMARY KEY (id, revision)'),
+        ('us_research_packages','PRIMARY KEY (owner, id)'),
+        ('us_refresh_jobs','PRIMARY KEY (owner, id)')
 ), expected_functions(signature, argument_names, optional_count) as (
  values ('us_plan_store(text,uuid,integer,integer,jsonb)',
          array['action','plan_id','wanted_revision','expected_revision','plan_payload'],4),
@@ -17,6 +19,11 @@ with roles as (
 ), checks as (
  select 'table' as object_kind, e.name as object_name, c.oid is not null as present,
    coalesce(c.relkind='r' and c.relpersistence='p' and c.relrowsecurity and r.client_roles_enforce_rls
+    and exists (
+     select 1 from pg_constraint k
+     where k.conrelid=c.oid and k.contype='p' and not k.condeferrable
+      and pg_get_constraintdef(k.oid)=e.primary_key
+    )
     and not has_table_privilege(r.anon,c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
     and not has_table_privilege(r.authenticated,c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
     and not has_any_column_privilege(r.anon,c.oid,'SELECT,INSERT,UPDATE,REFERENCES')
