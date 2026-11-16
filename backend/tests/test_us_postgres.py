@@ -590,3 +590,17 @@ def test_operator_inspection_rejects_wrong_admission_index_predicate(pg):
             connection.execute(inspection_sql()).fetchall()
         )
         connection.rollback()
+
+
+
+@pytest.mark.parametrize("flag", ["indisready", "indislive"])
+def test_operator_inspection_requires_maintained_admission_index(pg, flag):
+    with pg.connect(DSN) as connection:
+        connection.execute(
+            f"update pg_catalog.pg_index set {flag} = false "
+            "where indexrelid = 'public.us_refresh_jobs_one_active_owner'::regclass"
+        )
+        assert ('index', 'us_refresh_jobs_one_active_owner', True, False) in (
+            connection.execute(inspection_sql()).fetchall()
+        )
+        connection.rollback()

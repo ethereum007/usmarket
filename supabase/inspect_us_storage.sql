@@ -25,7 +25,7 @@ with roles as (
  left join pg_proc p on p.oid=to_regprocedure('public.'||e.signature)
  union all
  select 'index','us_refresh_jobs_one_active_owner',i.indexrelid is not null,
-   coalesce(i.indisunique and i.indisvalid
+   coalesce(i.indisunique and i.indisvalid and i.indisready and i.indislive
     and pg_get_expr(i.indpred,i.indrelid) =
      $$((payload ->> 'state'::text) = ANY (ARRAY['queued'::text, 'running'::text]))$$
     and i.indnkeyatts=1 and pg_get_indexdef(i.indexrelid,1,true)='owner'
