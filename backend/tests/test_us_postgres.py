@@ -604,3 +604,14 @@ def test_operator_inspection_requires_maintained_admission_index(pg, flag):
             connection.execute(inspection_sql()).fetchall()
         )
         connection.rollback()
+
+
+
+@pytest.mark.parametrize("role", ["anon", "authenticated", "public"])
+def test_operator_inspection_reports_column_grant_drift(pg, role):
+    with pg.connect(DSN) as connection:
+        connection.execute(f'grant select (payload) on public.us_refresh_jobs to {role}')
+        rows = connection.execute(inspection_sql()).fetchall()
+        assert ('table', 'us_refresh_jobs', True, False) in rows
+        assert sum(not secure for _, _, _, secure in rows) == 1
+        connection.rollback()

@@ -13,7 +13,9 @@ with roles as (
  select 'table' as object_kind, e.name as object_name, c.oid is not null as present,
    coalesce(c.relkind='r' and c.relrowsecurity
     and not has_table_privilege(r.anon,c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
-    and not has_table_privilege(r.authenticated,c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER'),false) as security_contract
+    and not has_table_privilege(r.authenticated,c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+    and not has_any_column_privilege(r.anon,c.oid,'SELECT,INSERT,UPDATE,REFERENCES')
+    and not has_any_column_privilege(r.authenticated,c.oid,'SELECT,INSERT,UPDATE,REFERENCES'),false) as security_contract
  from expected_tables e cross join roles r
  left join pg_class c on c.oid=to_regclass('public.'||e.name)
  union all
