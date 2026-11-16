@@ -736,3 +736,15 @@ def test_operator_inspection_reports_unvalidated_owner_reference(pg):
         assert ('table', 'us_research_packages', True, False) in rows
         assert sum(not secure for _, _, _, secure in rows) == 1
         connection.rollback()
+
+
+
+def test_operator_inspection_reports_plan_policy_drift(pg):
+    with pg.connect(DSN) as connection:
+        connection.execute(
+            'alter policy us_plan_owner_read on public.us_plan_revisions using (true)'
+        )
+        rows = connection.execute(inspection_sql()).fetchall()
+        assert ('table', 'us_plan_revisions', True, False) in rows
+        assert sum(not secure for _, _, _, secure in rows) == 1
+        connection.rollback()

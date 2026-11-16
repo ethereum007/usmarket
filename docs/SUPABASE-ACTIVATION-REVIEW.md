@@ -67,3 +67,5 @@ The inspection requires permanent, logged storage tables. A disposable regressio
 The inspection verifies immediate composite primary keys for plan revisions, research packages and refresh jobs. A disposable regression drops the plan revision key and checks that inspection flags that table. Refs #4.
 
 The inspection verifies each non-null owner column has the reviewed validated, immediate foreign key to auth.users(id), with NO ACTION on update and delete. A disposable regression replaces the research owner constraint with an unvalidated one and checks that the table fails inspection. Refs #4.
+
+The inspection verifies the two reviewed authenticated owner policies on plan revisions and expects zero policies on the research and refresh tables. A disposable regression replaces the plan read predicate with TRUE. The policy comparison uses the reviewed deparsed expressions. Refs #4.

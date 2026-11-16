@@ -34,6 +34,20 @@ with roles as (
       and fk.conkey=array[owner_column.attnum] and fk.confkey=array[user_id.attnum]
       and owner_column.attnotnull
     )
+    and (
+     select count(*) = case when e.name='us_plan_revisions' then 2 else 0 end
+      and coalesce(bool_and(
+       pol.polpermissive and pol.polroles=array[r.authenticated]
+       and (
+        (pol.polname='us_plan_owner_read' and pol.polcmd='r'
+         and pg_get_expr(pol.polqual,c.oid)='(owner = auth.uid())' and pol.polwithcheck is null)
+        or
+        (pol.polname='us_plan_owner_insert' and pol.polcmd='a'
+         and pol.polqual is null and pg_get_expr(pol.polwithcheck,c.oid)='(owner = auth.uid())')
+       ) is true
+      ),true)
+     from pg_policy pol where pol.polrelid=c.oid
+    )
     and not has_table_privilege(r.anon,c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
     and not has_table_privilege(r.authenticated,c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
     and not has_any_column_privilege(r.anon,c.oid,'SELECT,INSERT,UPDATE,REFERENCES')
