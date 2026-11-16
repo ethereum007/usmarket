@@ -641,3 +641,20 @@ def test_operator_inspection_reports_rpc_execution_setting_drift(pg, setting):
         assert ('function', 'us_plan_store(text,uuid,integer,integer,jsonb)', True, False) in rows
         assert sum(not secure for _, _, _, secure in rows) == 1
         connection.rollback()
+
+
+
+@pytest.mark.parametrize("change", [
+    "proargnames = array['renamed_job_id']",
+    "pronargdefaults = 1",
+])
+def test_operator_inspection_reports_named_rpc_argument_drift(pg, change):
+    with pg.connect(DSN) as connection:
+        connection.execute(
+            f"update pg_catalog.pg_proc set {change} "
+            "where oid = 'public.us_job_interrupt(uuid)'::regprocedure"
+        )
+        rows = connection.execute(inspection_sql()).fetchall()
+        assert ('function', 'us_job_interrupt(uuid)', True, False) in rows
+        assert sum(not secure for _, _, _, secure in rows) == 1
+        connection.rollback()

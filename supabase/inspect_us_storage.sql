@@ -5,10 +5,13 @@ with roles as (
         (select oid from pg_roles where rolname='authenticated') as authenticated
 ), expected_tables(name) as (
  values ('us_plan_revisions'),('us_research_packages'),('us_refresh_jobs')
-), expected_functions(signature) as (
- values ('us_plan_store(text,uuid,integer,integer,jsonb)'),
-        ('us_research_store(text,text,jsonb)'),('us_job_store(text,uuid,jsonb)'),
-        ('us_job_publish(uuid,jsonb)'),('us_job_interrupt(uuid)')
+), expected_functions(signature, argument_names, optional_count) as (
+ values ('us_plan_store(text,uuid,integer,integer,jsonb)',
+         array['action','plan_id','wanted_revision','expected_revision','plan_payload'],4),
+        ('us_research_store(text,text,jsonb)',array['action','package_id','package_payload'],2),
+        ('us_job_store(text,uuid,jsonb)',array['action','job_id','job_payload'],2),
+        ('us_job_publish(uuid,jsonb)',array['job_id','package_payload'],0),
+        ('us_job_interrupt(uuid)',array['job_id'],0)
 ), checks as (
  select 'table' as object_kind, e.name as object_name, c.oid is not null as present,
    coalesce(c.relkind='r' and c.relrowsecurity
@@ -22,6 +25,7 @@ with roles as (
  select 'function',e.signature,p.oid is not null,
    coalesce(p.prokind='f' and p.provolatile='v' and not p.proisstrict
     and p.prorettype='jsonb'::regtype and not p.proretset
+    and p.proargnames=e.argument_names and p.pronargdefaults=e.optional_count
     and p.prosecdef and p.proconfig @> array['search_path=""']::text[]
     and not has_function_privilege(r.anon,p.oid,'EXECUTE')
     and has_function_privilege(r.authenticated,p.oid,'EXECUTE')
