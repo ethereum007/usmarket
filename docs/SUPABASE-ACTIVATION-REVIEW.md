@@ -53,3 +53,5 @@ Post-application supabase/inspect_us_storage.sql returned present=true and secur
 The read-only inspection now requires the active refresh index to have owner as its sole key. A disposable PostgreSQL test replaces it within a transaction with a unique partial index keyed by job ID and checks that inspection reports it as present but invalid. The migration bundle and hosted acceptance record are unaffected. Refs #4.
 
 The read-only inspection compares PostgreSQL's deparsed admission-index predicate against the reviewed queued/running expression. A disposable PostgreSQL regression replaces it with a running-only predicate and expects the index to be present with a failed security contract. The comparison checks the reviewed expression's structure and may flag equivalent rewrites for review. The 29 October results reflect the inspection version used that day. Refs #4.
+
+The read-only inspection also verifies that each storage RPC is a volatile function, accepts null arguments, and returns one JSONB value. These settings preserve the reviewed write and optional-argument behavior. Disposable PostgreSQL regressions detect STABLE and STRICT drift. Refs #4.

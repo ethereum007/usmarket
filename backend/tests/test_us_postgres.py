@@ -628,3 +628,16 @@ def test_operator_inspection_reports_delegable_rpc_grant(pg):
         assert ('function', 'us_job_interrupt(uuid)', True, False) in rows
         assert sum(not secure for _, _, _, secure in rows) == 1
         connection.rollback()
+
+
+
+@pytest.mark.parametrize("setting", ["stable", "strict"])
+def test_operator_inspection_reports_rpc_execution_setting_drift(pg, setting):
+    with pg.connect(DSN) as connection:
+        connection.execute(
+            f'alter function public.us_plan_store(text,uuid,integer,integer,jsonb) {setting}'
+        )
+        rows = connection.execute(inspection_sql()).fetchall()
+        assert ('function', 'us_plan_store(text,uuid,integer,integer,jsonb)', True, False) in rows
+        assert sum(not secure for _, _, _, secure in rows) == 1
+        connection.rollback()

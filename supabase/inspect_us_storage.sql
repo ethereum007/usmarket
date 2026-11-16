@@ -20,7 +20,9 @@ with roles as (
  left join pg_class c on c.oid=to_regclass('public.'||e.name)
  union all
  select 'function',e.signature,p.oid is not null,
-   coalesce(p.prosecdef and p.proconfig @> array['search_path=""']::text[]
+   coalesce(p.prokind='f' and p.provolatile='v' and not p.proisstrict
+    and p.prorettype='jsonb'::regtype and not p.proretset
+    and p.prosecdef and p.proconfig @> array['search_path=""']::text[]
     and not has_function_privilege(r.anon,p.oid,'EXECUTE')
     and has_function_privilege(r.authenticated,p.oid,'EXECUTE')
     and not has_function_privilege(r.authenticated,p.oid,'EXECUTE WITH GRANT OPTION'),false)
