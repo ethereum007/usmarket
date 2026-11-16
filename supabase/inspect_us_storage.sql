@@ -26,6 +26,12 @@ with roles as (
    coalesce(p.prokind='f' and p.provolatile='v' and not p.proisstrict
     and p.prorettype='jsonb'::regtype and not p.proretset
     and p.proargnames=e.argument_names and p.pronargdefaults=e.optional_count
+    and not exists (
+     select 1
+     from generate_series(p.pronargs-p.pronargdefaults+1,p.pronargs) args(position)
+     where pg_get_function_arg_default(p.oid,args.position) is distinct from
+      'NULL::'||format_type(p.proargtypes[args.position-1],null)
+    )
     and p.prosecdef and p.proconfig @> array['search_path=""']::text[]
     and not has_function_privilege(r.anon,p.oid,'EXECUTE')
     and has_function_privilege(r.authenticated,p.oid,'EXECUTE')

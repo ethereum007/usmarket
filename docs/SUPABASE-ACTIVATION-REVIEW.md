@@ -56,4 +56,4 @@ The read-only inspection compares PostgreSQL's deparsed admission-index predicat
 
 The read-only inspection also verifies that each storage RPC is a volatile function, accepts null arguments, and returns one JSONB value. These settings preserve the reviewed write and optional-argument behavior. Disposable PostgreSQL regressions detect STABLE and STRICT drift. Refs #4.
 
-The read-only inspection checks the reviewed RPC argument names and default argument counts used for PostgREST request matching. Disposable regressions detect drift in either field. The check covers default counts, with default expressions covered separately by the disposable restore definition comparison. Refs #4.
+The read-only inspection checks the reviewed RPC argument names and default argument counts used for PostgREST request matching. Disposable regressions detect drift in either field. The inspection also verifies that each optional argument defaults to NULL of the declared type. A disposable regression changes the requested plan revision default from NULL to 1 while preserving the signature and default count. Refs #4.

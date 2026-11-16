@@ -658,3 +658,19 @@ def test_operator_inspection_reports_named_rpc_argument_drift(pg, change):
         assert ('function', 'us_job_interrupt(uuid)', True, False) in rows
         assert sum(not secure for _, _, _, secure in rows) == 1
         connection.rollback()
+
+
+
+def test_operator_inspection_reports_rpc_default_value_drift(pg):
+    with pg.connect(DSN) as connection:
+        definition = connection.execute(
+            "select pg_get_functiondef('public.us_plan_store(text,uuid,integer,integer,jsonb)'::regprocedure)"
+        ).fetchone()[0]
+        changed = definition.replace('wanted_revision integer DEFAULT NULL::integer',
+                                     'wanted_revision integer DEFAULT 1', 1)
+        assert changed != definition
+        connection.execute(changed)
+        rows = connection.execute(inspection_sql()).fetchall()
+        assert ('function', 'us_plan_store(text,uuid,integer,integer,jsonb)', True, False) in rows
+        assert sum(not secure for _, _, _, secure in rows) == 1
+        connection.rollback()
