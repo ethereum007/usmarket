@@ -576,3 +576,17 @@ def test_operator_inspection_rejects_wrong_admission_index_key(pg):
             connection.execute(inspection_sql()).fetchall()
         )
         connection.rollback()
+
+
+
+def test_operator_inspection_rejects_wrong_admission_index_predicate(pg):
+    with pg.connect(DSN) as connection:
+        connection.execute('drop index public.us_refresh_jobs_one_active_owner')
+        connection.execute(
+            "create unique index us_refresh_jobs_one_active_owner "
+            "on public.us_refresh_jobs(owner) where payload->>'state' = 'running'"
+        )
+        assert ('index', 'us_refresh_jobs_one_active_owner', True, False) in (
+            connection.execute(inspection_sql()).fetchall()
+        )
+        connection.rollback()
