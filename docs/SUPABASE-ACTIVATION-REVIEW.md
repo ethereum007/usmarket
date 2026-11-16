@@ -61,3 +61,5 @@ The read-only inspection checks the reviewed RPC argument names and default argu
 The reviewed empty search path is the sole function-level setting accepted by the read-only inspection. A disposable regression adds a row_security override and verifies the affected RPC fails inspection. Refs #4.
 
 The storage table checks require both client roles to exist and have neither SUPERUSER nor BYPASSRLS. Tests apply each attribute transactionally to the disposable authenticated role and verify all three table checks fail. Refs #4.
+
+The inspection requires permanent, logged storage tables. A disposable regression converts the research table to UNLOGGED within a transaction and verifies that it fails inspection. This verifies table configuration for crash durability. Hosted backup and restore acceptance remains open in issue #4.

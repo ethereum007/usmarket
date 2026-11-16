@@ -698,3 +698,13 @@ def test_operator_inspection_reports_client_role_rls_bypass(pg, attribute):
         assert len(tables) == 3
         assert all(present and not secure for _, _, present, secure in tables)
         connection.rollback()
+
+
+
+def test_operator_inspection_requires_logged_storage_table(pg):
+    with pg.connect(DSN) as connection:
+        connection.execute('alter table public.us_research_packages set unlogged')
+        rows = connection.execute(inspection_sql()).fetchall()
+        assert ('table', 'us_research_packages', True, False) in rows
+        assert sum(not secure for _, _, _, secure in rows) == 1
+        connection.rollback()

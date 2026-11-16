@@ -16,7 +16,7 @@ with roles as (
         ('us_job_interrupt(uuid)',array['job_id'],0)
 ), checks as (
  select 'table' as object_kind, e.name as object_name, c.oid is not null as present,
-   coalesce(c.relkind='r' and c.relrowsecurity and r.client_roles_enforce_rls
+   coalesce(c.relkind='r' and c.relpersistence='p' and c.relrowsecurity and r.client_roles_enforce_rls
     and not has_table_privilege(r.anon,c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
     and not has_table_privilege(r.authenticated,c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
     and not has_any_column_privilege(r.anon,c.oid,'SELECT,INSERT,UPDATE,REFERENCES')
