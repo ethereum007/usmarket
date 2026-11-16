@@ -65,3 +65,5 @@ The storage table checks require both client roles to exist and have neither SUP
 The inspection requires permanent, logged storage tables. A disposable regression converts the research table to UNLOGGED within a transaction and verifies that it fails inspection. This verifies table configuration for crash durability. Hosted backup and restore acceptance remains open in issue #4.
 
 The inspection verifies immediate composite primary keys for plan revisions, research packages and refresh jobs. A disposable regression drops the plan revision key and checks that inspection flags that table. Refs #4.
+
+The inspection verifies each non-null owner column has the reviewed validated, immediate foreign key to auth.users(id), with NO ACTION on update and delete. A disposable regression replaces the research owner constraint with an unvalidated one and checks that the table fails inspection. Refs #4.

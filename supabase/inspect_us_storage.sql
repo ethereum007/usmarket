@@ -24,6 +24,16 @@ with roles as (
      where k.conrelid=c.oid and k.contype='p' and not k.condeferrable
       and pg_get_constraintdef(k.oid)=e.primary_key
     )
+    and exists (
+     select 1 from pg_constraint fk
+     join pg_attribute owner_column on owner_column.attrelid=c.oid and owner_column.attname='owner'
+     join pg_attribute user_id on user_id.attrelid=fk.confrelid and user_id.attname='id'
+     where fk.conrelid=c.oid and fk.contype='f' and fk.convalidated
+      and not fk.condeferrable and fk.confdeltype='a' and fk.confupdtype='a'
+      and fk.confrelid=to_regclass('auth.users')
+      and fk.conkey=array[owner_column.attnum] and fk.confkey=array[user_id.attnum]
+      and owner_column.attnotnull
+    )
     and not has_table_privilege(r.anon,c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
     and not has_table_privilege(r.authenticated,c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
     and not has_any_column_privilege(r.anon,c.oid,'SELECT,INSERT,UPDATE,REFERENCES')
