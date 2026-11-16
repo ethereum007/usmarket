@@ -32,7 +32,7 @@ with roles as (
      where pg_get_function_arg_default(p.oid,args.position) is distinct from
       'NULL::'||format_type(p.proargtypes[args.position-1],null)
     )
-    and p.prosecdef and p.proconfig @> array['search_path=""']::text[]
+    and p.prosecdef and p.proconfig = array['search_path=""']::text[]
     and not has_function_privilege(r.anon,p.oid,'EXECUTE')
     and has_function_privilege(r.authenticated,p.oid,'EXECUTE')
     and not has_function_privilege(r.authenticated,p.oid,'EXECUTE WITH GRANT OPTION'),false)

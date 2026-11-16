@@ -674,3 +674,15 @@ def test_operator_inspection_reports_rpc_default_value_drift(pg):
         assert ('function', 'us_plan_store(text,uuid,integer,integer,jsonb)', True, False) in rows
         assert sum(not secure for _, _, _, secure in rows) == 1
         connection.rollback()
+
+
+
+def test_operator_inspection_reports_extra_rpc_configuration(pg):
+    with pg.connect(DSN) as connection:
+        connection.execute(
+            'alter function public.us_job_interrupt(uuid) set row_security = off'
+        )
+        rows = connection.execute(inspection_sql()).fetchall()
+        assert ('function', 'us_job_interrupt(uuid)', True, False) in rows
+        assert sum(not secure for _, _, _, secure in rows) == 1
+        connection.rollback()
