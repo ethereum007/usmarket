@@ -22,7 +22,8 @@ with roles as (
  select 'function',e.signature,p.oid is not null,
    coalesce(p.prosecdef and p.proconfig @> array['search_path=""']::text[]
     and not has_function_privilege(r.anon,p.oid,'EXECUTE')
-    and has_function_privilege(r.authenticated,p.oid,'EXECUTE'),false)
+    and has_function_privilege(r.authenticated,p.oid,'EXECUTE')
+    and not has_function_privilege(r.authenticated,p.oid,'EXECUTE WITH GRANT OPTION'),false)
  from expected_functions e cross join roles r
  left join pg_proc p on p.oid=to_regprocedure('public.'||e.signature)
  union all

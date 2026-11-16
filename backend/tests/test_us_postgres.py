@@ -615,3 +615,16 @@ def test_operator_inspection_reports_column_grant_drift(pg, role):
         assert ('table', 'us_refresh_jobs', True, False) in rows
         assert sum(not secure for _, _, _, secure in rows) == 1
         connection.rollback()
+
+
+
+def test_operator_inspection_reports_delegable_rpc_grant(pg):
+    with pg.connect(DSN) as connection:
+        connection.execute(
+            'grant execute on function public.us_job_interrupt(uuid) '
+            'to authenticated with grant option'
+        )
+        rows = connection.execute(inspection_sql()).fetchall()
+        assert ('function', 'us_job_interrupt(uuid)', True, False) in rows
+        assert sum(not secure for _, _, _, secure in rows) == 1
+        connection.rollback()
