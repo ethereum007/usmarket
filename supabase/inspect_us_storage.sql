@@ -89,6 +89,11 @@ with roles as (
  select 'function',e.signature,p.oid is not null,
    coalesce(p.prokind='f' and p.provolatile='v' and not p.proisstrict
     and p.prorettype='jsonb'::regtype and not p.proretset
+    and not exists (
+     select 1 from pg_proc overload
+     where overload.pronamespace=p.pronamespace and overload.proname=p.proname
+      and overload.oid<>p.oid
+    )
     and p.proargnames=e.argument_names and p.pronargdefaults=e.optional_count
     and not exists (
      select 1

@@ -81,3 +81,5 @@ The inspection checks that record IDs have the reviewed SQL types. Plan revision
 The inspection checks that plan ownership defaults to auth.uid() and that research and refresh ownership have no column default. Disposable regressions remove the plan default and add a research default. Refs #4.
 
 The inspection requires the reviewed non-null integer type for plan revisions, in agreement with the RPC argument types. A disposable regression widens the column to bigint while preserving its constraints. Refs #4.
+
+The inspection flags additional routines sharing any reviewed storage RPC name in the same schema. An overload can alter PostgREST routing or expose an unreviewed entry point while the reviewed signature remains present. A disposable regression creates a text overload of the UUID interruption RPC. Refs #4.
