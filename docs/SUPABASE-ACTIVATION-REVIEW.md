@@ -77,3 +77,5 @@ The read-only inspection requires a non-null JSONB payload column on all three s
 The inspection verifies that plan revisions and refresh jobs have the reviewed non-null zoned updated_at column with a now() default. Disposable PostgreSQL tests remove the default on each table and verify that inspection flags the affected table. Refs #4.
 
 The inspection checks that record IDs have the reviewed SQL types. Plan revisions and refresh jobs use UUID, and research packages use text. A disposable regression changes the research ID to varchar while retaining the composite key. Refs #4.
+
+The inspection checks that plan ownership defaults to auth.uid() and that research and refresh ownership have no column default. Disposable regressions remove the plan default and add a research default. Refs #4.

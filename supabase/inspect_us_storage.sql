@@ -27,12 +27,16 @@ with roles as (
     and exists (
      select 1 from pg_constraint fk
      join pg_attribute owner_column on owner_column.attrelid=c.oid and owner_column.attname='owner'
+     left join pg_attrdef owner_default
+      on owner_default.adrelid=c.oid and owner_default.adnum=owner_column.attnum
      join pg_attribute user_id on user_id.attrelid=fk.confrelid and user_id.attname='id'
      where fk.conrelid=c.oid and fk.contype='f' and fk.convalidated
       and not fk.condeferrable and fk.confdeltype='a' and fk.confupdtype='a'
       and fk.confrelid=to_regclass('auth.users')
       and fk.conkey=array[owner_column.attnum] and fk.confkey=array[user_id.attnum]
       and owner_column.attnotnull
+      and pg_get_expr(owner_default.adbin,c.oid) is not distinct from
+       case when e.name='us_plan_revisions' then 'auth.uid()' end
     )
     and (
      select count(*) = case when e.name='us_plan_revisions' then 2 else 0 end

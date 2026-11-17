@@ -796,3 +796,17 @@ def test_operator_inspection_reports_research_id_type_drift(pg):
         assert ('table', 'us_research_packages', True, False) in rows
         assert sum(not secure for _, _, _, secure in rows) == 1
         connection.rollback()
+
+
+
+@pytest.mark.parametrize(("table", "change"), [
+    ("us_plan_revisions", "drop default"),
+    ("us_research_packages", "set default auth.uid()"),
+])
+def test_operator_inspection_reports_storage_owner_default_drift(pg, table, change):
+    with pg.connect(DSN) as connection:
+        connection.execute(f'alter table public.{table} alter column owner {change}')
+        rows = connection.execute(inspection_sql()).fetchall()
+        assert ('table', table, True, False) in rows
+        assert sum(not secure for _, _, _, secure in rows) == 1
+        connection.rollback()
