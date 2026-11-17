@@ -54,7 +54,10 @@ with roles as (
     )
     and (e.name <> 'us_plan_revisions' or exists (
      select 1 from pg_constraint revision_check
-     where revision_check.conrelid=c.oid and revision_check.contype='c'
+     join pg_attribute revision_column on revision_column.attrelid=c.oid
+      and revision_column.attname='revision' and not revision_column.attisdropped
+     where revision_column.atttypid='integer'::regtype and revision_column.attnotnull
+      and revision_check.conrelid=c.oid and revision_check.contype='c'
       and revision_check.convalidated
       and pg_get_expr(revision_check.conbin,c.oid)='(revision > 0)'
     ))

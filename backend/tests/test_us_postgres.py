@@ -810,3 +810,15 @@ def test_operator_inspection_reports_storage_owner_default_drift(pg, table, chan
         assert ('table', table, True, False) in rows
         assert sum(not secure for _, _, _, secure in rows) == 1
         connection.rollback()
+
+
+
+def test_operator_inspection_reports_plan_revision_type_drift(pg):
+    with pg.connect(DSN) as connection:
+        connection.execute(
+            'alter table public.us_plan_revisions alter column revision type bigint'
+        )
+        rows = connection.execute(inspection_sql()).fetchall()
+        assert ('table', 'us_plan_revisions', True, False) in rows
+        assert sum(not secure for _, _, _, secure in rows) == 1
+        connection.rollback()
