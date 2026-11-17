@@ -773,3 +773,14 @@ def test_operator_inspection_rejects_nullable_research_payload(pg):
         assert ('table', 'us_research_packages', True, False) in rows
         assert sum(not secure for _, _, _, secure in rows) == 1
         connection.rollback()
+
+
+
+@pytest.mark.parametrize("table", ["us_plan_revisions", "us_refresh_jobs"])
+def test_operator_inspection_requires_server_timestamp_default(pg, table):
+    with pg.connect(DSN) as connection:
+        connection.execute(f'alter table public.{table} alter column updated_at drop default')
+        rows = connection.execute(inspection_sql()).fetchall()
+        assert ('table', table, True, False) in rows
+        assert sum(not secure for _, _, _, secure in rows) == 1
+        connection.rollback()

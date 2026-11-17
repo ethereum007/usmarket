@@ -60,6 +60,13 @@ with roles as (
       and payload_column.atttypid='jsonb'::regtype and payload_column.attnotnull
       and not payload_column.attisdropped
     )
+    and (e.name='us_research_packages' or exists (
+     select 1 from pg_attribute stamp
+     join pg_attrdef d on d.adrelid=stamp.attrelid and d.adnum=stamp.attnum
+     where stamp.attrelid=c.oid and stamp.attname='updated_at'
+      and stamp.atttypid='timestamptz'::regtype and stamp.attnotnull
+      and not stamp.attisdropped and pg_get_expr(d.adbin,d.adrelid)='now()'
+    ))
     and not has_table_privilege(r.anon,c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
     and not has_table_privilege(r.authenticated,c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
     and not has_any_column_privilege(r.anon,c.oid,'SELECT,INSERT,UPDATE,REFERENCES')
