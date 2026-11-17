@@ -54,6 +54,12 @@ with roles as (
       and revision_check.convalidated
       and pg_get_expr(revision_check.conbin,c.oid)='(revision > 0)'
     ))
+    and exists (
+     select 1 from pg_attribute payload_column
+     where payload_column.attrelid=c.oid and payload_column.attname='payload'
+      and payload_column.atttypid='jsonb'::regtype and payload_column.attnotnull
+      and not payload_column.attisdropped
+    )
     and not has_table_privilege(r.anon,c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
     and not has_table_privilege(r.authenticated,c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
     and not has_any_column_privilege(r.anon,c.oid,'SELECT,INSERT,UPDATE,REFERENCES')

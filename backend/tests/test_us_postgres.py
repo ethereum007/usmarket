@@ -761,3 +761,15 @@ def test_operator_inspection_requires_positive_plan_revision_constraint(pg):
         assert ('table', 'us_plan_revisions', True, False) in rows
         assert sum(not secure for _, _, _, secure in rows) == 1
         connection.rollback()
+
+
+
+def test_operator_inspection_rejects_nullable_research_payload(pg):
+    with pg.connect(DSN) as connection:
+        connection.execute(
+            'alter table public.us_research_packages alter column payload drop not null'
+        )
+        rows = connection.execute(inspection_sql()).fetchall()
+        assert ('table', 'us_research_packages', True, False) in rows
+        assert sum(not secure for _, _, _, secure in rows) == 1
+        connection.rollback()

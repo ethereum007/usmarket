@@ -71,3 +71,5 @@ The inspection verifies each non-null owner column has the reviewed validated, i
 The inspection verifies the two reviewed authenticated owner policies on plan revisions and expects zero policies on the research and refresh tables. A disposable regression replaces the plan read predicate with TRUE. The policy comparison uses the reviewed deparsed expressions. Refs #4.
 
 The inspection requires the reviewed validated CHECK constraint for positive plan revisions. A disposable regression changes the constraint to allow zero and verifies that the plan table fails inspection. Refs #4.
+
+The read-only inspection requires a non-null JSONB payload column on all three storage tables. A disposable PostgreSQL regression verifies that dropping NOT NULL on research payloads fails inspection. Refs #4.
