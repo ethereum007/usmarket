@@ -48,6 +48,12 @@ with roles as (
       ),true)
      from pg_policy pol where pol.polrelid=c.oid
     )
+    and (e.name <> 'us_plan_revisions' or exists (
+     select 1 from pg_constraint revision_check
+     where revision_check.conrelid=c.oid and revision_check.contype='c'
+      and revision_check.convalidated
+      and pg_get_expr(revision_check.conbin,c.oid)='(revision > 0)'
+    ))
     and not has_table_privilege(r.anon,c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
     and not has_table_privilege(r.authenticated,c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
     and not has_any_column_privilege(r.anon,c.oid,'SELECT,INSERT,UPDATE,REFERENCES')

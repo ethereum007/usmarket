@@ -69,3 +69,5 @@ The inspection verifies immediate composite primary keys for plan revisions, res
 The inspection verifies each non-null owner column has the reviewed validated, immediate foreign key to auth.users(id), with NO ACTION on update and delete. A disposable regression replaces the research owner constraint with an unvalidated one and checks that the table fails inspection. Refs #4.
 
 The inspection verifies the two reviewed authenticated owner policies on plan revisions and expects zero policies on the research and refresh tables. A disposable regression replaces the plan read predicate with TRUE. The policy comparison uses the reviewed deparsed expressions. Refs #4.
+
+The inspection requires the reviewed validated CHECK constraint for positive plan revisions. A disposable regression changes the constraint to allow zero and verifies that the plan table fails inspection. Refs #4.
