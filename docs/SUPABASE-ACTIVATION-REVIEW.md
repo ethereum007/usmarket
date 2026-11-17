@@ -75,3 +75,5 @@ The inspection requires the reviewed validated CHECK constraint for positive pla
 The read-only inspection requires a non-null JSONB payload column on all three storage tables. A disposable PostgreSQL regression verifies that dropping NOT NULL on research payloads fails inspection. Refs #4.
 
 The inspection verifies that plan revisions and refresh jobs have the reviewed non-null zoned updated_at column with a now() default. Disposable PostgreSQL tests remove the default on each table and verify that inspection flags the affected table. Refs #4.
+
+The inspection checks that record IDs have the reviewed SQL types. Plan revisions and refresh jobs use UUID, and research packages use text. A disposable regression changes the research ID to varchar while retaining the composite key. Refs #4.

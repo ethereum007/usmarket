@@ -784,3 +784,15 @@ def test_operator_inspection_requires_server_timestamp_default(pg, table):
         assert ('table', table, True, False) in rows
         assert sum(not secure for _, _, _, secure in rows) == 1
         connection.rollback()
+
+
+
+def test_operator_inspection_reports_research_id_type_drift(pg):
+    with pg.connect(DSN) as connection:
+        connection.execute(
+            'alter table public.us_research_packages alter column id type varchar'
+        )
+        rows = connection.execute(inspection_sql()).fetchall()
+        assert ('table', 'us_research_packages', True, False) in rows
+        assert sum(not secure for _, _, _, secure in rows) == 1
+        connection.rollback()
