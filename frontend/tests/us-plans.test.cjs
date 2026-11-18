@@ -318,3 +318,11 @@ for (const change of [{market:'NSE'}, {currency:'INR'}, {market:undefined}, {cur
     await assert.rejects(lib.loadUSPlan(plan), /could not be verified/);
   });
 }
+
+test('reopening rejects duplicate setup versions in original evidence', async () => {
+  const lib = compile('lib/us-plans.ts', { './api': {
+    fetchAPI: async url => url.includes('/research/')
+      ? {package:{...data,setups:[setup,{...setup,symbol:'MSFT'}]}} : {plan},
+  } });
+  await assert.rejects(lib.loadUSPlan(plan), /could not be verified/);
+});

@@ -16,7 +16,8 @@ export async function loadUSPlan(plan: USPlan) {
     fetchAPI<{ package: USPackage }>(`/api/us/research/packages/${plan.package_id}`),
     fetchAPI<{ plan: USPlan }>(`${ROOT}/${plan.id}?revision=${plan.revision}`),
   ]);
-  const setup = source.package.setups.find(row => row.setup_version === saved.plan.setup_version);
+  const matches = source.package.setups.filter(row => row.setup_version === saved.plan.setup_version);
+  const setup = matches.length === 1 ? matches[0] : undefined;
   if (saved.plan.market !== "US" || saved.plan.currency !== "USD" ||
       saved.plan.id !== plan.id || saved.plan.revision !== plan.revision ||
       saved.plan.package_id !== plan.package_id || saved.plan.setup_version !== plan.setup_version ||
