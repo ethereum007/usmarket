@@ -9,7 +9,24 @@ export type USPlan = Omit<ConditionalPlan, "earnings_state"> & {
   sizing?: USSizing;
 };
 const ROOT = "/api/us/plans";
-export const listUSPlans = () => fetchAPI<{ plans: USPlan[] }>(ROOT);
+export async function listUSPlans() {
+  const result = await fetchAPI<{ plans: USPlan[] }>(ROOT);
+  const plans = result?.plans;
+  if (!Array.isArray(plans) || plans.some(plan =>
+    !plan || typeof plan !== "object" ||
+    typeof plan.id !== "string" || !plan.id ||
+    !Number.isSafeInteger(plan.revision) || plan.revision < 1 ||
+    plan.market !== "US" || plan.currency !== "USD" ||
+    !["BULL", "BEAR"].includes(plan.direction) ||
+    ["symbol", "state", "expiry", "session", "event_risk"].some(key =>
+      typeof plan[key as keyof USPlan] !== "string") ||
+    [plan.trigger, plan.stop, plan.quantity].some(value =>
+      typeof value !== "number" || !Number.isFinite(value))
+  ) || new Set(plans.map(plan => plan.id)).size !== plans.length) {
+    throw new Error("Saved US plans could not be verified. Reload the list to retry.");
+  }
+  return result;
+}
 
 export async function loadUSPlan(plan: USPlan) {
   const [source, saved] = await Promise.all([

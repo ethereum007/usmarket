@@ -261,3 +261,5 @@ Revision updates require the save destination ID to equal the existing plan ID b
 Reopening treats absent and null legacy provider asset IDs as the same unknown identity, consistent with source and save validation. Returned records retain their original value. Regressions cover both list/revision representation directions, while existing tests continue rejecting changes to known asset IDs. Hosted acceptance remains open in issue #4.
 
 Missing saved records and malformed source setup collections now return the fixed evidence-verification error before reopening. Transport regressions cover absent/null records and invalid collections. Hosted acceptance remains open in issue #4.
+
+The browser verifies saved-plan list structure, unique plan IDs, positive safe revisions, US/USD identity and basic rendered field types before replacing the list. Malformed lists return fixed retry feedback through the existing error path. Empty accounts remain valid. Transport regressions cover malformed collections, duplicate IDs and invalid display fields. Hosted acceptance remains open in issue #4.
