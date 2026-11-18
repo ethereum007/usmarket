@@ -16,6 +16,10 @@ export async function loadUSPlan(plan: USPlan) {
     fetchAPI<{ package: USPackage }>(`/api/us/research/packages/${plan.package_id}`),
     fetchAPI<{ plan: USPlan }>(`${ROOT}/${plan.id}?revision=${plan.revision}`),
   ]);
+  if (!source?.package || !saved?.plan || !Array.isArray(source.package.setups) ||
+      source.package.setups.some(row => !row || typeof row !== "object")) {
+    throw new Error("Original US plan evidence could not be verified. No revision was opened.");
+  }
   const matches = source.package.setups.filter(row => row.setup_version === saved.plan.setup_version);
   const setup = matches.length === 1 ? matches[0] : undefined;
   if (saved.plan.market !== "US" || saved.plan.currency !== "USD" ||

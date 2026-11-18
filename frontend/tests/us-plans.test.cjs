@@ -380,3 +380,21 @@ for (const [listedAsset, savedAsset] of [[undefined,null], [null,undefined]]) {
     assert.equal(result.plan.provider_asset_id, savedAsset);
   });
 }
+
+for (const response of [null, {}, {package:null}, {package:{...data,setups:null}},
+                        {package:{...data,setups:{}}}, {package:{...data,setups:[null]}}]) {
+  test('malformed source reopen returns verification feedback: '+JSON.stringify(response), async () => {
+    const lib = compile('lib/us-plans.ts', { './api': {
+      fetchAPI: async url => url.includes('/research/') ? response : {plan},
+    } });
+    await assert.rejects(lib.loadUSPlan(plan), /Original US plan evidence could not be verified/);
+  });
+}
+for (const response of [null, {}, {plan:null}]) {
+  test('missing saved revision returns verification feedback: '+JSON.stringify(response), async () => {
+    const lib = compile('lib/us-plans.ts', { './api': {
+      fetchAPI: async url => url.includes('/research/') ? {package:data} : response,
+    } });
+    await assert.rejects(lib.loadUSPlan(plan), /Original US plan evidence could not be verified/);
+  });
+}

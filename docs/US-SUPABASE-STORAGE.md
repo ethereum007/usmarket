@@ -259,3 +259,5 @@ Pre-save source verification includes provider asset identity. A selected asset 
 Revision updates require the save destination ID to equal the existing plan ID before submission. A regression supplies another destination and verifies zero requests. New plans retain their caller-generated identity. Hosted acceptance remains open in issue #4.
 
 Reopening treats absent and null legacy provider asset IDs as the same unknown identity, consistent with source and save validation. Returned records retain their original value. Regressions cover both list/revision representation directions, while existing tests continue rejecting changes to known asset IDs. Hosted acceptance remains open in issue #4.
+
+Missing saved records and malformed source setup collections now return the fixed evidence-verification error before reopening. Transport regressions cover absent/null records and invalid collections. Hosted acceptance remains open in issue #4.
