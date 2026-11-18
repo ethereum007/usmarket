@@ -36,7 +36,8 @@ def test_filing_dates_never_become_earnings_dates_and_amendments_preserved():
 @pytest.mark.parametrize("column,value", [
     ("acceptanceDateTime", "2026-10-21T01:00:00Z"), ("acceptanceDateTime", "2026-10-18T20:00:00"),
     ("primaryDocument", "../private.htm"), ("primaryDocument", "https://example.com/doc"),
-    ("accessionNumber", "not-accession"), ("filingDate", "2026-02-30"), ("items", None),
+    ("accessionNumber", "not-accession"), ("filingDate", "2026-02-30"),
+    ("filingDate", "2026-10-21"), ("items", None),
 ])
 def test_malformed_or_future_evidence_is_partial_not_false_clearance(column, value):
     data = payload()

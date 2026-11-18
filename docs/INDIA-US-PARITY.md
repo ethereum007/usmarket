@@ -58,3 +58,5 @@ Live bid/ask/trade price validation now also accepts only JSON numbers. Numeric 
 ## SEC configuration preflight consistency
 
 Operator readiness and the filings gateway now share validation for SEC_USER_AGENT: a present, bounded printable-ASCII header containing a contact marker. Controls, non-ASCII text, missing contact markers and oversized values fail configuration before constructing a provider client. Readiness exposes only booleans, never the configured contact. This is header safety and configuration evidence, not mailbox ownership, SEC access or filings coverage verification. Tests cover preflight failure and no-client runtime rejection. No contact value, provider setting, credential or hosted flag was changed.
+
+SEC filing evidence omits a filing date later than the UTC observation date, even if the acceptance timestamp is already in the past. The remaining response is partial and earnings timing remains unknown. A parser regression covers this inconsistent future-date record. Refs #6.

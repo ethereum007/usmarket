@@ -71,7 +71,9 @@ def filing_evidence(symbol, cik, payload, observed_at):
                 raise ValueError()
             stamp = datetime.fromisoformat(recent["acceptanceDateTime"][index].replace("Z", "+00:00"))
             filing_date = date.fromisoformat(recent["filingDate"][index])
-            if stamp.utcoffset() is None or stamp > observed_at or filing_date.isoformat() != recent["filingDate"][index]:
+            if (stamp.utcoffset() is None or stamp > observed_at
+                    or filing_date > observed_at.astimezone(timezone.utc).date()
+                    or filing_date.isoformat() != recent["filingDate"][index]):
                 raise ValueError()
             report_date = reports[index]
             if report_date:
