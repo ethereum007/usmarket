@@ -265,3 +265,5 @@ Missing saved records and malformed source setup collections now return the fixe
 The browser verifies saved-plan list structure, unique plan IDs, positive safe revisions, US/USD identity and basic rendered field types before replacing the list. Malformed lists return fixed retry feedback through the existing error path. Empty accounts remain valid. Transport regressions cover malformed collections, duplicate IDs and invalid display fields. Hosted acceptance remains open in issue #4.
 
 Saved-plan list validation requires positive trigger/stop prices and a nonnegative safe integer whole-share quantity. Zero-capacity plans remain valid. Regressions cover negative, fractional and unsafe quantities, nonpositive prices and accepted zero quantity. Hosted acceptance remains open in issue #4.
+
+Browser save acknowledgement requires filled=false and execution_readiness=PLANNING_ONLY, matching the existing backend contract. Missing or contradictory values leave the save unconfirmed through the existing editor error path. Four transport regressions cover these fields. Hosted acceptance remains open in issue #4.

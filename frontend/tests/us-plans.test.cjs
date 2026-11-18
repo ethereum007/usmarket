@@ -15,7 +15,7 @@ function compile(file, mocks = {}, globals = {}) {
 }
 const setup = { symbol: 'AAPL', signal: 'BULL', provider_asset_id: '11111111-1111-4111-8111-111111111111', setup_version: 'b'.repeat(64), setup_id: 'c'.repeat(64), source_snapshot_id: 'd'.repeat(64), entry_price: 100, stop_loss: 95 };
 const data = { id: 'a'.repeat(64), market: 'US', currency: 'USD', state: 'final', session: '2026-10-16', setups: [setup] };
-const plan = { id: 'plan-id', revision: 2, market: 'US', currency: 'USD', session: data.session, provider_asset_id: setup.provider_asset_id, package_id: data.id, setup_version: setup.setup_version, setup_id: setup.setup_id, source_snapshot_id: setup.source_snapshot_id, symbol: 'AAPL', direction: 'BULL', notes: 'original' };
+const plan = { filled: false, execution_readiness: 'PLANNING_ONLY', id: 'plan-id', revision: 2, market: 'US', currency: 'USD', session: data.session, provider_asset_id: setup.provider_asset_id, package_id: data.id, setup_version: setup.setup_version, setup_id: setup.setup_id, source_snapshot_id: setup.source_snapshot_id, symbol: 'AAPL', direction: 'BULL', notes: 'original' };
 const fields = () => new Map(Object.entries({ trigger: '100', stop: '95', expiry: '2026-11-25', capital: '10000', risk_pct: '1', allocation_cap_pct: '20', notes: 'Private thesis', exit_policy: 'Review invalidation', state: 'draft', owner: 'forged', filled: 'true', earnings_state: 'checked_no_event' }));
 test('US request uses exact source, expected revision and explicit fields only', async () => {
   let sent;
@@ -412,5 +412,14 @@ for (const plans of [[], [listedPlan], [{...listedPlan,quantity:0}]]) {
     const response = {plans};
     const lib = compile('lib/us-plans.ts', { './api': {fetchAPI:async () => response} });
     assert.equal(await lib.listUSPlans(), response);
+  });
+}
+
+for (const change of [{filled:true},{filled:undefined},{execution_readiness:'READY'},{execution_readiness:undefined}]) {
+  test('save acknowledgement must remain unfilled and planning-only: '+JSON.stringify(change), async () => {
+    const lib = compile('lib/us-plans.ts', { './api': {
+      postAPI: async () => ({plan:{...plan,revision:3,...change}}),
+    } });
+    await assert.rejects(lib.saveUSPlan(plan.id, data, setup, plan, fields()), /Plan save was not confirmed/);
   });
 }

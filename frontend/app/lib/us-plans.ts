@@ -85,7 +85,7 @@ export function saveUSPlan(id: string, data: USPackage, setup: ResearchSetup, ex
   }).then(result => {
     const saved = result?.plan;
     const asset = (setup as ResearchSetup & { provider_asset_id?: string | null }).provider_asset_id ?? null;
-    if (!saved || saved.id !== id || saved.revision !== (existing?.revision || 0) + 1 ||
+    if (!saved || saved.filled !== false || saved.execution_readiness !== "PLANNING_ONLY" || saved.id !== id || saved.revision !== (existing?.revision || 0) + 1 ||
         saved.package_id !== data.id || saved.setup_version !== setup.setup_version ||
         saved.setup_id !== setup.setup_id || saved.source_snapshot_id !== setup.source_snapshot_id ||
         saved.symbol !== setup.symbol || saved.direction !== setup.signal || saved.session !== data.session ||
