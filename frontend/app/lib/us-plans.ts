@@ -37,7 +37,7 @@ export async function loadUSPlan(plan: USPlan) {
 
 export function saveUSPlan(id: string, data: USPackage, setup: ResearchSetup, existing: USPlan | null, fields: FormData) {
   if (data.state !== "final" || data.currency !== "USD" || data.market !== "US" ||
-      !data.setups.some(row => row.setup_version === setup.setup_version)) {
+      data.setups.filter(row => row.setup_version === setup.setup_version).length !== 1) {
     throw new Error("Choose a setup from final US research before saving a plan.");
   }
   if (existing && (existing.package_id !== data.id || existing.setup_version !== setup.setup_version)) {

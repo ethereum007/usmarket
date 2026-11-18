@@ -249,3 +249,5 @@ The disposable backup rehearsal now requires all nine checks in the read-only st
 Reopening an exact saved revision now requires the returned plan itself to declare US/USD, alongside the existing source package checks. Transport regressions reject missing or incorrect market and currency values. Hosted acceptance remains open in issue #4.
 
 Reopening requires exactly one source setup matching the saved version. Duplicate matches fail verification before the editor opens evidence. The transport regression places a conflicting duplicate after the matching setup. Hosted acceptance remains open in issue #4.
+
+The browser also requires exactly one matching source setup version before submitting a plan save. A duplicate source version blocks submission. The regression verifies zero API calls. Hosted acceptance remains open in issue #4.

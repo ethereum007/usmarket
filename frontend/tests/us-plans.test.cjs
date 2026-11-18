@@ -326,3 +326,11 @@ test('reopening rejects duplicate setup versions in original evidence', async ()
   } });
   await assert.rejects(lib.loadUSPlan(plan), /could not be verified/);
 });
+
+test('saving ambiguous setup versions never submits a plan', () => {
+  let calls = 0;
+  const lib = compile('lib/us-plans.ts', { './api': {postAPI: () => calls++} });
+  assert.throws(() => lib.saveUSPlan(plan.id,
+    {...data,setups:[setup,{...setup,symbol:'MSFT'}]}, setup, plan, fields()), /final US/);
+  assert.equal(calls, 0);
+});
