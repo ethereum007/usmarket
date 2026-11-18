@@ -263,3 +263,5 @@ Reopening treats absent and null legacy provider asset IDs as the same unknown i
 Missing saved records and malformed source setup collections now return the fixed evidence-verification error before reopening. Transport regressions cover absent/null records and invalid collections. Hosted acceptance remains open in issue #4.
 
 The browser verifies saved-plan list structure, unique plan IDs, positive safe revisions, US/USD identity and basic rendered field types before replacing the list. Malformed lists return fixed retry feedback through the existing error path. Empty accounts remain valid. Transport regressions cover malformed collections, duplicate IDs and invalid display fields. Hosted acceptance remains open in issue #4.
+
+Saved-plan list validation requires positive trigger/stop prices and a nonnegative safe integer whole-share quantity. Zero-capacity plans remain valid. Regressions cover negative, fractional and unsafe quantities, nonpositive prices and accepted zero quantity. Hosted acceptance remains open in issue #4.

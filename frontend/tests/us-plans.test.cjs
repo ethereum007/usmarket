@@ -401,13 +401,13 @@ for (const response of [null, {}, {plan:null}]) {
 
 const listedPlan = {...plan,state:'draft',expiry:'2026-11-25',event_risk:'unknown',trigger:100,stop:95,quantity:20};
 for (const response of [null, {}, {plans:null}, {plans:[null]}, {plans:[listedPlan,listedPlan]},
-  ...[{symbol:{}},{revision:0},{market:'NSE'},{trigger:'100'},{quantity:NaN}].map(change => ({plans:[{...listedPlan,...change}]}))]) {
+  ...[{symbol:{}},{revision:0},{market:'NSE'},{trigger:'100'},{quantity:NaN},{quantity:-1},{quantity:1.5},{quantity:Number.MAX_SAFE_INTEGER+1},{trigger:0},{stop:-1}].map(change => ({plans:[{...listedPlan,...change}]}))]) {
   test('saved plan list rejects malformed response: '+JSON.stringify(response), async () => {
     const lib = compile('lib/us-plans.ts', { './api': {fetchAPI:async () => response} });
     await assert.rejects(lib.listUSPlans(), /Saved US plans could not be verified/);
   });
 }
-for (const plans of [[], [listedPlan]]) {
+for (const plans of [[], [listedPlan], [{...listedPlan,quantity:0}]]) {
   test('saved plan list accepts verified records or an empty account: '+plans.length, async () => {
     const response = {plans};
     const lib = compile('lib/us-plans.ts', { './api': {fetchAPI:async () => response} });

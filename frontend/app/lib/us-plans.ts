@@ -20,6 +20,8 @@ export async function listUSPlans() {
     !["BULL", "BEAR"].includes(plan.direction) ||
     ["symbol", "state", "expiry", "session", "event_risk"].some(key =>
       typeof plan[key as keyof USPlan] !== "string") ||
+    !Number.isSafeInteger(plan.quantity) || plan.quantity < 0 ||
+    plan.trigger <= 0 || plan.stop <= 0 ||
     [plan.trigger, plan.stop, plan.quantity].some(value =>
       typeof value !== "number" || !Number.isFinite(value))
   ) || new Set(plans.map(plan => plan.id)).size !== plans.length) {
