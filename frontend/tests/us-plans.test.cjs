@@ -366,3 +366,17 @@ test('revision update cannot target another plan ID', () => {
   assert.throws(() => lib.saveUSPlan('another-plan-id', data, setup, plan, fields()), /Saved plan identity changed/);
   assert.equal(calls, 0);
 });
+
+for (const [listedAsset, savedAsset] of [[undefined,null], [null,undefined]]) {
+  test('reopening preserves legacy unknown asset across null and absent values: '+listedAsset, async () => {
+    const listed = {...plan,provider_asset_id:listedAsset};
+    const saved = {...plan,provider_asset_id:savedAsset};
+    const legacyData = {...data,setups:[{...setup,provider_asset_id:null}]};
+    const lib = compile('lib/us-plans.ts', { './api': {
+      fetchAPI: async url => url.includes('/research/') ? {package:legacyData} : {plan:saved},
+    } });
+    const result = await lib.loadUSPlan(listed);
+    assert.equal(result.plan, saved);
+    assert.equal(result.plan.provider_asset_id, savedAsset);
+  });
+}

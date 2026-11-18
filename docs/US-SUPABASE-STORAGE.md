@@ -257,3 +257,5 @@ Before saving, the browser verifies the selected setup ID, snapshot, symbol and 
 Pre-save source verification includes provider asset identity. A selected asset that differs from the package, including a missing ID where the package records one, blocks submission. Legacy evidence with unknown IDs on both sides remains supported. Hosted acceptance remains open in issue #4.
 
 Revision updates require the save destination ID to equal the existing plan ID before submission. A regression supplies another destination and verifies zero requests. New plans retain their caller-generated identity. Hosted acceptance remains open in issue #4.
+
+Reopening treats absent and null legacy provider asset IDs as the same unknown identity, consistent with source and save validation. Returned records retain their original value. Regressions cover both list/revision representation directions, while existing tests continue rejecting changes to known asset IDs. Hosted acceptance remains open in issue #4.
