@@ -334,3 +334,12 @@ test('saving ambiguous setup versions never submits a plan', () => {
     {...data,setups:[setup,{...setup,symbol:'MSFT'}]}, setup, plan, fields()), /final US/);
   assert.equal(calls, 0);
 });
+
+for (const change of [{setup_id:'wrong'}, {source_snapshot_id:'wrong'}, {symbol:'MSFT'}, {signal:'BEAR'}]) {
+  test('saving rejects a rebound selected setup: '+JSON.stringify(change), () => {
+    let calls = 0;
+    const lib = compile('lib/us-plans.ts', { './api': {postAPI: () => calls++} });
+    assert.throws(() => lib.saveUSPlan(plan.id, data, {...setup,...change}, plan, fields()), /original US research/);
+    assert.equal(calls, 0);
+  });
+}
