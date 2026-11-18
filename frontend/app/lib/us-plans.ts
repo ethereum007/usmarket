@@ -47,6 +47,9 @@ export function saveUSPlan(id: string, data: USPackage, setup: ResearchSetup, ex
       sourceSetup.symbol !== setup.symbol || sourceSetup.signal !== setup.signal) {
     throw new Error("Selected setup does not match the original US research.");
   }
+  if (existing && existing.id !== id) {
+    throw new Error("Saved plan identity changed. Reopen the intended plan before saving.");
+  }
   if (existing && (existing.package_id !== data.id || existing.setup_version !== setup.setup_version)) {
     throw new Error("A different source requires a new plan.");
   }

@@ -359,3 +359,10 @@ test('legacy unknown provider asset remains saveable', async () => {
   } });
   await lib.saveUSPlan(plan.id, {...data,setups:[legacySetup]}, legacySetup, plan, fields());
 });
+
+test('revision update cannot target another plan ID', () => {
+  let calls = 0;
+  const lib = compile('lib/us-plans.ts', { './api': {postAPI: () => calls++} });
+  assert.throws(() => lib.saveUSPlan('another-plan-id', data, setup, plan, fields()), /Saved plan identity changed/);
+  assert.equal(calls, 0);
+});
