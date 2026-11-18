@@ -41,7 +41,9 @@ export function saveUSPlan(id: string, data: USPackage, setup: ResearchSetup, ex
     throw new Error("Choose a setup from final US research before saving a plan.");
   }
   const sourceSetup = data.setups.find(row => row.setup_version === setup.setup_version)!;
-  if (sourceSetup.setup_id !== setup.setup_id || sourceSetup.source_snapshot_id !== setup.source_snapshot_id ||
+  const sourceAsset = (sourceSetup as ResearchSetup & { provider_asset_id?: string | null }).provider_asset_id ?? null;
+  const selectedAsset = (setup as ResearchSetup & { provider_asset_id?: string | null }).provider_asset_id ?? null;
+  if (sourceAsset !== selectedAsset || sourceSetup.setup_id !== setup.setup_id || sourceSetup.source_snapshot_id !== setup.source_snapshot_id ||
       sourceSetup.symbol !== setup.symbol || sourceSetup.signal !== setup.signal) {
     throw new Error("Selected setup does not match the original US research.");
   }

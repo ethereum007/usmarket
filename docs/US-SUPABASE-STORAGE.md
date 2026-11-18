@@ -253,3 +253,5 @@ Reopening requires exactly one source setup matching the saved version. Duplicat
 The browser also requires exactly one matching source setup version before submitting a plan save. A duplicate source version blocks submission. The regression verifies zero API calls. Hosted acceptance remains open in issue #4.
 
 Before saving, the browser verifies the selected setup ID, snapshot, symbol and direction against the unique package entry for that version. Four regressions retain the version while changing each identity field and verify zero API requests. Hosted acceptance remains open in issue #4.
+
+Pre-save source verification includes provider asset identity. A selected asset that differs from the package, including a missing ID where the package records one, blocks submission. Legacy evidence with unknown IDs on both sides remains supported. Hosted acceptance remains open in issue #4.

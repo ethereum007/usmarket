@@ -343,3 +343,19 @@ for (const change of [{setup_id:'wrong'}, {source_snapshot_id:'wrong'}, {symbol:
     assert.equal(calls, 0);
   });
 }
+
+for (const provider_asset_id of ['22222222-2222-4222-8222-222222222222', null, undefined]) {
+  test('saving rejects a rebound or missing selected provider asset: '+provider_asset_id, () => {
+    let calls = 0;
+    const lib = compile('lib/us-plans.ts', { './api': {postAPI: () => calls++} });
+    assert.throws(() => lib.saveUSPlan(plan.id, data, {...setup,provider_asset_id}, plan, fields()), /original US research/);
+    assert.equal(calls, 0);
+  });
+}
+test('legacy unknown provider asset remains saveable', async () => {
+  const legacySetup = {...setup,provider_asset_id:undefined};
+  const lib = compile('lib/us-plans.ts', { './api': {
+    postAPI: async () => ({plan:{...plan,revision:3,provider_asset_id:null}}),
+  } });
+  await lib.saveUSPlan(plan.id, {...data,setups:[legacySetup]}, legacySetup, plan, fields());
+});
