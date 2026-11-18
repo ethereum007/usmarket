@@ -17,7 +17,8 @@ export async function loadUSPlan(plan: USPlan) {
     fetchAPI<{ plan: USPlan }>(`${ROOT}/${plan.id}?revision=${plan.revision}`),
   ]);
   const setup = source.package.setups.find(row => row.setup_version === saved.plan.setup_version);
-  if (saved.plan.id !== plan.id || saved.plan.revision !== plan.revision ||
+  if (saved.plan.market !== "US" || saved.plan.currency !== "USD" ||
+      saved.plan.id !== plan.id || saved.plan.revision !== plan.revision ||
       saved.plan.package_id !== plan.package_id || saved.plan.setup_version !== plan.setup_version ||
       saved.plan.setup_id !== plan.setup_id || saved.plan.source_snapshot_id !== plan.source_snapshot_id ||
       saved.plan.symbol !== plan.symbol || saved.plan.direction !== plan.direction ||

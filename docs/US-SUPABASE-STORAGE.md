@@ -245,3 +245,5 @@ The disposable PostgreSQL restore check also compares the active-owner admission
 The disposable restore verifier compares the synthetic account identities and checks plan, research and job lists for every fixture account under the authenticated database role. Hosted acceptance remains open in issue #4.
 
 The disposable backup rehearsal now requires all nine checks in the read-only storage inspection to pass on both the source and the restored database. This ties restore verification to the reviewed storage contract, including the queued/running admission predicate, even when the two database definitions match. Hosted backup and restore acceptance remains open in issue #4.
+
+Reopening an exact saved revision now requires the returned plan itself to declare US/USD, alongside the existing source package checks. Transport regressions reject missing or incorrect market and currency values. Hosted acceptance remains open in issue #4.

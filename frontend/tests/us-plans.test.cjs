@@ -309,3 +309,12 @@ test('new-plan acknowledgement confirms revision one only',async()=>{
   const lib=compile('lib/us-plans.ts',{'./api':{postAPI:async()=>({plan:{...plan,revision:1}})}});
   assert.equal((await lib.saveUSPlan(plan.id,data,setup,null,fields())).plan.revision,1);
 });
+
+for (const change of [{market:'NSE'}, {currency:'INR'}, {market:undefined}, {currency:undefined}]) {
+  test('reopening rejects a saved plan outside US/USD: '+JSON.stringify(change), async () => {
+    const lib = compile('lib/us-plans.ts', { './api': {
+      fetchAPI: async url => url.includes('/research/') ? {package:data} : {plan:{...plan,...change}},
+    } });
+    await assert.rejects(lib.loadUSPlan(plan), /could not be verified/);
+  });
+}
