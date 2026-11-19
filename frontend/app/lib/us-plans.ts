@@ -17,6 +17,7 @@ export async function listUSPlans() {
     typeof plan.id !== "string" || !plan.id ||
     !Number.isSafeInteger(plan.revision) || plan.revision < 1 ||
     plan.market !== "US" || plan.currency !== "USD" ||
+    plan.filled !== false || plan.execution_readiness !== "PLANNING_ONLY" ||
     !["BULL", "BEAR"].includes(plan.direction) ||
     ["symbol", "state", "expiry", "session", "event_risk"].some(key =>
       typeof plan[key as keyof USPlan] !== "string") ||
@@ -41,7 +42,8 @@ export async function loadUSPlan(plan: USPlan) {
   }
   const matches = source.package.setups.filter(row => row.setup_version === saved.plan.setup_version);
   const setup = matches.length === 1 ? matches[0] : undefined;
-  if (saved.plan.market !== "US" || saved.plan.currency !== "USD" ||
+  if (saved.plan.filled !== false || saved.plan.execution_readiness !== "PLANNING_ONLY" ||
+      saved.plan.market !== "US" || saved.plan.currency !== "USD" ||
       saved.plan.id !== plan.id || saved.plan.revision !== plan.revision ||
       saved.plan.package_id !== plan.package_id || saved.plan.setup_version !== plan.setup_version ||
       saved.plan.setup_id !== plan.setup_id || saved.plan.source_snapshot_id !== plan.source_snapshot_id ||

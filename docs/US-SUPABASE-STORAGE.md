@@ -267,3 +267,5 @@ The browser verifies saved-plan list structure, unique plan IDs, positive safe r
 Saved-plan list validation requires positive trigger/stop prices and a nonnegative safe integer whole-share quantity. Zero-capacity plans remain valid. Regressions cover negative, fractional and unsafe quantities, nonpositive prices and accepted zero quantity. Hosted acceptance remains open in issue #4.
 
 Browser save acknowledgement requires filled=false and execution_readiness=PLANNING_ONLY, matching the existing backend contract. Missing or contradictory values leave the save unconfirmed through the existing editor error path. Four transport regressions cover these fields. Hosted acceptance remains open in issue #4.
+
+Saved-plan listing and exact revision reopening also require the backend contract filled=false and execution_readiness=PLANNING_ONLY. Eight transport regressions reject contradictory or missing flags before records reach either view. Hosted acceptance remains open in issue #4.

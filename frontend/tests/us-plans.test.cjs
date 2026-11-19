@@ -423,3 +423,18 @@ for (const change of [{filled:true},{filled:undefined},{execution_readiness:'REA
     await assert.rejects(lib.saveUSPlan(plan.id, data, setup, plan, fields()), /Plan save was not confirmed/);
   });
 }
+
+for (const change of [{filled:true},{filled:undefined},{execution_readiness:'READY'},{execution_readiness:undefined}]) {
+  test('saved plan list rejects execution claims: '+JSON.stringify(change), async () => {
+    const lib = compile('lib/us-plans.ts', { './api': {
+      fetchAPI: async () => ({plans:[{...listedPlan,...change}]}),
+    } });
+    await assert.rejects(lib.listUSPlans(), /Saved US plans could not be verified/);
+  });
+  test('reopening rejects execution claims: '+JSON.stringify(change), async () => {
+    const lib = compile('lib/us-plans.ts', { './api': {
+      fetchAPI: async url => url.includes('/research/') ? {package:data} : {plan:{...plan,...change}},
+    } });
+    await assert.rejects(lib.loadUSPlan(plan), /Original US plan evidence could not be verified/);
+  });
+}
