@@ -96,3 +96,5 @@ Read-only plan history now shows the displayed revision's direction, whole-share
 ## Unsaved plan departure warning
 
 The plan editor now requests the browser's beforeunload warning while inputs are edited or a save is pending. A failed/unconfirmed save retains edited state; confirmed save clears it, and cleanup removes the listener. Late save failures/pending-state updates are ignored after account/editor unmount. Drafts remain in memory and are not written to browser storage or another account. Browser warning behavior requires actual desktop/mobile acceptance and is not guaranteed on mobile termination; in-app research/editor switching is not intercepted. The editor explicitly asks users to save before changing research or leaving. Synthetic event tests verify clean/edited/pending/failed/confirmed behavior and cleanup; this is not draft persistence or hosted acceptance.
+
+The US bearer boundary rejects non-ASCII and control characters before identity verification, returning the existing 401 sign-in response. Synthetic ASGI tests cover Latin-1, DEL and NUL bytes and assert that the verifier is never called. Hosted identity acceptance remains open. Refs #2.

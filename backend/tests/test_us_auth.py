@@ -178,7 +178,7 @@ def test_wrong_project_never_receives_auth_or_storage_bearers(origin):
                 (us_remote_jobs,lambda:us_remote_jobs.execute('list','synthetic-private-token'))]
     for module,call in operations:
         with patch.object(module,'settings',config),patch.object(module.httpx,'Client') as storage_client:
-            with pytest.raises(HTTPException) as error:call()
+            with pytest.raises(us_auth.HTTPException) as error:call()
         assert error.value.status_code==503
         assert origin not in error.value.detail and 'synthetic-private-token' not in error.value.detail
         storage_client.assert_not_called()
@@ -247,3 +247,17 @@ def test_invited_identity_requires_boolean_anonymity_when_present(anonymous):
          patch.object(us_auth.httpx, 'AsyncClient', provider_client(httpx.Response(200, json=body))):
         response = TestClient(auth_app()).get('/private', headers={'Authorization': 'Bearer test-session'})
     assert response.status_code == (200 if anonymous is False else 401 if anonymous is True else 503)
+
+
+
+@pytest.mark.parametrize("token", [b"synthetic-\xff", b"synthetic-\x7f", b"synthetic-\x00"])
+def test_malformed_bearer_characters_never_reach_identity_verifier(token):
+    import asyncio
+    from starlette.requests import Request
+    request = Request({"type": "http", "headers": [(b"authorization", b"Bearer " + token)]})
+    with patch.object(us_auth, "verify_us_token", AsyncMock()) as verifier:
+        with pytest.raises(us_auth.HTTPException) as error:
+            asyncio.run(us_auth.require_us_user(request))
+        assert error.value.status_code == 401
+        assert error.value.headers["WWW-Authenticate"] == "Bearer"
+        verifier.assert_not_awaited()
