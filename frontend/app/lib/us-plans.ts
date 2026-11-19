@@ -16,7 +16,7 @@ export async function listUSPlans() {
     !plan || typeof plan !== "object" ||
     typeof plan.id !== "string" || !plan.id ||
     !Number.isSafeInteger(plan.revision) || plan.revision < 1 ||
-    plan.market !== "US" || plan.currency !== "USD" ||
+    plan.market !== "US" || plan.currency !== "USD" || plan.timezone !== "America/New_York" ||
     plan.filled !== false || plan.execution_readiness !== "PLANNING_ONLY" ||
     !["BULL", "BEAR"].includes(plan.direction) ||
     ["symbol", "state", "expiry", "session", "event_risk"].some(key =>
@@ -43,7 +43,7 @@ export async function loadUSPlan(plan: USPlan) {
   const matches = source.package.setups.filter(row => row.setup_version === saved.plan.setup_version);
   const setup = matches.length === 1 ? matches[0] : undefined;
   if (saved.plan.filled !== false || saved.plan.execution_readiness !== "PLANNING_ONLY" ||
-      saved.plan.market !== "US" || saved.plan.currency !== "USD" ||
+      saved.plan.market !== "US" || saved.plan.currency !== "USD" || saved.plan.timezone !== "America/New_York" ||
       saved.plan.id !== plan.id || saved.plan.revision !== plan.revision ||
       saved.plan.package_id !== plan.package_id || saved.plan.setup_version !== plan.setup_version ||
       saved.plan.setup_id !== plan.setup_id || saved.plan.source_snapshot_id !== plan.source_snapshot_id ||
@@ -91,7 +91,7 @@ export function saveUSPlan(id: string, data: USPackage, setup: ResearchSetup, ex
         saved.package_id !== data.id || saved.setup_version !== setup.setup_version ||
         saved.setup_id !== setup.setup_id || saved.source_snapshot_id !== setup.source_snapshot_id ||
         saved.symbol !== setup.symbol || saved.direction !== setup.signal || saved.session !== data.session ||
-        (saved.provider_asset_id ?? null) !== asset || saved.market !== "US" || saved.currency !== "USD") {
+        (saved.provider_asset_id ?? null) !== asset || saved.market !== "US" || saved.currency !== "USD" || saved.timezone !== "America/New_York") {
       throw new Error("Plan save was not confirmed for this revision and source. Reload saved plans before retrying.");
     }
     return result;

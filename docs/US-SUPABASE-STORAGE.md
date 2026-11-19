@@ -271,3 +271,5 @@ Browser save acknowledgement requires filled=false and execution_readiness=PLANN
 Saved-plan listing and exact revision reopening also require the backend contract filled=false and execution_readiness=PLANNING_ONLY. Eight transport regressions reject contradictory or missing flags before records reach either view. Hosted acceptance remains open in issue #4.
 
 Sizing previews now validate whole-share quantities, finite nonnegative USD amounts, positive stop distance, quantity/state agreement and the requested direction with explicit planning-only/unfilled status before rendering. Malformed responses follow the existing preview error path. Valid zero-capacity previews remain supported. Hosted acceptance remains open in issue #4.
+
+Browser list, reopen and save acknowledgements require the stored plan timezone America/New_York, matching the existing backend contract and displayed ET expiry labels. Missing or different timezones fail verification. Six transport regressions cover these paths. Hosted acceptance remains open in issue #4.

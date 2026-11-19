@@ -15,7 +15,7 @@ function compile(file, mocks = {}, globals = {}) {
 }
 const setup = { symbol: 'AAPL', signal: 'BULL', provider_asset_id: '11111111-1111-4111-8111-111111111111', setup_version: 'b'.repeat(64), setup_id: 'c'.repeat(64), source_snapshot_id: 'd'.repeat(64), entry_price: 100, stop_loss: 95 };
 const data = { id: 'a'.repeat(64), market: 'US', currency: 'USD', state: 'final', session: '2026-10-16', setups: [setup] };
-const plan = { filled: false, execution_readiness: 'PLANNING_ONLY', id: 'plan-id', revision: 2, market: 'US', currency: 'USD', session: data.session, provider_asset_id: setup.provider_asset_id, package_id: data.id, setup_version: setup.setup_version, setup_id: setup.setup_id, source_snapshot_id: setup.source_snapshot_id, symbol: 'AAPL', direction: 'BULL', notes: 'original' };
+const plan = { timezone: 'America/New_York', filled: false, execution_readiness: 'PLANNING_ONLY', id: 'plan-id', revision: 2, market: 'US', currency: 'USD', session: data.session, provider_asset_id: setup.provider_asset_id, package_id: data.id, setup_version: setup.setup_version, setup_id: setup.setup_id, source_snapshot_id: setup.source_snapshot_id, symbol: 'AAPL', direction: 'BULL', notes: 'original' };
 const fields = () => new Map(Object.entries({ trigger: '100', stop: '95', expiry: '2026-11-25', capital: '10000', risk_pct: '1', allocation_cap_pct: '20', notes: 'Private thesis', exit_policy: 'Review invalidation', state: 'draft', owner: 'forged', filled: 'true', earnings_state: 'checked_no_event' }));
 test('US request uses exact source, expected revision and explicit fields only', async () => {
   let sent;
@@ -455,5 +455,22 @@ for (const sizing of [previewSizing,{...previewSizing,quantity:0,state:'zero_cap
   test('sizing preview preserves valid server sizing: '+sizing.quantity, async () => {
     const lib = compile('lib/us-plans.ts', { './api': {postAPI:async () => ({sizing})} });
     assert.equal((await lib.previewUSPlanSizing('BULL', fields())).sizing,sizing);
+  });
+}
+
+for (const timezone of ['Asia/Kolkata', undefined]) {
+  test('list requires explicit New York plan timezone: '+timezone, async () => {
+    const lib = compile('lib/us-plans.ts', { './api': {fetchAPI:async () => ({plans:[{...listedPlan,timezone}]})} });
+    await assert.rejects(lib.listUSPlans(), /could not be verified/);
+  });
+  test('reopen requires explicit New York plan timezone: '+timezone, async () => {
+    const lib = compile('lib/us-plans.ts', { './api': {
+      fetchAPI:async url => url.includes('/research/') ? {package:data} : {plan:{...plan,timezone}},
+    } });
+    await assert.rejects(lib.loadUSPlan(plan), /could not be verified/);
+  });
+  test('save acknowledgement requires explicit New York plan timezone: '+timezone, async () => {
+    const lib = compile('lib/us-plans.ts', { './api': {postAPI:async () => ({plan:{...plan,revision:3,timezone}})} });
+    await assert.rejects(lib.saveUSPlan(plan.id,data,setup,plan,fields()), /save was not confirmed/);
   });
 }
