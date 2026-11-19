@@ -67,3 +67,13 @@ The health endpoint sends Cache-Control: no-store so caches do not retain its de
 The anonymous probe requires HTTP 200 and Cache-Control no-store on health. A missing directive fails the check, including on older deployments.
 
 On 11 November 2026 at 05:02:32 UTC, Render health returned transport unavailable while all three private routes passed. At 05:02:39 UTC the retry passed all four checks. Health returned HTTP 200 with no-store and reported source revision 18b40aee74af2201e244cb9583fbace3b5e63c79. Each private route returned 401 with a Bearer challenge and the expected cache headers. The initial timeout cause is unknown. Hosted sign-in, account isolation, restart persistence and backup restoration still await acceptance following the missed 25 October target.
+
+## Anonymous boundary observation on 19 November 2026
+
+The credential-free hosted probe at 13:20:08 UTC reported transport_unavailable for /api/health and /api/us/research/access. The plans and research-package endpoints returned 401 with private/no-store, Vary Authorization and a Bearer challenge.
+
+A retry completed at 13:20:17 UTC. Health returned 200 with no-store and source revision 82240f158e3d6fb1d029300953a30ebbd43fd0c3. All three protected endpoints returned 401 with the expected private cache headers and Bearer challenge.
+
+These observations used app.services.us_hosted_probe, which reads status and selected headers without credentials or response bodies. The first failures are retained as availability evidence. A Free-service wake-up is a possible explanation, with no cause confirmed by this probe. Market-open reliability and cold-start acceptance remain open in issue #9.
+
+The 25 October private MVP target remains missed. Actual sign-in, two-account isolation, research/save/reopen/restart and controlled backup/restore remain outstanding in issue #4.
