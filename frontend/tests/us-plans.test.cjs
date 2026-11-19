@@ -438,3 +438,22 @@ for (const change of [{filled:true},{filled:undefined},{execution_readiness:'REA
     await assert.rejects(lib.loadUSPlan(plan), /Original US plan evidence could not be verified/);
   });
 }
+
+const previewSizing = {quantity:20,state:'whole_shares',currency:'USD',direction:'BULL',filled:false,
+  execution_readiness:'PLANNING_ONLY',risk_budget_usd:100,allocation_budget_usd:2000,
+  risk_per_share_usd:5,planning_notional_usd:2000,stop_risk_usd:100};
+for (const change of [null,{quantity:{}},{quantity:-1},{quantity:1.5},{state:'zero_capacity'},
+  {risk_budget_usd:'100'},{risk_per_share_usd:0},{stop_risk_usd:NaN},{currency:'INR'},{direction:'BEAR'},{filled:true}]) {
+  test('sizing preview rejects malformed values: '+JSON.stringify(change), async () => {
+    const lib = compile('lib/us-plans.ts', { './api': {
+      postAPI: async () => ({sizing:change===null ? null : {...previewSizing,...change}}),
+    } });
+    await assert.rejects(lib.previewUSPlanSizing('BULL', fields()), /could not be verified/);
+  });
+}
+for (const sizing of [previewSizing,{...previewSizing,quantity:0,state:'zero_capacity',planning_notional_usd:0,stop_risk_usd:0}]) {
+  test('sizing preview preserves valid server sizing: '+sizing.quantity, async () => {
+    const lib = compile('lib/us-plans.ts', { './api': {postAPI:async () => ({sizing})} });
+    assert.equal((await lib.previewUSPlanSizing('BULL', fields())).sizing,sizing);
+  });
+}

@@ -116,7 +116,20 @@ export async function loadUSPlanRevision(plan: USPlan, revision: number) {
 export type USSizing = { quantity: number; state: string; risk_budget_usd: number; allocation_budget_usd: number;
   risk_per_share_usd: number; planning_notional_usd: number; stop_risk_usd: number };
 export function previewUSPlanSizing(direction: "BULL" | "BEAR", fields: FormData) {
-  return postAPI<{ sizing: USSizing }>(`${ROOT}/sizing-preview`, {
+  return postAPI<{ sizing: USSizing & {currency: string; direction: string; filled: boolean; execution_readiness: string} }>(`${ROOT}/sizing-preview`, {
     direction, ...Object.fromEntries(["trigger", "stop", "capital", "risk_pct", "allocation_cap_pct"].map(key => [key, Number(fields.get(key))])),
+  }).then(result => {
+    const sizing = result?.sizing;
+    if (!sizing || sizing.currency !== "USD" || sizing.direction !== direction ||
+        sizing.filled !== false || sizing.execution_readiness !== "PLANNING_ONLY" ||
+        !Number.isSafeInteger(sizing.quantity) || sizing.quantity < 0 ||
+        sizing.state !== (sizing.quantity === 0 ? "zero_capacity" : "whole_shares") ||
+        ["risk_budget_usd", "allocation_budget_usd", "risk_per_share_usd", "planning_notional_usd", "stop_risk_usd"].some(key => {
+          const value = sizing[key as keyof USSizing];
+          return typeof value !== "number" || !Number.isFinite(value) || value < 0;
+        }) || sizing.risk_per_share_usd <= 0) {
+      throw new Error("US sizing preview could not be verified.");
+    }
+    return result;
   });
 }
