@@ -62,3 +62,25 @@ def test_probe_deadline_cancels_stalled_header_requests(monkeypatch):
     assert not result['passed']
     assert cancelled==list(probe.PATHS)
     assert all(row['result']=='transport_unavailable' for row in result['checks'])
+    assert all(row['failure_kind']=='total_deadline' for row in result['checks'])
+
+
+
+@pytest.mark.parametrize(('error_type', 'kind'), [
+    (httpx.ConnectTimeout, 'network_timeout'),
+    (httpx.ReadTimeout, 'network_timeout'),
+    (httpx.ConnectError, 'transport_error'),
+])
+def test_probe_classifies_transport_failure_without_exception_details(error_type, kind):
+    def gateway(request):
+        raise error_type('synthetic private detail https://private.example secret')
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(gateway)) as client:
+            return await probe.report(client)
+    result = asyncio.run(run())
+    assert not result['passed']
+    assert all(row['failure_kind'] == kind for row in result['checks'])
+    assert all(row['result'] == 'transport_unavailable' for row in result['checks'])
+    assert 'synthetic private' not in json.dumps(result)
+    assert 'private.example' not in json.dumps(result)
+    assert 'secret' not in json.dumps(result)

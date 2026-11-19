@@ -77,3 +77,5 @@ A retry completed at 13:20:17 UTC. Health returned 200 with no-store and source 
 These observations used app.services.us_hosted_probe, which reads status and selected headers without credentials or response bodies. The first failures are retained as availability evidence. A Free-service wake-up is a possible explanation, with no cause confirmed by this probe. Market-open reliability and cold-start acceptance remain open in issue #9.
 
 The 25 October private MVP target remains missed. Actual sign-in, two-account isolation, research/save/reopen/restart and controlled backup/restore remain outstanding in issue #4.
+
+Future hosted probes retain result=transport_unavailable and add a fixed failure_kind of total_deadline, network_timeout or transport_error. Exception text remains excluded. Synthetic tests cover deadline cancellation, HTTPX timeouts and connection errors. The earlier 19 November observations retain their original unspecified transport category. Refs #9.

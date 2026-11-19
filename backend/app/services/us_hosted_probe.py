@@ -37,8 +37,15 @@ async def report(client=None):
                                    bearer_challenge=response.headers.get('www-authenticate', '').lower() == 'bearer')
                         row['passed'] = response.status_code == 401 and all(row[key] for key in ('private_no_store', 'vary_authorization', 'bearer_challenge'))
                     checks.append(row)
-        except (httpx.HTTPError, TimeoutError):
-            checks.append({'path': path, 'passed': False, 'result': 'transport_unavailable'})
+        except TimeoutError:
+            checks.append({'path': path, 'passed': False, 'result': 'transport_unavailable',
+                           'failure_kind': 'total_deadline'})
+        except httpx.TimeoutException:
+            checks.append({'path': path, 'passed': False, 'result': 'transport_unavailable',
+                           'failure_kind': 'network_timeout'})
+        except httpx.HTTPError:
+            checks.append({'path': path, 'passed': False, 'result': 'transport_unavailable',
+                           'failure_kind': 'transport_error'})
     return {'passed': all(row['passed'] for row in checks), 'checks': checks,
             'observed_at': datetime.now(timezone.utc).isoformat(),
             'scope': 'Anonymous HTTP status and cache headers only; reported revision is informational; sign-in, isolation and persistence unverified'}
