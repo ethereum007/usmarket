@@ -63,3 +63,13 @@ Provider rights reference: https://alpaca.markets/support/redistribute-alpaca-ap
 US refresh jobs return a fixed failure message for all exception types, including validation errors. Exception text is not a safe public diagnostic: a provider adapter or storage validator may include credentials, response fragments or local paths. Regression tests inject ValueError, RuntimeError and OSError failures, assert owner/exception details are absent, then verify a subsequent refresh completes after the failed worker releases its lock.
 
 This does not satisfy durable job coordination or operator observability. Durable last-recorded job status and exclusion between cooperating API workers on one SQLite-compatible local volume are now implemented (docs/US-REFRESH-STATUS.md). A later exclusive request can now reconcile abandoned queued/running observations as interrupted with completion unknown. Hosted/multi-host coordination and crash/publication outcome reconstruction stay open in issue #4. Market-open and hosted acceptance gates remain open.
+
+## 19 November acceptance checkpoint
+
+The feature-freeze checkpoint has no completed hosted product acceptance evidence. G2 identity, G3 storage and G8 product acceptance remain open. Required inputs are the dedicated private frontend URL and two approved controlled test accounts with an authorized way to exercise their sessions. Keep credentials outside issues and source.
+
+The approved replacement schema was applied once on 29 October. Structural checks and disposable restore CI have passed. They leave actual Supabase gateway isolation, hosted sign-in/research/save/exact reopen/backend restart and controlled backup/restore to be exercised. Storage flags stay off until controlled acceptance.
+
+Source verification through 19e6015b950b89221a37a15d784b2abb66ae9b14 passed CI run 44537333131. The 19 November anonymous hosted probe recovered after initial transport failures and reported backend revision 82240f158e3d6fb1d029300953a30ebbd43fd0c3. The dated results are in US-HOSTED-ACCEPTANCE.md. Reliability acceptance remains open in issue #9.
+
+The 25 October private MVP target remains missed without hosted acceptance. No revised private deadline is assigned. Public beta remains targeted for 26 November, subject to all release gates. Issue #10 tracks the incomplete product checkpoint, and issue #4 tracks hosted persistence acceptance.
