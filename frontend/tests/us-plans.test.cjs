@@ -127,7 +127,7 @@ test('history refuses a rebound historical thesis',async()=>{
 
 
 test('sizing preview sends only direction and numeric sizing fields',async()=>{
-  let sent;const lib=compile('lib/us-plans.ts',{'./api':{postAPI:async(url,body)=>{sent={url,body};return {sizing:{quantity:20}};}}});
+  let sent;const lib=compile('lib/us-plans.ts',{'./api':{postAPI:async(url,body)=>{sent={url,body};return {sizing:previewSizing};}}});
   await lib.previewUSPlanSizing('BULL',fields());
   assert.equal(sent.url,'/api/us/plans/sizing-preview');
   assert.deepEqual(Object.keys(sent.body).sort(),['allocation_cap_pct','capital','direction','risk_pct','stop','trigger']);
