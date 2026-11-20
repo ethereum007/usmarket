@@ -5,7 +5,8 @@ const path = require('node:path');
 const vm = require('node:vm');
 const ts = require('typescript');
 const React = require('react');
-const valid={schema_version:1,market:'US',currency:'USD',revision_count:2,plan_revisions:[{id:'same',revision:1},{id:'same',revision:2}]};
+const row={id:'same',revision:1,market:'US',currency:'USD',timezone:'America/New_York',filled:false,execution_readiness:'PLANNING_ONLY'};
+const valid={schema_version:1,market:'US',currency:'USD',revision_count:2,plan_revisions:[row,{...row,revision:2}]};
 function load(fetcher) {
   const effects=[],updates=[],requests=[],downloads=[],revoked=[],blobs=[];
   const context={exports:{},Blob:class {constructor(parts){blobs.push(parts.join(''));}},URL:{createObjectURL:()=> 'blob:test',revokeObjectURL:url=>revoked.push(url)},
@@ -39,4 +40,27 @@ test('network failures do not leak provider text or create a download',async()=>
   const fixture=load(async()=>{throw Error('private provider details');});fixture.start();await flush();
   assert.equal(fixture.downloads.length,0);assert.ok(fixture.updates.some(value=>typeof value==='string' && value.includes('not confirmed')));
   assert.equal(fixture.updates.some(value=>typeof value==='string' && value.includes('provider details')),false);
+});
+
+for(const rows of [
+  [row,row], [row,{...row,revision:3}], [{...row,revision:2}],
+  [{...row,revision:Number.MAX_SAFE_INTEGER+1}], [null],
+  [{...row,market:'NSE'}], [{...row,currency:'INR'}], [{...row,timezone:'UTC'}],
+  [{...row,filled:true}], [{...row,execution_readiness:'READY'}],
+  [{...row,owner:'private-owner'}], [{...row,_access_token:'private-token'}],
+])test('invalid revision evidence prevents file creation '+JSON.stringify(rows),async()=>{
+  const fixture=load(async()=>({...valid,revision_count:rows.length,plan_revisions:rows}));
+  fixture.start();await flush();assert.equal(fixture.downloads.length,0);assert.equal(fixture.blobs.length,0);
+  assert.ok(fixture.updates.some(value=>typeof value==='string' && value.includes('not confirmed')));
+});
+
+test('interleaved histories verify independently without changing file order',async()=>{
+  const payload={...valid,revision_count:3,plan_revisions:[{...row,revision:2},{...row,id:'other'},row]};
+  const fixture=load(async()=>payload);fixture.start();await flush();
+  assert.deepEqual(JSON.parse(fixture.blobs[0]),payload);
+});
+
+test('empty private history remains downloadable',async()=>{
+  const fixture=load(async()=>({...valid,revision_count:0,plan_revisions:[]}));fixture.start();await flush();
+  assert.equal(fixture.downloads.length,1);
 });
