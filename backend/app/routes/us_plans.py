@@ -3,6 +3,7 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 import sqlite3
 import os
+import re
 from typing import Callable, Literal
 from uuid import UUID
 
@@ -123,8 +124,10 @@ def save(plan_id: UUID, payload: PlanRequest, user: dict = Depends(require_us_us
     if not matches:
         raise HTTPException(422, "Setup version does not belong to source package")
     setup = matches[0]
-    if not all(setup.get(key) for key in ("setup_id", "source_snapshot_id", "symbol")):
-        raise HTTPException(409, "Source setup is missing evidence identity")
+    if (not all(isinstance(setup.get(key), str) and re.fullmatch(r"[a-f0-9]{64}", setup[key])
+                for key in ("setup_id", "source_snapshot_id"))
+            or setup.get("symbol") not in package["symbols"]):
+        raise HTTPException(409, "Source setup evidence identity is invalid")
     direction = setup.get("signal")
     if direction not in {"BULL", "BEAR"}:
         raise HTTPException(422, "Unsupported research direction")

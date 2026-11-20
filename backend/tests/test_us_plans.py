@@ -513,3 +513,19 @@ def test_plan_save_rejects_malformed_source_collection_before_storage(fixture, s
     assert response.status_code == 409
     assert response.json()["detail"] == "Source package setup evidence is invalid"
     assert not (root / "us-plans.sqlite3").exists()
+
+
+
+@pytest.mark.parametrize("change", [
+    {"setup_id": True}, {"setup_id": "wrong"}, {"setup_id": "C" * 64},
+    {"source_snapshot_id": {"id": SNAPSHOT}}, {"source_snapshot_id": "wrong"},
+    {"symbol": "MSFT"}, {"symbol": None},
+])
+def test_plan_save_rejects_invalid_source_identity_before_storage(fixture, change):
+    client, _, payload, path, package, root = fixture
+    package["setups"][0].update(change)
+    path.write_text(json.dumps(package), encoding="utf-8")
+    response = client.post("/api/us/plans/" + str(uuid4()), json=payload)
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Source setup evidence identity is invalid"
+    assert not (root / "us-plans.sqlite3").exists()
