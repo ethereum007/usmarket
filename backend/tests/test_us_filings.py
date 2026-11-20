@@ -38,7 +38,8 @@ def test_filing_dates_never_become_earnings_dates_and_amendments_preserved():
     ("primaryDocument", "../private.htm"), ("primaryDocument", "https://example.com/doc"),
     ("accessionNumber", "not-accession"), ("filingDate", "2026-02-30"),
     ("filingDate", "2026-10-21"),
-    ("reportDate", False), ("reportDate", 0), ("reportDate", None), ("items", None),
+    ("reportDate", False), ("reportDate", 0), ("reportDate", None),
+    ("reportDate", "20261017"), ("reportDate", "2026-W42-6"), ("items", None),
 ])
 def test_malformed_or_future_evidence_is_partial_not_false_clearance(column, value):
     data = payload()

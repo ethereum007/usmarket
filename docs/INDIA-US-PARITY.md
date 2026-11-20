@@ -62,3 +62,5 @@ Operator readiness and the filings gateway now share validation for SEC_USER_AGE
 SEC filing evidence omits a filing date later than the UTC observation date, even if the acceptance timestamp is already in the past. The remaining response is partial and earnings timing remains unknown. A parser regression covers this inconsistent future-date record. Refs #6.
 
 SEC report dates require provider strings. Boolean, numeric and null reportDate values cause the affected filing to be omitted with partial coverage. An empty string remains a valid unknown report date, preserving the filing without manufacturing an earnings date or fiscal period. Synthetic parser tests cover both malformed and genuine unknown values. Refs #6.
+
+SEC report dates must retain the provider calendar-date format. Compact and ISO week dates are omitted with partial coverage instead of being normalized into displayed evidence. Existing empty-string unknown handling remains supported. Parser regressions cover both alternate formats. Refs #6.
