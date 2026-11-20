@@ -32,6 +32,10 @@ export async function listUSPlans() {
 }
 
 export async function loadUSPlan(plan: USPlan) {
+  return loadUSPlanEvidence(plan, true);
+}
+
+async function loadUSPlanEvidence(plan: USPlan, compareListedContent: boolean) {
   const [source, saved] = await Promise.all([
     fetchAPI<{ package: USPackage }>(`/api/us/research/packages/${plan.package_id}`),
     fetchAPI<{ plan: USPlan }>(`${ROOT}/${plan.id}?revision=${plan.revision}`),
@@ -45,6 +49,8 @@ export async function loadUSPlan(plan: USPlan) {
   if (saved.plan.filled !== false || saved.plan.execution_readiness !== "PLANNING_ONLY" ||
       saved.plan.market !== "US" || saved.plan.currency !== "USD" || saved.plan.timezone !== "America/New_York" ||
       saved.plan.id !== plan.id || saved.plan.revision !== plan.revision ||
+      (compareListedContent && (["trigger", "stop", "capital", "risk_pct", "allocation_cap_pct", "expiry", "state", "notes", "exit_policy", "quantity"] as const)
+        .some(key => saved.plan[key] !== plan[key])) ||
       saved.plan.package_id !== plan.package_id || saved.plan.setup_version !== plan.setup_version ||
       saved.plan.setup_id !== plan.setup_id || saved.plan.source_snapshot_id !== plan.source_snapshot_id ||
       saved.plan.symbol !== plan.symbol || saved.plan.direction !== plan.direction ||
@@ -106,7 +112,8 @@ export async function loadUSPlanRevision(plan: USPlan, revision: number) {
   if (!Number.isInteger(revision) || revision < 1 || revision > plan.revision) {
     throw new Error("Choose an existing saved revision.");
   }
-  const result = await loadUSPlan({ ...plan, revision });
+  // Earlier revisions legitimately have different edits from the latest list.
+  const result = await loadUSPlanEvidence({ ...plan, revision }, revision === plan.revision);
   if (result.plan.symbol !== plan.symbol || result.plan.direction !== plan.direction ||
       result.plan.setup_version !== plan.setup_version || result.plan.setup_id !== plan.setup_id ||
       result.plan.source_snapshot_id !== plan.source_snapshot_id) {

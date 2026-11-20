@@ -17,6 +17,29 @@ const setup = { symbol: 'AAPL', signal: 'BULL', provider_asset_id: '11111111-111
 const data = { id: 'a'.repeat(64), market: 'US', currency: 'USD', state: 'final', session: '2026-10-16', setups: [setup] };
 const plan = { timezone: 'America/New_York', filled: false, execution_readiness: 'PLANNING_ONLY', id: 'plan-id', revision: 2, market: 'US', currency: 'USD', session: data.session, provider_asset_id: setup.provider_asset_id, package_id: data.id, setup_version: setup.setup_version, setup_id: setup.setup_id, source_snapshot_id: setup.source_snapshot_id, symbol: 'AAPL', direction: 'BULL', trigger:100, stop:95, expiry:'2026-11-25', capital:10000, risk_pct:1, allocation_cap_pct:20, notes:'Private thesis', exit_policy:'Review invalidation', state:'draft' };
 const fields = () => new Map(Object.entries({ trigger: '100', stop: '95', expiry: '2026-11-25', capital: '10000', risk_pct: '1', allocation_cap_pct: '20', notes: 'Private thesis', exit_policy: 'Review invalidation', state: 'draft', owner: 'forged', filled: 'true', earnings_state: 'checked_no_event' }));
+
+for (const change of [
+  {trigger: 101}, {stop: 94}, {capital: 11000}, {risk_pct: 2},
+  {allocation_cap_pct: 30}, {expiry: '2026-11-26'}, {state: 'planned'},
+  {notes: 'Changed thesis'}, {exit_policy: 'Changed invalidation'}, {quantity: 21},
+]) test(`same revision cannot reopen changed plan content: ${JSON.stringify(change)}`, async () => {
+  const lib = compile('lib/us-plans.ts', {'./api': {fetchAPI: async url =>
+    url.includes('/research/') ? {package: data} : {plan: {...plan, ...change}}}});
+  await assert.rejects(lib.loadUSPlan(plan), /could not be verified/);
+});
+
+test('earlier revision retains its own original editable values', async () => {
+  const old = {...plan, revision: 1, trigger: 99, stop: 93, notes: 'Original thesis'};
+  const lib = compile('lib/us-plans.ts', {'./api': {fetchAPI: async url =>
+    url.includes('/research/') ? {package: data} : {plan: old}}});
+  assert.deepEqual(await lib.loadUSPlanRevision(plan, 1), old);
+});
+
+test('latest revision opened from history also verifies listed edits', async () => {
+  const lib = compile('lib/us-plans.ts', {'./api': {fetchAPI: async url =>
+    url.includes('/research/') ? {package: data} : {plan: {...plan, notes: 'Changed'}}}});
+  await assert.rejects(lib.loadUSPlanRevision(plan, plan.revision), /could not be verified/);
+});
 test('US request uses exact source, expected revision and explicit fields only', async () => {
   let sent;
   const lib = compile('lib/us-plans.ts', { './api': { postAPI: async (url, body) => { sent = { url, body }; return { plan: {...plan,revision:3} }; } } });
