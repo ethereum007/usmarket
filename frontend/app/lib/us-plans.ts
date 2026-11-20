@@ -79,15 +79,18 @@ export function saveUSPlan(id: string, data: USPackage, setup: ResearchSetup, ex
     throw new Error("A different source requires a new plan.");
   }
   // Reuse the imported editor's explicit allowlist; never send owner/fill/event assertions.
-  return postAPI<{ plan: USPlan }>(`${ROOT}/${id}`, {
-    expected_revision: existing?.revision || 0, package_id: data.id, setup_version: setup.setup_version,
+  const editable = {
     trigger: Number(fields.get("trigger")), stop: Number(fields.get("stop")), expiry: fields.get("expiry"),
     capital: Number(fields.get("capital")), risk_pct: Number(fields.get("risk_pct")), allocation_cap_pct: Number(fields.get("allocation_cap_pct")),
     notes: fields.get("notes"), exit_policy: fields.get("exit_policy"), state: fields.get("state"),
+  };
+  return postAPI<{ plan: USPlan }>(`${ROOT}/${id}`, {
+    expected_revision: existing?.revision || 0, package_id: data.id, setup_version: setup.setup_version,
+    ...editable,
   }).then(result => {
     const saved = result?.plan;
     const asset = (setup as ResearchSetup & { provider_asset_id?: string | null }).provider_asset_id ?? null;
-    if (!saved || saved.filled !== false || saved.execution_readiness !== "PLANNING_ONLY" || saved.id !== id || saved.revision !== (existing?.revision || 0) + 1 ||
+    if (!saved || Object.entries(editable).some(([field, value]) => saved[field as keyof USPlan] !== value) || saved.filled !== false || saved.execution_readiness !== "PLANNING_ONLY" || saved.id !== id || saved.revision !== (existing?.revision || 0) + 1 ||
         saved.package_id !== data.id || saved.setup_version !== setup.setup_version ||
         saved.setup_id !== setup.setup_id || saved.source_snapshot_id !== setup.source_snapshot_id ||
         saved.symbol !== setup.symbol || saved.direction !== setup.signal || saved.session !== data.session ||
