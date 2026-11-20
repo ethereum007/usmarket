@@ -75,6 +75,37 @@ def test_revision_reload_restart_and_foreign_read_write(fixture):
     assert not (root / "swing_research.sqlite3").exists()
 
 
+@pytest.mark.parametrize('operation', ['list_plans', 'get_plan', 'save_plan', 'export_plan_revisions'])
+def test_unexpected_storage_validation_errors_are_private(fixture, monkeypatch, operation):
+    a, _, payload, *_ = fixture
+    def fail(*args, **kwargs):
+        raise ValueError('PRIVATE_STORAGE_TOKEN owner=private-owner path=private-file')
+    monkeypatch.setattr(repo, operation, fail)
+    url = '/api/us/plans/' + str(uuid4())
+    if operation == 'save_plan':
+        response = a.post(url, json=payload)
+    elif operation == 'get_plan':
+        response = a.get(url + '?revision=1')
+    else:
+        response = a.get('/api/us/plans/export' if operation == 'export_plan_revisions' else '/api/us/plans')
+    assert response.status_code == 503
+    assert response.json() == {'detail': 'US plan storage is unavailable; no save was confirmed'}
+    assert 'PRIVATE_STORAGE_TOKEN' not in response.text
+
+
+@pytest.mark.parametrize('message', [
+    'Plan changed; reload before saving another revision',
+    'A different thesis requires a new plan', 'Plan history exceeds download limit',
+])
+def test_known_storage_conflicts_keep_actionable_feedback(message):
+    def fail(*args, **kwargs):
+        raise ValueError(message)
+    with pytest.raises(api.HTTPException) as raised:
+        api.store(fail)
+    assert raised.value.status_code == 409
+    assert raised.value.detail == message
+
+
 def test_two_independent_writers_cannot_both_save_stale_revision(fixture):
     a, _, payload, _, _, _ = fixture
     url = "/api/us/plans/" + str(uuid4())

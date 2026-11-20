@@ -283,3 +283,7 @@ Save acknowledgements now compare every submitted editable value before clearing
 The save API requires a valid setup collection and a unique match for the requested source version. Duplicate matches, including identical duplicates, and malformed collections return fixed 409 feedback before storage is called. Six API regressions verify the rejection and absence of a newly created plan database. Missing requested versions retain their existing 422 response. Hosted acceptance remains open in issue #4.
 
 The plan API verifies setup and snapshot identities as canonical lowercase SHA-256 text, matching the imported engine identity function, and requires the selected symbol in the source package membership. Invalid evidence returns fixed 409 feedback before storage. Seven API regressions cover malformed hashes and out-of-package symbols. Hosted acceptance remains open in issue #4.
+
+## Private local storage failure feedback
+
+The US plan API preserves only the three known repository conflict messages (stale revision, changed thesis and export limit). Unexpected ValueError details return fixed 503 unavailable/no-save-confirmed feedback rather than arbitrary exception text. Four API regressions inject private error markers into list, exact reopen, save and export; three regressions retain actionable known conflicts. This applies to the local SQLite path. The remote adapter already sanitizes its transport/validation failures. Hosted real-account acceptance remains open in issue #4; storage flags remain unchanged/off.

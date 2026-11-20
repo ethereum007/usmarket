@@ -80,7 +80,14 @@ def store(operation: Callable, *args, access_token=None, **kwargs):
     except PermissionError:
         raise HTTPException(404, "Plan not found")
     except ValueError as exc:
-        raise HTTPException(409, str(exc))
+        detail = str(exc)
+        if detail in {
+            'Plan changed; reload before saving another revision',
+            'A different thesis requires a new plan',
+            'Plan history exceeds download limit',
+        }:
+            raise HTTPException(409, detail) from None
+        raise HTTPException(503, "US plan storage is unavailable; no save was confirmed") from None
     except (sqlite3.Error, OSError):
         raise HTTPException(503, "US plan storage is unavailable; no save was confirmed")
 
