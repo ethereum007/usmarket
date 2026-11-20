@@ -24,34 +24,40 @@ async function responseError(response: Response): Promise<APIError> {
   return new APIError(await apiErrorMessage(response), response.status, retry);
 }
 
+async function requestJSON<T>(path: string, init: RequestInit): Promise<T> {
+  const usRequest = path.startsWith("/api/us/");
+  const originalSubject = usRequest ? tokenSubject(new Headers(init.headers).get("Authorization")?.replace(/^Bearer /i, "") || null) : null;
+  const response = await fetchWithAuthRetry(path, init);
+  if (!response.ok) throw await responseError(response);
+  const result = await response.json();
+  if (usRequest && originalSubject !== tokenSubject(cachedAccessToken)) {
+    throw new Error("Account changed while receiving the response. Review the current account before retrying.");
+  }
+  return result;
+}
+
 export async function fetchAPI<T = any>(path: string): Promise<T> {
-  const res = await fetchWithAuthRetry(path, {
+  return requestJSON<T>(path, {
     credentials: "include",
     headers: await authHeaders(),
   });
-  if (!res.ok) throw await responseError(res);
-  return res.json();
 }
 
 export async function postAPI<T = any>(path: string, body: any): Promise<T> {
-  const res = await fetchWithAuthRetry(path, {
+  return requestJSON<T>(path, {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json", ...(await authHeaders()) },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw await responseError(res);
-  return res.json();
 }
 
 export async function deleteAPI<T = any>(path: string): Promise<T> {
-  const res = await fetchWithAuthRetry(path, {
+  return requestJSON<T>(path, {
     method: "DELETE",
     credentials: "include",
     headers: await authHeaders(),
   });
-  if (!res.ok) throw await responseError(res);
-  return res.json();
 }
 
 export function getWSUrl(): string {

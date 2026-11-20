@@ -8,12 +8,18 @@ const A = '11111111-1111-4111-8111-111111111111';
 const B = '22222222-2222-4222-8222-222222222222';
 const token = (sub, version = 'old') => `header.${Buffer.from(JSON.stringify({ sub })).toString('base64url')}.${version}`;
 const denied = () => new Response(JSON.stringify({ detail:'Sign in to the US workspace' }), { status:401, headers:{ 'WWW-Authenticate':'Bearer' } });
-function fixture({ timeout = 12000, initial = token(A), refresh = async () => ({ data:{ session:{ access_token:token(A,'new') } } }), lookup = async () => ({ data:{ session:null } }), response = denied, retryResponse = () => new Response(JSON.stringify({ success:true })) } = {}) {
+function fixture({ afterJSON = () => {}, timeout = 12000, initial = token(A), refresh = async () => ({ data:{ session:{ access_token:token(A,'new') } } }), lookup = async () => ({ data:{ session:null } }), response = denied, retryResponse = () => new Response(JSON.stringify({ success:true })) } = {}) {
   const calls = [];
   let refreshed = 0, listener;
   const auth = { getSession:lookup, onAuthStateChange: callback => { listener = callback; }, refreshSession: async () => { refreshed++; return refresh(); } };
   const context = { exports:{}, window:{ location:{ protocol:'https:', host:'localhost' } }, process:{ env:{NEXT_PUBLIC_API_TIMEOUT_MS:String(timeout)} },
-    Headers, Response, AbortController, setTimeout, clearTimeout, atob,
+    Headers, Response: class extends Response {
+      async json() {
+        const value = await super.json();
+        await afterJSON();
+        return value;
+      }
+    }, AbortController, setTimeout, clearTimeout, atob,
     fetch: async (url, init) => { calls.push({ url, init }); return calls.length === 1 ? response(url, init) : retryResponse(url, init); },
     require: name => name === './supabase' ? { supabase:{ auth } } : require(name) };
   vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(__dirname,'../app/lib/api.ts'),'utf8'), {
@@ -234,5 +240,16 @@ for (const next of [token(B),null]) {
     await assert.rejects(f.api.fetchAPI('/api/us/plans'), /Account changed while receiving/);
     assert.equal(f.calls.length,2);
     assert.equal(f.refreshed(),1);
+  });
+}
+
+for (const next of [token(B),null]) {
+  for (const method of ['GET','POST','DELETE']) test('US '+method+' rejects account changes during JSON reading: '+Boolean(next), async () => {
+    let f;
+    f = fixture({afterJSON:() => f.event(next),response:() => new Response(JSON.stringify({private:'old-account'}))});
+    const request = method === 'POST' ? f.api.postAPI('/api/us/plans/id',{expected_revision:2})
+      : method === 'DELETE' ? f.api.deleteAPI('/api/us/plans/id') : f.api.fetchAPI('/api/us/plans');
+    await assert.rejects(request, /Account changed while receiving/);
+    assert.equal(f.calls.length,1);
   });
 }
