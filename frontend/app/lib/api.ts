@@ -121,10 +121,14 @@ async function fetchWithAuthRetry(path: string, init: RequestInit): Promise<Resp
     }
   }
   const requestInit: RequestInit = usRequest ? { ...init, cache: "no-store", redirect: "error" } : init;
-  const response = await fetchWithTimeout(path, requestInit);
-  if (!(await isExpiredAppSession(path, response))) return response;
-
   const originalSubject = usRequest ? tokenSubject(new Headers(init.headers).get("Authorization")?.replace(/^Bearer /i, "") || null) : null;
+  const response = await fetchWithTimeout(path, requestInit);
+  const expired = await isExpiredAppSession(path, response);
+  if (usRequest && response.ok && originalSubject !== tokenSubject(cachedAccessToken)) {
+    throw new Error("Account changed while receiving the response. Review the current account before retrying.");
+  }
+  if (!expired) return response;
+
   if (usRequest && (!originalSubject || originalSubject !== tokenSubject(cachedAccessToken))) return response;
 
   const accessToken = await refreshAccessToken();
@@ -132,7 +136,11 @@ async function fetchWithAuthRetry(path: string, init: RequestInit): Promise<Resp
 
   const headers = new Headers(init.headers);
   headers.set("Authorization", `Bearer ${accessToken}`);
-  return fetchWithTimeout(path, { ...requestInit, headers });
+  const retried = await fetchWithTimeout(path, { ...requestInit, headers });
+  if (usRequest && retried.ok && originalSubject !== tokenSubject(cachedAccessToken)) {
+    throw new Error("Account changed while receiving the response. Review the current account before retrying.");
+  }
+  return retried;
 }
 
 // Unverified JWT subject is used only to prevent cross-account replay, never to grant access.

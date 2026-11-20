@@ -211,3 +211,28 @@ test('US response buffering preserves valid JSON and private response error head
     return true;
   });
 });
+
+for (const next of [token(B),null]) {
+  for (const method of ['GET','POST']) test('US '+method+' rejects an initial success after account change: '+Boolean(next), async () => {
+    let f;
+    f = fixture({response:() => {
+      f.event(next);
+      return new Response(JSON.stringify({private:'old-account'}));
+    }});
+    await assert.rejects(method === 'POST'
+      ? f.api.postAPI('/api/us/plans/id',{expected_revision:2})
+      : f.api.fetchAPI('/api/us/plans'), /Account changed while receiving/);
+    assert.equal(f.calls.length,1);
+    assert.equal(f.refreshed(),0);
+  });
+  test('US refreshed retry rejects success after account change: '+Boolean(next), async () => {
+    let f;
+    f = fixture({retryResponse:() => {
+      f.event(next);
+      return new Response(JSON.stringify({private:'old-account'}));
+    }});
+    await assert.rejects(f.api.fetchAPI('/api/us/plans'), /Account changed while receiving/);
+    assert.equal(f.calls.length,2);
+    assert.equal(f.refreshed(),1);
+  });
+}
