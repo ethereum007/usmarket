@@ -42,10 +42,31 @@ def test_hosted_probe_checks_boundary_without_sending_credentials_or_reading_bod
     assert result['passed'] is (change is None)
     assert [request.url.path for request in requests] == [
         '/api/health', '/api/us/research/access', '/api/us/plans', '/api/us/research/packages',
+        '/api/us/plans/export', '/api/us/research/jobs', '/api/us/research/live',
     ]
     assert read == []
     assert 'private runtime' not in json.dumps(result) and 'private transport' not in json.dumps(result)
     assert 'private.example' not in json.dumps(result)
+
+
+@pytest.mark.parametrize('path', ['/api/us/plans/export', '/api/us/research/jobs', '/api/us/research/live'])
+@pytest.mark.parametrize('failure', ['open', 'cache', 'vary', 'challenge'])
+def test_sensitive_read_boundaries_fail_independently(path, failure):
+    def gateway(request):
+        headers = {'cache-control': 'private, no-store', 'vary': 'Authorization', 'www-authenticate': 'Bearer'}
+        status = 200 if request.url.path == '/api/health' else 401
+        if request.url.path == path:
+            if failure == 'open': status = 200
+            if failure == 'cache': headers['cache-control'] = 'public'
+            if failure == 'vary': headers['vary'] = 'Accept-Encoding'
+            if failure == 'challenge': headers['www-authenticate'] = 'Basic'
+        return httpx.Response(status, headers=headers)
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(gateway)) as client:
+            return await probe.report(client)
+    result = asyncio.run(run())
+    assert result['passed'] is False
+    assert [row['path'] for row in result['checks'] if not row['passed']] == [path]
 
 
 

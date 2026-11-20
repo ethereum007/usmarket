@@ -8,7 +8,8 @@ import httpx
 
 ORIGIN = 'https://usmarket.onrender.com'
 REQUEST_DEADLINE_SECONDS = 25
-PATHS = ('/api/health', '/api/us/research/access', '/api/us/plans', '/api/us/research/packages')
+PATHS = ('/api/health', '/api/us/research/access', '/api/us/plans', '/api/us/research/packages',
+         '/api/us/plans/export', '/api/us/research/jobs', '/api/us/research/live')
 
 
 async def report(client=None):
