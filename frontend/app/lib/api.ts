@@ -199,10 +199,18 @@ async function fetchWithTimeout(path: string, init: RequestInit): Promise<Respon
   const timer = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
 
   try {
-    return await fetch(`${GATEWAY_URL}${path}`, {
+    const response = await fetch(`${GATEWAY_URL}${path}`, {
       ...init,
       signal: controller.signal,
     });
+    if (path.startsWith("/api/us/") && response.body) {
+      // Keep the network deadline active until the JSON response has arrived.
+      const body = await response.arrayBuffer();
+      return new Response(body, {
+        status: response.status, statusText: response.statusText, headers: response.headers,
+      });
+    }
+    return response;
   } catch (err) {
     if (err instanceof Error && err.name === "AbortError") {
       throw new Error(`API request timed out after ${Math.round(API_TIMEOUT_MS / 1000)}s: ${path}`);

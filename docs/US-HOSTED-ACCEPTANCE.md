@@ -79,3 +79,5 @@ These observations used app.services.us_hosted_probe, which reads status and sel
 The 25 October private MVP target remains missed. Actual sign-in, two-account isolation, research/save/reopen/restart and controlled backup/restore remain outstanding in issue #4.
 
 Future hosted probes retain result=transport_unavailable and add a fixed failure_kind of total_deadline, network_timeout or transport_error. Exception text remains excluded. Synthetic tests cover deadline cancellation, HTTPX timeouts and connection errors. The earlier 19 November observations retain their original unspecified transport category. Refs #9.
+
+US browser requests keep their existing network deadline active through response-body receipt. A response that sends headers and then stalls is aborted before JSON parsing and follows the existing request failure path. Synthetic GET/save tests verify cancellation without an auth retry. Existing identity-refresh and private error-header tests cover the buffered response behavior. Hosted acceptance remains open in issues #4 and #9.

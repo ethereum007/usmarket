@@ -8,13 +8,13 @@ const A = '11111111-1111-4111-8111-111111111111';
 const B = '22222222-2222-4222-8222-222222222222';
 const token = (sub, version = 'old') => `header.${Buffer.from(JSON.stringify({ sub })).toString('base64url')}.${version}`;
 const denied = () => new Response(JSON.stringify({ detail:'Sign in to the US workspace' }), { status:401, headers:{ 'WWW-Authenticate':'Bearer' } });
-function fixture({ initial = token(A), refresh = async () => ({ data:{ session:{ access_token:token(A,'new') } } }), lookup = async () => ({ data:{ session:null } }), response = denied, retryResponse = () => new Response(JSON.stringify({ success:true })) } = {}) {
+function fixture({ timeout = 12000, initial = token(A), refresh = async () => ({ data:{ session:{ access_token:token(A,'new') } } }), lookup = async () => ({ data:{ session:null } }), response = denied, retryResponse = () => new Response(JSON.stringify({ success:true })) } = {}) {
   const calls = [];
   let refreshed = 0, listener;
   const auth = { getSession:lookup, onAuthStateChange: callback => { listener = callback; }, refreshSession: async () => { refreshed++; return refresh(); } };
-  const context = { exports:{}, window:{ location:{ protocol:'https:', host:'localhost' } }, process:{ env:{} },
+  const context = { exports:{}, window:{ location:{ protocol:'https:', host:'localhost' } }, process:{ env:{NEXT_PUBLIC_API_TIMEOUT_MS:String(timeout)} },
     Headers, Response, AbortController, setTimeout, clearTimeout, atob,
-    fetch: async (url, init) => { calls.push({ url, init }); return calls.length === 1 ? response() : retryResponse(); },
+    fetch: async (url, init) => { calls.push({ url, init }); return calls.length === 1 ? response(url, init) : retryResponse(url, init); },
     require: name => name === './supabase' ? { supabase:{ auth } } : require(name) };
   vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(__dirname,'../app/lib/api.ts'),'utf8'), {
     compilerOptions:{ module:ts.ModuleKind.CommonJS },
@@ -182,4 +182,32 @@ for (const [header,expected] of [['30',30],['3600',3600],['0',undefined],['-1',u
     assert.doesNotMatch(error.message,/Private upstream/);return true;
   });
   assert.equal(f.calls.length,1);assert.equal(f.refreshed(),0);
+});
+
+for (const method of ['GET','POST']) test('US '+method+' deadline cancels a stalled response body', async () => {
+  let aborted = false;
+  const f = fixture({timeout:20,response:(_url,init) => new Response(new ReadableStream({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode('{"partial":'));
+      init.signal.addEventListener('abort', () => {
+        aborted = true;
+        controller.error(Object.assign(new Error('aborted body'), {name:'AbortError'}));
+      }, {once:true});
+    },
+  }), {status:200})});
+  await assert.rejects(method === 'POST'
+    ? f.api.postAPI('/api/us/plans/id',{expected_revision:2})
+    : f.api.fetchAPI('/api/us/plans'));
+  assert.equal(aborted,true);
+  assert.equal(f.calls.length,1);
+  assert.equal(f.refreshed(),0);
+});
+test('US response buffering preserves valid JSON and private response error headers', async () => {
+  const f = fixture({response:() => new Response(JSON.stringify({detail:'Private failure'}),
+    {status:429,headers:{'Retry-After':'15'}})});
+  await assert.rejects(f.api.fetchAPI('/api/us/plans'), error => {
+    assert.equal(error.status,429);
+    assert.equal(error.retryAfterSeconds,15);
+    return true;
+  });
 });
