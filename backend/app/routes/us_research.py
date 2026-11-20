@@ -66,6 +66,9 @@ def package_summary(data: dict):
     try:
         if not isinstance(data, dict) or data.get('market') != 'US' or data.get('currency') != 'USD':
             raise ValueError()
+        # Python's JSON decoder accepts NaN/Infinity (and overflowing numeric
+        # literals). Such saved evidence cannot be served as a JSON response.
+        json.dumps(data, allow_nan=False)
         order = publication_order(data)
         symbols = data.get('symbols')
         if not isinstance(symbols, list) or not 1 <= len(symbols) <= 500:

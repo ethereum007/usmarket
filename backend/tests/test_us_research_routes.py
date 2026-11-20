@@ -93,6 +93,41 @@ def write_catalog_package(root, package):
     (folder/(package['id']+'.json')).write_text(json.dumps(package), encoding='utf-8')
 
 
+@pytest.mark.parametrize('value', [float('nan'), float('inf'), float('-inf')])
+@pytest.mark.parametrize('remote', [False, True])
+def test_nonfinite_saved_evidence_does_not_break_catalog_or_reopen(client, monkeypatch, value, remote):
+    c, root = client
+    invalid = catalog_package('a')
+    invalid['features'] = {'AAPL': {'evidence': [None, {'close': value}]}}
+    valid = catalog_package('b')
+    valid['features'] = {'AAPL': {'close': None}}
+    monkeypatch.setattr(api.remote_research, 'enabled', lambda: remote)
+    if remote:
+        def execute(action, token, package_id=None):
+            return [invalid, valid] if action == 'list' else invalid
+        monkeypatch.setattr(api.remote_research, 'execute', execute)
+    else:
+        write_catalog_package(root, invalid)
+        write_catalog_package(root, valid)
+    response = c.get('/api/us/research/packages/' + invalid['id'])
+    assert response.status_code == 409
+    assert response.json() == {'detail': 'Saved US research metadata is invalid'}
+    catalog = c.get('/api/us/research/packages')
+    assert catalog.status_code == 200
+    assert [row['id'] for row in catalog.json()['packages']] == [valid['id']]
+    assert catalog.json()['unavailable_packages'] == 1
+
+
+def test_overflowing_saved_json_number_is_unavailable(client):
+    c, root = client
+    package = catalog_package()
+    write_catalog_package(root, package)
+    path = root / 'us-research' / (package['id'] + '.json')
+    path.write_text(path.read_text()[:-1] + ', "features": {"close": 1e999}}', encoding='utf-8')
+    assert c.get('/api/us/research/packages/' + package['id']).status_code == 409
+    assert c.get('/api/us/research/packages').json()['unavailable_packages'] == 1
+
+
 def test_catalog_sorts_by_session_then_actual_instant_not_offset_text(client):
     c,root=client
     newer=catalog_package('a')
