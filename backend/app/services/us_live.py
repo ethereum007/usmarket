@@ -43,7 +43,9 @@ def quote_diagnostic(symbol, quote, trade, now):
     age = event_age(quote.get('t'), now)
     valid = bid is not None and ask is not None and ask >= bid
     spread = ask - bid if valid else None
-    spread_bps = spread / (bid / 2 + ask / 2) * 10000 if valid else None
+    # Scale by ask first: halving tiny positive prices can underflow the
+    # midpoint to zero. Both ratios stay in [0, 1] for an uncrossed quote.
+    spread_bps = (spread / ask) / (bid / ask + 1) * 20000 if valid else None
     status = 'invalid' if not valid or age is None else 'fresh' if age <= 30 else 'stale'
     price = number(trade.get('p'))
     trade_age = event_age(trade.get('t'), now)

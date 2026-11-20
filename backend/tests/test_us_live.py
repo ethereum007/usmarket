@@ -134,6 +134,19 @@ def test_large_finite_prices_do_not_overflow_spread_midpoint():
     assert row['wide_spread'] is True
 
 
+@pytest.mark.parametrize('bid,ask,expected', [
+    (5e-324, 5e-324, 0), (5e-324, 1e-323, 20000 / 3),
+    (5e-324, 1.7e308, 20000), (1e308, 1.7e308, 5185.185185),
+])
+def test_finite_price_extremes_produce_serializable_spread(bid, ask, expected):
+    from fastapi.responses import JSONResponse
+    row = quote_diagnostic('AAPL', quote(bp=bid, ap=ask), {}, NOW)
+    assert row['quote_status'] == 'fresh'
+    assert row['spread_bps'] == pytest.approx(expected)
+    assert row['wide_spread'] is (expected > 100)
+    assert JSONResponse({'success': True, 'live': {'rows': [row]}}).status_code == 200
+
+
 @pytest.fixture
 def live_cache(monkeypatch):
     from app.services import us_live
