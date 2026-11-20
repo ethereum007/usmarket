@@ -337,7 +337,7 @@ def test_api_remote_plan_journey_uses_real_sql_and_preserves_account_boundaries(
     key=uuid4().hex*2; version=uuid4().hex*2; plan=str(uuid4())
     package={'id':key,'market':'US','currency':'USD','state':'final','universe':'us-contract-journey',
              'session':'2026-10-23','computed_at':'2026-10-24T00:00:00Z','symbols':['AAPL'],'benchmark':'SPY','feed':'sip',
-             'setups':[{'setup_version':version,'setup_id':'synthetic-setup','source_snapshot_id':'c'*64,
+             'setups':[{'setup_version':version,'setup_id':'d'*64,'source_snapshot_id':'c'*64,
                         'symbol':'AAPL','signal':'BULL','provider_asset_id':'synthetic-asset'}]}
     rpc(pg,A,'us_research_store',dict(action='publish',package_id=key,package_payload=package))
     app=FastAPI();app.include_router(us_plans.router)
