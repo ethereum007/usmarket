@@ -35,6 +35,23 @@ test('earlier revision retains its own original editable values', async () => {
   assert.deepEqual(await lib.loadUSPlanRevision(plan, 1), old);
 });
 
+for (const key of ['symbol', 'state', 'expiry', 'session', 'notes', 'exit_policy'])
+  test(`historical revision rejects non-text display field: ${key}`, async () => {
+    const old = {...plan, revision: 1, [key]: {private: 'malformed stored text'}};
+    const lib = compile('lib/us-plans.ts', {'./api': {fetchAPI: async url =>
+      url.includes('/research/') ? {package: data} : {plan: old}}});
+    await assert.rejects(lib.loadUSPlanRevision(plan, 1), /could not be verified/);
+  });
+
+test('historical revision preserves empty notes and original whitespace', async () => {
+  for (const notes of ['', '  Original thesis\n']) {
+    const old = {...plan, revision: 1, notes};
+    const lib = compile('lib/us-plans.ts', {'./api': {fetchAPI: async url =>
+      url.includes('/research/') ? {package: data} : {plan: old}}});
+    assert.equal((await lib.loadUSPlanRevision(plan, 1)).notes, notes);
+  }
+});
+
 test('latest revision opened from history also verifies listed edits', async () => {
   const lib = compile('lib/us-plans.ts', {'./api': {fetchAPI: async url =>
     url.includes('/research/') ? {package: data} : {plan: {...plan, notes: 'Changed'}}}});

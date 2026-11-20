@@ -41,6 +41,8 @@ async function loadUSPlanEvidence(plan: USPlan, compareListedContent: boolean) {
     fetchAPI<{ plan: USPlan }>(`${ROOT}/${plan.id}?revision=${plan.revision}`),
   ]);
   if (!source?.package || !saved?.plan || !Array.isArray(source.package.setups) ||
+      (["symbol", "state", "expiry", "session", "notes", "exit_policy"] as const)
+        .some(key => typeof saved.plan[key] !== "string") ||
       source.package.setups.some(row => !row || typeof row !== "object")) {
     throw new Error("Original US plan evidence could not be verified. No revision was opened.");
   }
