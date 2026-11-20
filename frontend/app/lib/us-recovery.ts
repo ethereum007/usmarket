@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { supabase, isRecoverySession } from "./supabase";
 
 export async function requestUSRecovery(email: string, origin: string) {
   if (!supabase) throw new Error("US authentication is not configured.");
@@ -13,7 +13,7 @@ export async function requestUSRecovery(email: string, origin: string) {
 }
 
 export async function updateUSRecoveredPassword(password: string, confirmation: string, recoverySession: boolean) {
-  if (!supabase || !recoverySession) throw new Error("Open a valid recovery link before updating your password.");
+  if (!supabase || !recoverySession || !isRecoverySession()) throw new Error("Open a valid recovery link before updating your password.");
   if (password.length < 12 || password !== confirmation) throw new Error("Use at least 12 characters and matching passwords.");
   try {
     const { error } = await supabase.auth.updateUser({ password });

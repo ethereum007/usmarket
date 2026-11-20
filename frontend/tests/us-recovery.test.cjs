@@ -25,13 +25,25 @@ test('reset provider errors never expose account existence or raw response', asy
 });
 test('password update needs recovery state, matching confirmation and minimum length', async () => {
   const calls = [];
-  const api = load('lib/us-recovery.ts', { './supabase': { supabase: { auth: { updateUser: async body => { calls.push(body); return {}; } } } } });
+  const api = load('lib/us-recovery.ts', { './supabase': { isRecoverySession: () => true, supabase: { auth: { updateUser: async body => { calls.push(body); return {}; } } } } });
   await assert.rejects(api.updateUSRecoveredPassword('synthetic-long-password', 'synthetic-long-password', false));
   await assert.rejects(api.updateUSRecoveredPassword('short', 'short', true));
   await assert.rejects(api.updateUSRecoveredPassword('synthetic-long-password', 'different', true));
   assert.equal(calls.length, 0);
   await api.updateUSRecoveredPassword('synthetic-long-password', 'synthetic-long-password', true);
   assert.deepEqual(Object.keys(calls[0]), ['password']);
+});
+
+test('stale React recovery flag cannot update after SDK recovery state clears', async () => {
+  let recovery = true;
+  const calls = [];
+  const api = load('lib/us-recovery.ts', {'./supabase': {
+    isRecoverySession: () => recovery,
+    supabase: {auth: {updateUser: async body => {calls.push(body); return {};}}},
+  }});
+  recovery = false; // SDK sign-out/account switch before React rerenders.
+  await assert.rejects(api.updateUSRecoveredPassword('synthetic-long-password', 'synthetic-long-password', true), /valid recovery link/);
+  assert.equal(calls.length, 0);
 });
 test('missing configuration fails closed for both recovery actions', async () => {
   const api = load('lib/us-recovery.ts', { './supabase': { supabase: null } });
@@ -92,7 +104,7 @@ test('password success followed by failed sign-out is reported as updated, not f
 });
 test('thrown SDK failures are sanitized for both recovery operations', async () => {
   const fail = async () => { throw new Error('private provider account details'); };
-  const api = load('lib/us-recovery.ts', { './supabase': { supabase: { auth: { resetPasswordForEmail: fail, updateUser: fail } } } });
+  const api = load('lib/us-recovery.ts', { './supabase': { isRecoverySession: () => true, supabase: { auth: { resetPasswordForEmail: fail, updateUser: fail } } } });
   const clean = error => !error.message.includes('private provider');
   await assert.rejects(api.requestUSRecovery('account@example.test', 'https://us.example.test'), clean);
   await assert.rejects(api.updateUSRecoveredPassword('synthetic-long-password', 'synthetic-long-password', true), clean);
