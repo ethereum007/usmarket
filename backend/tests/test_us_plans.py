@@ -490,3 +490,26 @@ def test_verified_plan_preserves_original_zoned_observation(stamp):
     from app.services.us_remote_plans import verified_plan
     row={'id':'11111111-1111-4111-8111-111111111111','revision':1,'market':'US','currency':'USD','updated_at':stamp}
     assert verified_plan(row)['updated_at']==stamp
+
+
+
+@pytest.mark.parametrize("symbol", ["AAPL", "MSFT"])
+def test_plan_save_rejects_duplicate_source_setup_version_before_storage(fixture, symbol):
+    client, _, payload, path, package, root = fixture
+    package["setups"].append({**package["setups"][0], "symbol": symbol})
+    path.write_text(json.dumps(package), encoding="utf-8")
+    response = client.post("/api/us/plans/" + str(uuid4()), json=payload)
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Source setup version is ambiguous"
+    assert not (root / "us-plans.sqlite3").exists()
+
+
+@pytest.mark.parametrize("setups", [None, {}, [None], ["invalid"]])
+def test_plan_save_rejects_malformed_source_collection_before_storage(fixture, setups):
+    client, _, payload, path, package, root = fixture
+    package["setups"] = setups
+    path.write_text(json.dumps(package), encoding="utf-8")
+    response = client.post("/api/us/plans/" + str(uuid4()), json=payload)
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Source package setup evidence is invalid"
+    assert not (root / "us-plans.sqlite3").exists()

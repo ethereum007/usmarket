@@ -114,9 +114,15 @@ def save(plan_id: UUID, payload: PlanRequest, user: dict = Depends(require_us_us
     package = read_package(payload.package_id, user.get("_access_token"))
     if package.get("state") != "final" or package.get("currency") != "USD":
         raise HTTPException(422, "A US plan requires final USD research")
-    setup = next((row for row in package.get("setups", []) if row.get("setup_version") == payload.setup_version), None)
-    if setup is None:
+    setups = package.get("setups", [])
+    if not isinstance(setups, list) or any(not isinstance(row, dict) for row in setups):
+        raise HTTPException(409, "Source package setup evidence is invalid")
+    matches = [row for row in setups if row.get("setup_version") == payload.setup_version]
+    if len(matches) > 1:
+        raise HTTPException(409, "Source setup version is ambiguous")
+    if not matches:
         raise HTTPException(422, "Setup version does not belong to source package")
+    setup = matches[0]
     if not all(setup.get(key) for key in ("setup_id", "source_snapshot_id", "symbol")):
         raise HTTPException(409, "Source setup is missing evidence identity")
     direction = setup.get("signal")
