@@ -37,7 +37,8 @@ def test_filing_dates_never_become_earnings_dates_and_amendments_preserved():
     ("acceptanceDateTime", "2026-10-21T01:00:00Z"), ("acceptanceDateTime", "2026-10-18T20:00:00"),
     ("primaryDocument", "../private.htm"), ("primaryDocument", "https://example.com/doc"),
     ("accessionNumber", "not-accession"), ("filingDate", "2026-02-30"),
-    ("filingDate", "2026-10-21"), ("items", None),
+    ("filingDate", "2026-10-21"),
+    ("reportDate", False), ("reportDate", 0), ("reportDate", None), ("items", None),
 ])
 def test_malformed_or_future_evidence_is_partial_not_false_clearance(column, value):
     data = payload()
@@ -208,3 +209,16 @@ def test_invalid_sec_operator_header_never_constructs_provider_client(monkeypatc
         with pytest.raises(filings.FilingUnavailable,match='not configured'):
             asyncio.run(filings.SecGateway().load('AAPL'))
         client.assert_not_called()
+
+
+
+def test_empty_sec_report_date_remains_unknown_without_degrading_valid_filing():
+    data = payload()
+    data["filings"]["recent"]["reportDate"][0] = ""
+    evidence = filing_evidence("AAPL", "123", data, NOW)
+    assert evidence["state"] == "available"
+    assert evidence["omitted_records"] == 0
+    filing = next(row for row in evidence["filings"] if row["form"] == "8-K")
+    assert filing["report_date"] is None
+    assert filing["earnings_date"] is None
+    assert filing["fiscal_period"] is None

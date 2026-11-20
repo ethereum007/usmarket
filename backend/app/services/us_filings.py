@@ -76,6 +76,8 @@ def filing_evidence(symbol, cik, payload, observed_at):
                     or filing_date.isoformat() != recent["filingDate"][index]):
                 raise ValueError()
             report_date = reports[index]
+            if not isinstance(report_date, str):
+                raise ValueError()
             if report_date:
                 report_date = date.fromisoformat(report_date).isoformat()
             items = item_values[index]
