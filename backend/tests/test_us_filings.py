@@ -1,4 +1,5 @@
 import asyncio
+import json
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch
 
@@ -9,6 +10,43 @@ from fastapi.testclient import TestClient
 from app.services.us_filings import issuer_for, filing_evidence, FilingUnavailable, SecGateway
 
 NOW = datetime(2026, 10, 20, tzinfo=timezone.utc)
+
+
+def test_oversized_stream_stops_early_closes_and_can_recover(monkeypatch):
+    monkeypatch.setattr('app.services.us_filings.MAX_RESPONSE_BYTES', 100_000)
+    class Oversized(httpx.AsyncByteStream):
+        def __init__(self): self.chunks = 0; self.closed = False
+        async def __aiter__(self):
+            for _ in range(100):
+                self.chunks += 1
+                yield b'x' * 65536
+        async def aclose(self): self.closed = True
+    stream = Oversized()
+    calls = []
+    def handler(request):
+        calls.append(request.url)
+        return httpx.Response(200, stream=stream) if len(calls) == 1 else httpx.Response(200, json={'recovered': True})
+    async def exercise():
+        gateway = SecGateway(interval=0)
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            with pytest.raises(FilingUnavailable, match='temporarily unavailable'):
+                await gateway.get(client, 'https://www.sec.gov/files/company_tickers.json', 3600)
+            assert stream.closed and stream.chunks == 2
+            assert not gateway.lock.locked() and gateway.cache == {}
+            recovered, _ = await gateway.get(client, 'https://www.sec.gov/files/company_tickers.json', 3600)
+            assert recovered == {'recovered': True}
+    asyncio.run(exercise())
+
+
+def test_exact_stream_limit_accepts_original_json(monkeypatch):
+    encoded = json.dumps({'value': 'synthetic'}).encode()
+    monkeypatch.setattr('app.services.us_filings.MAX_RESPONSE_BYTES', len(encoded))
+    async def exercise():
+        gateway = SecGateway(interval=0)
+        async with httpx.AsyncClient(transport=httpx.MockTransport(lambda request: httpx.Response(200, content=encoded))) as client:
+            value, _ = await gateway.get(client, 'https://www.sec.gov/files/company_tickers.json', 3600)
+            assert value == {'value': 'synthetic'}
+    asyncio.run(exercise())
 
 
 def payload():

@@ -1,5 +1,6 @@
 """Read-only current SEC issuer mapping and filing evidence, never an earnings calendar."""
 import asyncio
+import json
 from datetime import date, datetime, timezone
 import os
 import re
@@ -8,6 +9,7 @@ import time
 import httpx
 
 REQUEST_DEADLINE_SECONDS = 20
+MAX_RESPONSE_BYTES = 10_000_000
 
 
 def valid_operator_agent(value):
@@ -120,10 +122,15 @@ class SecGateway:
             await asyncio.sleep(max(0, self.interval - (time.monotonic() - self.last)))
             self.last = time.monotonic()
             try:
-                response = await client.get(url)
-                if response.status_code != 200 or len(response.content) > 10_000_000:
-                    raise FilingUnavailable("SEC evidence is temporarily unavailable")
-                data = response.json()
+                async with client.stream('GET', url) as response:
+                    if response.status_code != 200:
+                        raise FilingUnavailable("SEC evidence is temporarily unavailable")
+                    body = bytearray()
+                    async for chunk in response.aiter_bytes(chunk_size=65536):
+                        if len(body) + len(chunk) > MAX_RESPONSE_BYTES:
+                            raise FilingUnavailable("SEC evidence is temporarily unavailable")
+                        body.extend(chunk)
+                    data = json.loads(body)
             except (httpx.HTTPError, ValueError):
                 raise FilingUnavailable("SEC evidence is temporarily unavailable") from None
             if len(self.cache) >= 64:
