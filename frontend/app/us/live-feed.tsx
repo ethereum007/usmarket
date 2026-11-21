@@ -29,6 +29,20 @@ type Live = {
   transport: string;
   error?: string;
 };
+export function verifyLiveIdentity(value: unknown, symbols: string, feed: string): Live {
+  const live = value as Live;
+  if (!live || live.feed !== feed || !["connected", "degraded", "denied", "unavailable"].includes(live.state)) {
+    throw new Error("Live response could not be verified");
+  }
+  if (live.rows === undefined && ["denied", "unavailable"].includes(live.state)) return live;
+  const requested = symbols.split(",");
+  if (!Array.isArray(live.rows) || live.rows.length !== requested.length ||
+      live.rows.some(row => !row || typeof row.symbol !== "string" || !requested.includes(row.symbol)) ||
+      new Set(live.rows.map(row => row.symbol)).size !== requested.length) {
+    throw new Error("Live response could not be verified");
+  }
+  return live;
+}
 function age(timestamp: string | null, now: number) {
   const value = timestamp ? (now - Date.parse(timestamp)) / 1000 : NaN;
   return Number.isFinite(value) && value >= -5 ? Math.max(0, value) : null;
@@ -68,7 +82,7 @@ export default function LiveFeed({
             `/api/us/research/live?symbols=${encodeURIComponent(symbols)}&feed=${feed}`,
           );
           if (active) {
-            setLive(result.live);
+            setLive(verifyLiveIdentity(result.live, symbols, feed));
             setError("");
           }
         } catch (e) {

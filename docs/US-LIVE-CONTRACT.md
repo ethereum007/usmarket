@@ -24,3 +24,7 @@ Three actual local samples on 20 November at 14:47:22, 14:47:37 and 14:47:45 UTC
 ## Finite spread arithmetic
 
 Spread basis points now use ask-scaled ratios, avoiding midpoint underflow when both positive finite prices are subnormal. The prior midpoint could round to zero and raise division by zero, preventing the live response from serializing. Tests exercise equal/minimum positive prices, unequal subnormal prices, mixed minimum/large prices and large finite prices through the JSON response serializer. The formula retains the same midpoint-based definition and wide-spread threshold; invalid prices remain unknown. These are synthetic numeric-boundary regressions, not additional market-open or hosted acceptance evidence.
+
+## Browser feed and symbol correspondence
+
+The live panel verifies that responses belong to the selected feed and contain exactly the requested symbol set, without duplicates, missing rows or foreign symbols, before displaying the observation. Malformed collections and unknown connection states follow fixed unavailable feedback. Explicit denied/unavailable responses may omit rows; their feed must still match. Provider row ordering is preserved and no fallback feed or invented rows are introduced. Twelve synthetic browser-contract regressions run in the US frontend CI suite. This does not prove actual provider recovery, aggregate rate limits or hosted real-account acceptance. No subscription, credential or storage flag changed.
