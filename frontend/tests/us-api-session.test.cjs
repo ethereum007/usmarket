@@ -29,6 +29,23 @@ function fixture({ afterJSON = () => {}, timeout = 12000, initial = token(A), re
   api.primeAuthAccessToken(initial);
   return { api, calls, refreshed:() => refreshed, event: next => listener('SIGNED_IN', next ? { access_token:next } : null) };
 }
+
+for (const status of [400,403,404,409,422,500,502,503])
+for (const body of [JSON.stringify({detail:'PRIVATE_TOKEN private-owner private-path'}), '<html>PRIVATE_TOKEN private-owner private-path</html>'])
+test(`US ${status} suppresses arbitrary upstream error body ${body.startsWith('<')?'html':'json'}`, async () => {
+  const f=fixture({response:()=>new Response(body,{status})});
+  await assert.rejects(f.api.postAPI('/api/us/plans/id',{notes:'Retain draft'}), error=>{
+    assert.equal(error.status,status);
+    assert.doesNotMatch(error.message,/PRIVATE_TOKEN|private-owner|private-path|<html>/);
+    return true;
+  });
+  assert.equal(f.calls.length,1);assert.equal(f.refreshed(),0);
+});
+
+test('non-US error feedback retains existing behavior',async()=>{
+  const f=fixture({response:()=>new Response(JSON.stringify({detail:'Legacy feedback'}),{status:422})});
+  await assert.rejects(f.api.fetchAPI('/api/legacy'),/Legacy feedback/);
+});
 for (const method of ['GET','POST']) test(`US ${method} retries once with refreshed same-account token`, async () => {
   const f = fixture();
   if (method === 'POST') await f.api.postAPI('/api/us/plans/id', { expected_revision:2, notes:'Retain exact draft' });

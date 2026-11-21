@@ -17,18 +17,29 @@ export class APIError extends Error {
   }
 }
 
-async function responseError(response: Response): Promise<APIError> {
+async function responseError(response: Response, privateUS = false): Promise<APIError> {
   const raw = response.headers.get("retry-after") || "";
   const seconds = /^\d{1,4}$/.test(raw) ? Number(raw) : NaN;
   const retry = Number.isInteger(seconds) && seconds >= 1 && seconds <= 3600 ? seconds : undefined;
-  return new APIError(await apiErrorMessage(response), response.status, retry);
+  const messages: Record<number, string> = {
+    401: "Sign in to the US workspace before retrying.",
+    403: "Private US access was not confirmed. Check your invitation and email confirmation.",
+    404: "Requested US evidence was not found. Reload before retrying.",
+    409: "Saved US evidence changed or could not be verified. Reload before retrying.",
+    422: "Check the request fields and source evidence before retrying.",
+    429: "Market data is temporarily busy. Your latest saved view is still available; please retry shortly.",
+  };
+  const message = privateUS
+    ? `API error ${response.status}: ${messages[response.status] || "US service is temporarily unavailable. No save was confirmed."}`
+    : await apiErrorMessage(response);
+  return new APIError(message, response.status, retry);
 }
 
 async function requestJSON<T>(path: string, init: RequestInit): Promise<T> {
   const usRequest = path.startsWith("/api/us/");
   const originalSubject = usRequest ? tokenSubject(new Headers(init.headers).get("Authorization")?.replace(/^Bearer /i, "") || null) : null;
   const response = await fetchWithAuthRetry(path, init);
-  if (!response.ok) throw await responseError(response);
+  if (!response.ok) throw await responseError(response, usRequest);
   const result = await response.json();
   if (usRequest && originalSubject !== tokenSubject(cachedAccessToken)) {
     throw new Error("Account changed while receiving the response. Review the current account before retrying.");
