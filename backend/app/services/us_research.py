@@ -28,8 +28,13 @@ def normalize_bars(raw: list[dict], sessions: list[str]) -> list[dict]:
     accepted = set(sessions)
     rows = {}
     for bar in raw:
+        if not isinstance(bar, dict) or not isinstance(bar.get('t'), str):
+            continue
         try:
             stamp = datetime.fromisoformat(bar['t'].replace('Z', '+00:00'))
+        except ValueError:
+            continue
+        try:
             if stamp.tzinfo is None:
                 continue
             day = stamp.astimezone(NY).date().isoformat()

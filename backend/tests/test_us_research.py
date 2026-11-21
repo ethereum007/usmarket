@@ -19,6 +19,24 @@ def test_missing_calendar_and_bad_bars_are_excluded():
     assert normalize_bars([bar(), bar('2026-07-02'), bar(close=100)], ['2026-07-02']) == [dict(date='2026-07-02',open=10,high=12,low=9,close=10,volume=100)]
 
 
+@pytest.mark.parametrize('stamp', ['invalid', '2026-99-99T00:00:00Z', None, True, {'private':'invalid timestamp'}])
+def test_malformed_bar_timestamp_is_omitted_without_losing_valid_neighbor(stamp):
+    invalid = {**bar(), 't': stamp}
+    assert normalize_bars([invalid, bar()], ['2026-07-01']) == normalize_bars([bar()], ['2026-07-01'])
+    calendar = [{'date':'2026-07-01', 'close':'16:00'}]
+    now = datetime(2026,7,2,tzinfo=timezone.utc)
+    package = research_package(['AAPL'], {'SPY':[bar()], 'AAPL':[invalid]}, calendar, now)
+    assert package['state'] == 'partial' and package['missing_symbols'] == ['AAPL']
+    assert package['setups'] == []
+    with pytest.raises(ValueError, match='Benchmark missing'):
+        research_package(['AAPL'], {'SPY':[invalid], 'AAPL':[bar()]}, calendar, now)
+
+
+def test_conflicting_valid_daily_bars_remain_fatal():
+    with pytest.raises(ValueError, match='Conflicting daily bars'):
+        normalize_bars([bar(), bar(close=11)], ['2026-07-01'])
+
+
 def test_missing_latest_benchmark_fails():
     with pytest.raises(ValueError, match='Benchmark missing'):
         research_package(['AAPL'], {'SPY':[]}, [{'date':'2026-07-01','close':'16:00'}], datetime(2026,7,2,tzinfo=timezone.utc))
