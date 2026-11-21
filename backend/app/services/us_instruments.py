@@ -9,6 +9,7 @@ import httpx
 from app.services.swing_repository import identity
 
 VERSION = "us-alpaca-assets-v1"
+LOOKUP_DEADLINE_SECONDS = 120
 
 
 def instrument_snapshot(symbols: list[str], raw: dict, observed_at: datetime) -> dict:
@@ -83,13 +84,16 @@ async def load_instruments(client: httpx.AsyncClient, symbols: list[str]) -> dic
                 return symbol, None
     tasks = [asyncio.create_task(load(symbol)) for symbol in members]
     try:
-        rows = await asyncio.gather(*tasks)
-    except BaseException:
+        async with asyncio.timeout(LOOKUP_DEADLINE_SECONDS):
+            rows = await asyncio.gather(*tasks)
+    except BaseException as exc:
         # gather does not cancel siblings when one lookup fails. Drain them before
         # the caller closes its HTTP client or releases refresh capacity.
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
+        if isinstance(exc, TimeoutError):
+            raise RuntimeError("US instrument resolution timed out; research was not published") from None
         raise
     return instrument_snapshot(members, dict(rows), datetime.now(timezone.utc))
 

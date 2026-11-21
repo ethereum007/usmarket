@@ -7,6 +7,34 @@ import httpx
 import pytest
 
 from app.services.us_instruments import instrument_snapshot, load_instruments, bind_instruments
+
+
+def test_batch_deadline_cancels_active_and_queued_lookups_and_recovers(monkeypatch):
+    from app.services import us_instruments as service
+    monkeypatch.setattr(service, 'LOOKUP_DEADLINE_SECONDS', 0.02)
+    async def exercise():
+        started, cancelled = [], []
+        recover = False
+        async def handler(request):
+            symbol = request.url.path.rsplit('/', 1)[-1]
+            if recover:
+                return httpx.Response(404)
+            started.append(symbol)
+            try:
+                await asyncio.Event().wait()
+            finally:
+                cancelled.append(symbol)
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            with pytest.raises(RuntimeError, match='resolution timed out; research was not published'):
+                await asyncio.wait_for(service.load_instruments(client, ['AAPL','AMD','META','MSFT','NVDA','QQQ','SPY']), 1)
+            assert len(started) == 5 and set(cancelled) == set(started)
+            # Queued lookups never reached the client; no tasks survive expiry.
+            await asyncio.sleep(0)
+            assert len(started) == 5
+            recover = True
+            result = await service.load_instruments(client, ['AAPL'])
+            assert result['records']['AAPL']['resolution'] == 'unavailable'
+    asyncio.run(exercise())
 from app.services.us_research import research_package
 
 NOW = datetime(2026, 10, 20, tzinfo=timezone.utc)
