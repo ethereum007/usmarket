@@ -40,9 +40,24 @@ test('signed-out or invalid identities never touch browser notes',()=>{
   }
   assert.equal(store.reads.length,0);assert.equal(store.writes.length,0);
 });
-test('malformed note entries are excluded and storage failures remain explicit',()=>{
+test('malformed note entries fail rather than returning a reduced collection for autosave',()=>{
   const store=storage({[notesKey(A)]:JSON.stringify({AAPL:{note:'Valid',saved:true},MSFT:{note:2,saved:true},'../bad':{note:'Bad',saved:true}})});
-  assert.deepEqual(Object.keys(readNotes(store,A)),['AAPL']);
+  const original=store.data.get(notesKey(A));
+  assert.throws(()=>readNotes(store,A),/could not be verified/);
+  assert.equal(store.data.get(notesKey(A)),original);assert.equal(store.writes.length,0);
   assert.throws(()=>readNotes({getItem:()=>'{bad'},A));
   assert.throws(()=>writeNotes({setItem:()=>{throw Error('Unavailable');}},A,{}));
+});
+
+for(const value of [null,[],false,42,{AAPL:null},{AAPL:{note:'Preserve private note',saved:'true'}}])
+test('invalid stored notes stay untouched '+JSON.stringify(value),()=>{
+  const original=JSON.stringify(value),store=storage({[notesKey(A)]:original});
+  assert.throws(()=>readNotes(store,A),/could not be verified/);
+  assert.equal(store.data.get(notesKey(A)),original);assert.equal(store.writes.length,0);
+});
+
+test('valid notes retain empty text, whitespace and shortlist flags',()=>{
+  const value={AAPL:{note:'  Original thesis\n',saved:true},MSFT:{note:'',saved:false}};
+  const store=storage({[notesKey(A)]:JSON.stringify(value)});
+  assert.equal(JSON.stringify(readNotes(store,A)),JSON.stringify(value));
 });
