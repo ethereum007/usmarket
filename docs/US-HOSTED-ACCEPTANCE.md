@@ -91,3 +91,7 @@ At 18:26:01 UTC, health and access observations timed out; the other five routes
 ## Recovery state at submission
 
 Password recovery updates now require both the rendered recovery flag and the current SDK recovery-event state at the time the helper is called. A sign-out or account switch can clear the SDK state before React rerenders; a stale form can no longer invoke updateUser in that interval. The provider remains responsible for authorizing password changes. A synthetic regression clears SDK recovery state while retaining the stale rendered flag and verifies zero update calls. Existing valid recovery, password policy and sanitized provider-failure tests remain. No real recovery email, account or password was changed. Hosted recovery acceptance remains open.
+
+## Unexpected private API errors
+
+The hosted API now returns fixed 500 feedback for unexpected exceptions, with explicit private/no-store, no-cache, expiry and Vary Authorization headers on US private paths. Starlette handles these failures outside the normal cache middleware, so the handler sets its own headers. Expected authentication, validation and conflict responses retain existing behavior. Three synthetic API regressions inject private exception markers through research, plan and filing dependencies and verify sanitized uncacheable responses. Eighty cache-policy, entry-point and auth tests pass. This covers client-visible error handling, not provider reliability or hosted real-account acceptance. No accounts, credentials or storage flags changed.

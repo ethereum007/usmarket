@@ -7,11 +7,24 @@ import os
 import re
 
 from fastapi import FastAPI, Response
+from fastapi.responses import JSONResponse
 from app.routes.us_research import router
 from app.routes.us_plans import router as plans_router
 from app.routes.us_filings import router as filings_router
 
 app = FastAPI(title='US Market Research API', version='0.1.0')
+
+
+@app.exception_handler(Exception)
+async def unexpected_failure(request, exc):
+    # ServerErrorMiddleware handles these outside the normal cache middleware.
+    headers = {'Cache-Control': 'no-store'}
+    if request.url.path == '/api/us' or request.url.path.startswith('/api/us/'):
+        headers.update({'Cache-Control': 'private, no-store', 'Pragma': 'no-cache',
+                        'Expires': '0', 'Vary': 'Authorization'})
+    return JSONResponse({'detail': 'US service is temporarily unavailable'}, status_code=500, headers=headers)
+
+
 @app.middleware('http')
 async def private_us_cache_policy(request, call_next):
     response = await call_next(request)
