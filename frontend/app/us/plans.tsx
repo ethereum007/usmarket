@@ -150,6 +150,9 @@ export function USPlanEditor({ data, setup, existing, onSaved, replacementGuard,
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (pending.current) return;
+    // Even untouched defaults may have been saved before a timeout. Preserve
+    // the retry identity and departure warning until acknowledgement confirms.
+    dirty.current = true;
     onDraftStarted?.();
     pending.current = true;
     setSaving(true);

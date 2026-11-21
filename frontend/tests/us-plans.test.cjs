@@ -216,6 +216,17 @@ test('failed save preserves unsaved departure warning and confirmed save clears 
   fails=false;await f.element.props.onSubmit(event);
   assert.equal(f.departure().blocked,false);assert.deepEqual(f.saved,[plan]);
 });
+
+test('unconfirmed save of untouched defaults retains departure warning until confirmed retry',async()=>{
+  let fails=true;
+  const f=departureFixture(async()=>{if(fails)throw Error('Not confirmed');return {plan};});
+  assert.equal(f.departure().blocked,false);
+  const event={preventDefault(){},currentTarget:{}};
+  await f.element.props.onSubmit(event);
+  assert.equal(f.departure().blocked,true);assert.equal(f.saved.length,0);
+  fails=false;await f.element.props.onSubmit(event);
+  assert.equal(f.departure().blocked,false);assert.deepEqual(f.saved,[plan]);
+});
 test('pending save warns on departure and late failure cannot update unmounted editor',async()=>{
   let reject;const f=departureFixture(()=>new Promise((done,fail)=>{reject=fail;}));
   const pending=f.element.props.onSubmit({preventDefault(){},currentTarget:{}});
@@ -241,7 +252,7 @@ test('replacement guard confirms current edits and blocks pending saves',async()
 test('failed save keeps replacement confirmation required',async()=>{
   const guard={current:null};let prompts=0;
   const f=editorFixture(async()=>{throw Error('unconfirmed');},null,undefined,{confirm:()=>{prompts++;return false;},addEventListener(){},removeEventListener(){}},guard);
-  f.element.props.onChange();await f.element.props.onSubmit({preventDefault(){},currentTarget:{}});
+  await f.element.props.onSubmit({preventDefault(){},currentTarget:{}});
   assert.equal(guard.current(),false);assert.equal(prompts,1);assert.equal(f.saved.length,0);
 });
 
