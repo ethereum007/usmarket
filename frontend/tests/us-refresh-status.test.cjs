@@ -19,6 +19,27 @@ test('transport failure preserves recorded outcome and sanitizes details',async(
   assert.match(fixture.errors[0],/last recorded outcome is unchanged/);
   assert.doesNotMatch(fixture.errors[0],/private/);
 });
+
+for(const received of [
+  {state:'queued',updated_at:'2026-11-20T15:01:00Z'},
+  {state:'running',updated_at:'2026-11-20T14:59:00Z'},
+  {state:'completed',package_id:'a'.repeat(64),updated_at:'2026-11-20T14:59:00Z'},
+  {state:'failed'},
+  {state:'running',updated_at:'2026-11-20T15:01:00'},
+])test('regressed or unverified poll preserves prior observation '+JSON.stringify(received),async()=>{
+  const fixture=load(async()=>({job:{id:'one',...received}}));
+  const previous={id:'one',state:'running',updated_at:'2026-11-20T15:00:00Z'};
+  fixture.start(previous);await fixture.timers[0]();
+  assert.equal(fixture.statuses.length,0);assert.equal(fixture.errors.length,1);
+  assert.match(fixture.errors[0],/last recorded outcome is unchanged/);
+  assert.equal(previous.state,'running');
+});
+
+test('poll orders instants rather than timestamp offset text',async()=>{
+  const fixture=load(async()=>({job:{id:'one',state:'completed',package_id:'a'.repeat(64),updated_at:'2026-11-20T10:01:00-05:00'}}));
+  fixture.start({id:'one',state:'running',updated_at:'2026-11-20T15:00:00Z'});await fixture.timers[0]();
+  assert.equal(fixture.statuses[0].state,'completed');assert.equal(fixture.errors.length,0);
+});
 for(const state of ['completed','failed','interrupted'])test(`server ${state} remains the recorded outcome`,async()=>{
   const fixture=load(async()=>({job:{id:'one',state,...(state==='completed'?{package_id:'a'.repeat(64)}:{})}}));fixture.start({id:'one',state:'running'});await fixture.timers[0]();
   assert.equal(fixture.statuses[0].state,state);assert.equal(fixture.errors.length,0);

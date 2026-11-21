@@ -12,6 +12,15 @@ export function observeRefresh(job: RefreshJob | null, onStatus: (job: RefreshJo
       const result = await fetchAPI<{ job: RefreshJob }>(`/api/us/research/jobs/${encodeURIComponent(job.id)}`);
       const [observation] = validateRefreshHistory([result.job]);
       if (observation.id !== job.id) throw new Error("Unexpected refresh identity");
+      if (job.state === "running" && observation.state === "queued") throw new Error("Regressed refresh state");
+      if (job.updated_at !== undefined) {
+        const previous = Date.parse(job.updated_at);
+        const observed = Date.parse(observation.updated_at || "");
+        if (![job.updated_at, observation.updated_at || ""].every(value => /(?:Z|[+-]\d{2}:\d{2})$/.test(value)) ||
+            !Number.isFinite(previous) || !Number.isFinite(observed) || observed < previous) {
+          throw new Error("Unverified refresh observation order");
+        }
+      }
       if (active) onStatus(observation);
     } catch {
       if (active) onUnavailable("Refresh status could not be checked. The last recorded outcome is unchanged. Check again or inspect saved research.");

@@ -73,3 +73,7 @@ US generation now places instrument resolution plus calendar/history retrieval (
 ## Instrument lookup task cleanup
 
 Instrument retrieval now owns explicit lookup tasks and cancels/awaits all remaining tasks before propagating access denial, another fatal error or caller cancellation. asyncio.gather alone does not stop siblings after one failure. This prevents queued/in-flight siblings from continuing after generation returns and the HTTP client/capacity is cleaned up. Already-sent requests cannot be undone; ordinary missing/invalid asset responses remain explicit unavailable evidence. Synthetic async HTTP tests verify both denial statuses and caller cancellation leave no lookup tasks running. No real provider request or hosted configuration change was made, and aggregate/market-open acceptance remains open.
+
+## Monotonic browser poll observations
+
+A poll cannot replace a recorded running job with queued state. When the prior observation has a timestamp, the response must have a valid zoned timestamp at least as recent, compared as instants rather than offset text. Older, missing or unzoned evidence follows the existing unavailable-status path and preserves the last recorded outcome. This does not infer worker liveness or terminal completion. Six synthetic regressions cover state regression, older active/terminal timestamps, missing/unzoned timestamps and a valid later offset timestamp. No worker, persisted record or hosted storage flag changed. Hosted reliability acceptance remains open.
