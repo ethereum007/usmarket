@@ -44,6 +44,21 @@ function renderEvidence(view, filings) {
 }
 const reportRows=[{id:'results',form:'8-K/A',accepted_at:'2026-10-19T20:00:00Z',filing_date:'2026-10-19',report_date:'2026-10-16',source_url:'https://www.sec.gov/Archives/results.htm',amendment:true,results_item_reported:true},
 {id:'periodic',form:'10-Q',accepted_at:'2026-10-18T20:00:00Z',filing_date:'2026-10-18',report_date:'2026-09-30',source_url:'https://www.sec.gov/Archives/periodic.htm',amendment:false,results_item_reported:false}];
+
+const verifier=load('us/filings.tsx',{'../lib/api':{},'../latest-updates/model':model}).verifyFilingEvidence;
+const validEvidence={symbol:'AAPL',cik:'123',state:'partial',observed_at:'2026-10-19T21:00:00Z',scope:'Issuer-level recent filings',omitted_records:1,filings:reportRows};
+for(const change of [
+  {symbol:'MSFT'}, {filings:null}, {filings:[null]}, {filings:[reportRows[0],reportRows[0]]},
+  {scope:{}}, {omitted_records:-1}, {observed_at:'2026-10-19T21:00:00'},
+  ...[{results_item_reported:'false'},{amendment:1},{form:{}},{report_date:{}},{accepted_at:'bad'}]
+    .map(change=>({filings:[{...reportRows[0],...change}]})),
+])test('malformed filing response is unavailable '+JSON.stringify(change),()=>{
+  assert.throws(()=>verifier({...validEvidence,...change},'AAPL'),/could not be verified/);
+});
+test('filing verification preserves partial evidence and unknown report dates',()=>{
+  const value={...validEvidence,filings:[{...reportRows[0],report_date:null}]};
+  assert.equal(verifier(value,'AAPL'),value);
+});
 test('filing, report and acceptance dates stay distinct with no fiscal-period inference',()=>{
   const html=renderEvidence('all',reportRows);
   assert.match(html,/Accepted/);assert.match(html,/Filing date: 2026-10-19/);assert.match(html,/Report date: 2026-10-16/);

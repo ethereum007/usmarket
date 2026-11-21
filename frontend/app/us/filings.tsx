@@ -6,6 +6,24 @@ import { sourceLink } from "../latest-updates/model";
 type Filing = { id: string; form: string; accepted_at: string; filing_date?: string; report_date?: string | null; source_url: string; amendment: boolean; results_item_reported: boolean };
 type Evidence = { symbol: string; cik: string; state: string; observed_at: string; filings: Filing[]; omitted_records: number; scope: string };
 
+export function verifyFilingEvidence(value: unknown, symbol: string): Evidence {
+  const evidence = value as Evidence;
+  const zoned = (stamp: unknown) => typeof stamp === "string" && /(?:Z|[+-]\d{2}:\d{2})$/.test(stamp) && Number.isFinite(Date.parse(stamp));
+  if (!evidence || evidence.symbol !== symbol || typeof evidence.cik !== "string" ||
+      !["available", "partial"].includes(evidence.state) || typeof evidence.scope !== "string" ||
+      !zoned(evidence.observed_at) || !Number.isSafeInteger(evidence.omitted_records) || evidence.omitted_records < 0 ||
+      !Array.isArray(evidence.filings) || evidence.filings.length > 20 || evidence.filings.some(row =>
+        !row || typeof row.id !== "string" || !row.id || typeof row.form !== "string" ||
+        typeof row.source_url !== "string" || !zoned(row.accepted_at) ||
+        typeof row.amendment !== "boolean" || typeof row.results_item_reported !== "boolean" ||
+        (row.filing_date !== undefined && typeof row.filing_date !== "string") ||
+        (row.report_date != null && typeof row.report_date !== "string")) ||
+      new Set(evidence.filings.map(row => row.id)).size !== evidence.filings.length) {
+    throw new Error("SEC evidence could not be verified");
+  }
+  return evidence;
+}
+
 export default function USFilings({ symbol }: { symbol: string }) {
   const [evidence, setEvidence] = useState<Evidence | null>(null);
   const [error, setError] = useState("");
@@ -19,7 +37,7 @@ export default function USFilings({ symbol }: { symbol: string }) {
     if (!symbol) return;
     setLoading(true);
     fetchAPI<{ evidence: Evidence }>(`/api/us/filings?symbol=${encodeURIComponent(symbol)}`)
-      .then(result => { if (active) setEvidence(result.evidence); })
+      .then(result => { if (active) setEvidence(verifyFilingEvidence(result.evidence, symbol)); })
       .catch(cause => { if (active) setError(cause instanceof Error ? cause.message : "SEC evidence unavailable"); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
