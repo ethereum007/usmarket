@@ -30,7 +30,7 @@ function fixture({ afterJSON = () => {}, timeout = 12000, initial = token(A), re
   return { api, calls, refreshed:() => refreshed, event: next => listener('SIGNED_IN', next ? { access_token:next } : null) };
 }
 
-for (const status of [400,403,404,409,422,500,502,503])
+for (const status of [400,403,404,408,409,413,422,500,502,503])
 for (const body of [JSON.stringify({detail:'PRIVATE_TOKEN private-owner private-path'}), '<html>PRIVATE_TOKEN private-owner private-path</html>'])
 test(`US ${status} suppresses arbitrary upstream error body ${body.startsWith('<')?'html':'json'}`, async () => {
   const f=fixture({response:()=>new Response(body,{status})});

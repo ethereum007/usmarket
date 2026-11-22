@@ -25,7 +25,9 @@ async function responseError(response: Response, privateUS = false): Promise<API
     401: "Sign in to the US workspace before retrying.",
     403: "Private US access was not confirmed. Check your invitation and email confirmation.",
     404: "Requested US evidence was not found. Reload before retrying.",
+    408: "US request was not received in time. Check the connection before retrying.",
     409: "Saved US evidence changed or could not be verified. Reload before retrying.",
+    413: "US request exceeds supported size. Reduce the request before retrying.",
     422: "Check the request fields and source evidence before retrying.",
     429: "Market data is temporarily busy. Your latest saved view is still available; please retry shortly.",
   };
