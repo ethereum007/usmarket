@@ -1,5 +1,26 @@
 from fastapi.testclient import TestClient
 from app.us_main import app
+import pytest
+
+
+@pytest.mark.parametrize('body', [
+    b'{"direction":"PRIVATE_INPUT_MARKER","trigger":100}',
+    b'{"notes":"PRIVATE_INPUT_MARKER",',
+    b'{"direction":"BULL","trigger":{"PRIVATE_INPUT_MARKER":1}}',
+])
+def test_private_validation_never_echoes_submitted_values(body):
+    from app.us_auth import require_us_user
+    app.dependency_overrides[require_us_user] = lambda: {'id': 'owner-a'}
+    try:
+        response = TestClient(app).post('/api/us/plans/sizing-preview', content=body,
+                                        headers={'Content-Type': 'application/json'})
+    finally:
+        app.dependency_overrides.pop(require_us_user, None)
+    assert response.status_code == 422
+    assert response.json() == {'detail': 'Check the request fields and source evidence before retrying.'}
+    assert 'PRIVATE_INPUT_MARKER' not in response.text
+    assert response.headers['cache-control'] == 'private, no-store'
+    assert 'authorization' in response.headers['vary'].lower()
 
 def test_us_entrypoint_mounts_only_us_routes_and_health():
     paths=set(app.openapi()['paths'])

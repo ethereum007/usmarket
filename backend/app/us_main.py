@@ -8,6 +8,8 @@ import re
 
 from fastapi import FastAPI, Response
 from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from fastapi.exception_handlers import request_validation_exception_handler
 from app.routes.us_research import router
 from app.routes.us_plans import router as plans_router
 from app.routes.us_filings import router as filings_router
@@ -15,6 +17,14 @@ from app.services.us_request_limits import USRequestBodyLimit
 
 app = FastAPI(title='US Market Research API', version='0.1.0')
 app.add_middleware(USRequestBodyLimit)
+
+
+@app.exception_handler(RequestValidationError)
+async def invalid_request(request, exc):
+    if request.url.path == '/api/us' or request.url.path.startswith('/api/us/'):
+        # Default validation details can contain submitted values and parser context.
+        return JSONResponse({'detail': 'Check the request fields and source evidence before retrying.'}, status_code=422)
+    return await request_validation_exception_handler(request, exc)
 
 
 @app.exception_handler(Exception)
