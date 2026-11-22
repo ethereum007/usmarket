@@ -11,8 +11,10 @@ from fastapi.responses import JSONResponse
 from app.routes.us_research import router
 from app.routes.us_plans import router as plans_router
 from app.routes.us_filings import router as filings_router
+from app.services.us_request_limits import USRequestBodyLimit
 
 app = FastAPI(title='US Market Research API', version='0.1.0')
+app.add_middleware(USRequestBodyLimit)
 
 
 @app.exception_handler(Exception)

@@ -75,6 +75,18 @@ def test_revision_reload_restart_and_foreign_read_write(fixture):
     assert not (root / "swing_research.sqlite3").exists()
 
 
+def test_largest_escaped_note_fields_fit_private_body_limit(fixture):
+    from app.services.us_request_limits import USRequestBodyLimit
+    a, _, payload, *_ = fixture
+    a.app.add_middleware(USRequestBodyLimit)
+    values = {**payload, 'notes': '\U0001f600' * 10000, 'exit_policy': '\U0001f600' * 1000}
+    encoded = json.dumps(values).encode()
+    assert len(encoded) > 128 * 1024
+    response = a.post('/api/us/plans/' + str(uuid4()), content=encoded, headers={'Content-Type':'application/json'})
+    assert response.status_code == 200
+    assert response.json()['plan']['notes'] == values['notes']
+
+
 @pytest.mark.parametrize('operation', ['list_plans', 'get_plan', 'save_plan', 'export_plan_revisions'])
 def test_unexpected_storage_validation_errors_are_private(fixture, monkeypatch, operation):
     a, _, payload, *_ = fixture
