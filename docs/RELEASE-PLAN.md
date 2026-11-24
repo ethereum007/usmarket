@@ -73,3 +73,9 @@ The approved replacement schema was applied once on 29 October. Structural check
 Source verification through 19e6015b950b89221a37a15d784b2abb66ae9b14 passed CI run 44537333131. The 19 November anonymous hosted probe recovered after initial transport failures and reported backend revision 82240f158e3d6fb1d029300953a30ebbd43fd0c3. The dated results are in US-HOSTED-ACCEPTANCE.md. Reliability acceptance remains open in issue #9.
 
 The 25 October private MVP target remains missed without hosted acceptance. No revised private deadline is assigned. Public beta remains targeted for 26 November, subject to all release gates. Issue #10 tracks the incomplete product checkpoint, and issue #4 tracks hosted persistence acceptance.
+
+## 24 November rehearsal checkpoint
+
+The 23 November rehearsal deadline passed without completed hosted acceptance evidence. This is a missed release checkpoint. G2 identity, G3 storage and G8 product acceptance remain open: controlled two-account isolation, hosted sign-in/research/save/exact reopen/backend restart and backup/restore have not been demonstrated. The private frontend URL and two approved test accounts with an authorized session-access method remain required inputs.
+
+Source verification at 925a323ef7fc77e797d3f3a70082cc3d669add97 passed full CI 45064281876, including disposable PostgreSQL restore. It does not replace the missing hosted rehearsal. Storage flags remain off; the approved six-migration bundle is not replayed. The 25 October private MVP target remains missed without hosted acceptance, with no revised private deadline. The 26 November public beta target remains subject to all release gates and is not an authorization to launch with these gates open.
