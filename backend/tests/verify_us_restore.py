@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 
 import psycopg
+from app.services.us_json import same_value
 
 TABLES = ('us_plan_revisions','us_research_packages','us_refresh_jobs')
 FUNCTIONS = ('us_plan_store','us_research_store','us_job_store','us_job_publish','us_job_interrupt')
@@ -14,7 +15,7 @@ def records(connection):
         # Fixed allowlist; compare every column including owner, revisions and timestamps.
         rows = connection.execute('select to_jsonb(t) from public.'+table+' t order by to_jsonb(t)::text').fetchall()
         assert rows, 'Missing synthetic test records'
-        result[table] = rows
+        result[table] = [row[0] for row in rows]
     return result
 
 
@@ -34,7 +35,7 @@ def verify(source_dsn, restored_dsn):
             assert len(checks) == 9 and all(present and secure for _, _, present, secure in checks), (
                 'Storage structural inspection failed'
             )
-        assert records(source)==records(restored), 'Restored records differ'
+        assert same_value(records(source), records(restored)), 'Restored records differ'
         original=definitions(source)
         assert len(original)==len(FUNCTIONS) and original==definitions(restored), 'Restored RPC definitions differ'
         index_query = (
@@ -58,7 +59,7 @@ def verify(source_dsn, restored_dsn):
                 connection.execute("select set_config('request.jwt.claim.sub', %s, true)", (owner,))
             for function in ('us_plan_store', 'us_research_store', 'us_job_store'):
                 query = 'select public.' + function + "('list')"
-                assert source.execute(query).fetchone() == restored.execute(query).fetchone(), (
+                assert same_value(source.execute(query).fetchone()[0], restored.execute(query).fetchone()[0]), (
                     'Restored owner RPC differs'
                 )
     for role in ('anon','authenticated'):
