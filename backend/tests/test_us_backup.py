@@ -127,3 +127,30 @@ def test_cli_never_confirms_wrong_sqlite_schema(tmp_path,capsys,kind,schema):
     result=json.loads(capsys.readouterr().out)
     assert result['success'] is False and 'schema' not in result['error']
     assert not target.exists() and source.read_bytes()==before
+
+
+def test_integrity_scan_deadline_interrupts_and_cleans_only_new_backup(tmp_path):
+    source=tmp_path/'source.sqlite3';target=tmp_path/'new-backup.sqlite3'
+    with closing(sqlite3.connect(source)) as connection:
+        connection.execute('CREATE TABLE synthetic (id INTEGER PRIMARY KEY, value TEXT)')
+        connection.executemany('INSERT INTO synthetic(value) VALUES (?)', [('synthetic',)] * 5000)
+        connection.commit()
+    original=source.read_bytes()
+    clock=[0.0]
+    connect=sqlite3.connect
+    def factory(path,*args,**kwargs):
+        connection=connect(path,*args,**kwargs)
+        if path==target:
+            def trace(statement):
+                if statement=='PRAGMA integrity_check':clock[0]=31.0
+            connection.set_trace_callback(trace)
+        return connection
+    with patch.object(backup.sqlite3,'connect',factory), \
+         patch.object(backup.time,'monotonic',side_effect=lambda:clock[0]):
+        with pytest.raises(sqlite3.OperationalError,match='interrupted'):
+            backup.backup_database(source,target)
+    assert not target.exists() and source.read_bytes()==original
+    # A timed-out verification does not poison the next independent attempt.
+    backup.backup_database(source,target)
+    with closing(connect(target)) as connection:
+        assert connection.execute('SELECT count(*) FROM synthetic').fetchone()==(5000,)

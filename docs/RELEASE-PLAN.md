@@ -97,3 +97,9 @@ Synthetic transport regressions cover oversized plain and gzip responses, early 
 The disposable PostgreSQL restore verifier now reuses the strict JSON comparator for all stored columns and owner RPC list results. Cursor tuples are unwrapped before recursive comparison, so a restored nested boolean cannot compare equal to numeric 1/0. Unknown nulls remain unchanged. Synthetic verifier regressions reproduce substitutions that ordinary Python equality accepted, and CI runs them before the actual disposable dump/restore rehearsal. Thirty focused restore-verifier and SQLite-backup tests passed locally.
 
 This improves the source verification gate only. It does not provide the missing real Supabase accounts, hosted restart/persistence or operator backup/restore acceptance. No source migration, hosted data, account, credential or storage flag changed. The missed 25 October private MVP and 26 November beta targets remain recorded without a replacement deadline. Refs #4 and #10.
+
+## SQLite backup verification deadline
+
+The local SQLite backup utility now applies its existing 30-second deadline to schema and integrity verification as well as the online copy. A SQLite progress handler interrupts long verification VM work, with explicit checks around verification for short queries. A synthetic 5,000-row regression expires the clock as the integrity scan starts, confirms interruption removes only the newly created backup, preserves source bytes and proves a later independent attempt succeeds. All 27 SQLite-backup tests passed locally.
+
+This is a cooperative SQLite copy/verification deadline, not a hard bound on filesystem open/fsync or OS stalls. It does not cover remote Supabase backups, research JSON retention or actual hosted restore acceptance. No hosted files, accounts, credentials, migrations or storage flags changed. The missed private MVP and public beta targets remain recorded without a replacement deadline. Refs #4 and #9.

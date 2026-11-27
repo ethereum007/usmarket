@@ -41,16 +41,23 @@ def backup_database(source: Path, target: Path, kind=None):
         os.close(descriptor)
         created = True
         deadline = time.monotonic() + 30
-        def progress(status, remaining, total):
+        def check_deadline():
             if time.monotonic() > deadline:
                 raise TimeoutError('Backup exceeded time limit')
+        def progress(status, remaining, total):
+            check_deadline()
         with closing(sqlite3.connect(source.as_uri()+'?mode=ro', uri=True, timeout=5)) as reader:
             with closing(sqlite3.connect(target, timeout=5)) as destination:
                 reader.backup(destination, pages=128, progress=progress, sleep=0.1)
+                # Integrity verification can scan the whole copied database.
+                # Interrupt SQLite VM work after the same copy/verification deadline.
+                destination.set_progress_handler(lambda: int(time.monotonic() > deadline), 1000)
+                check_deadline()
                 if kind is not None:
                     verify_kind(destination, kind)
                 if destination.execute('PRAGMA integrity_check').fetchone()[0] != 'ok':
                     raise ValueError('Backup integrity check failed')
+                check_deadline()
         with target.open('rb+') as handle:
             os.fsync(handle.fileno())
     except BaseException:
