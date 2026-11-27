@@ -39,7 +39,11 @@ def provider_client(response=None,error=None):
         def __init__(self,*args,**kwargs):pass
         async def __aenter__(self):return self
         async def __aexit__(self,*args):return False
-        async def get(self,url,headers):
+        def build_request(self,method,url,headers):
+            return httpx.Request(method,url,headers=headers)
+        async def send(self,request,stream):
+            assert stream is True
+            url=str(request.url);headers=request.headers
             assert url=='https://apidhmrlawbjvisnadht.supabase.co/auth/v1/user'
             assert headers['Authorization']=='Bearer test-session'
             if error:raise error
@@ -199,7 +203,8 @@ def test_total_auth_deadline_cancels_stalled_provider_and_allows_later_verificat
             if stage=='enter':await self.wait()
             return self
         async def __aexit__(self,*args):return False
-        async def get(self,*args,**kwargs):await self.wait()
+        def build_request(self,*args,**kwargs):return None
+        async def send(self,*args,**kwargs):await self.wait()
     async def exercise():
         with patch.object(us_auth,'settings',config),patch.object(us_auth,'AUTH_DEADLINE_SECONDS',0.01),patch.object(us_auth.httpx,'AsyncClient',Stalled):
             with pytest.raises(HTTPException) as failure:
@@ -223,7 +228,8 @@ def test_caller_cancellation_is_not_converted_to_auth_outage():
             def __init__(self,*args,**kwargs):pass
             async def __aenter__(self):return self
             async def __aexit__(self,*args):return False
-            async def get(self,*args,**kwargs):
+            def build_request(self,*args,**kwargs):return None
+            async def send(self,*args,**kwargs):
                 started.set()
                 try:await asyncio.Event().wait()
                 finally:cancelled.set()
@@ -261,3 +267,91 @@ def test_malformed_bearer_characters_never_reach_identity_verifier(token):
         assert error.value.status_code == 401
         assert error.value.headers["WWW-Authenticate"] == "Bearer"
         verifier.assert_not_awaited()
+
+
+@pytest.mark.parametrize('compressed', [False, True])
+def test_oversized_auth_stream_is_closed_early_and_next_identity_can_verify(compressed):
+    import asyncio
+    import gzip
+    import json
+    identity = '11111111-1111-4111-8111-111111111111'
+    valid = json.dumps({'id': identity, 'email': 'owner@example.com',
+                        'email_confirmed_at': '2026-01-01T00:00:00Z'}).encode()
+    limit = 65536
+    payload = valid + b' ' * (limit * 4)
+    wire = gzip.compress(payload) if compressed else payload
+    class Body(httpx.AsyncByteStream):
+        closed = False
+        consumed = 0
+        async def __aiter__(self):
+            for offset in range(0, len(wire), 1024):
+                self.consumed += 1
+                yield wire[offset:offset + 1024]
+        async def aclose(self):self.closed = True
+    body = Body()
+    attempts = []
+    def handler(request):
+        attempts.append(request)
+        if len(attempts) > 1:return httpx.Response(200, content=valid)
+        headers = {'Content-Encoding': 'gzip'} if compressed else {}
+        return httpx.Response(200, headers=headers, stream=body)
+    client_factory = httpx.AsyncClient
+    def factory(**kwargs):
+        return client_factory(transport=httpx.MockTransport(handler), **kwargs)
+    config = SimpleNamespace(SUPABASE_URL='https://apidhmrlawbjvisnadht.supabase.co',
+                             SUPABASE_ANON_KEY='test-public-key')
+    async def exercise():
+        with patch.object(us_auth, 'settings', config), \
+             patch.dict(us_auth.os.environ, {'US_INVITED_USER_IDS': identity}), \
+             patch.object(us_auth, 'MAX_AUTH_RESPONSE_BYTES', limit), \
+             patch.object(us_auth.httpx, 'AsyncClient', factory):
+            with pytest.raises(us_auth.HTTPException) as failure:
+                await us_auth.verify_us_token('test-session')
+            assert failure.value.status_code == 503
+            assert failure.value.detail == 'US authentication returned an invalid response'
+            assert body.closed
+            if not compressed:assert body.consumed < len(wire) // 1024
+            assert (await us_auth.verify_us_token('test-session'))['id'] == identity
+    asyncio.run(exercise())
+
+
+def test_auth_response_at_decoded_limit_is_accepted():
+    import asyncio
+    import json
+    identity = '11111111-1111-4111-8111-111111111111'
+    payload = json.dumps({'id': identity, 'email': 'owner@example.com',
+                          'email_confirmed_at': '2026-01-01T00:00:00Z'}).encode()
+    config = SimpleNamespace(SUPABASE_URL='https://apidhmrlawbjvisnadht.supabase.co',
+                             SUPABASE_ANON_KEY='test-public-key')
+    with patch.object(us_auth, 'settings', config), \
+         patch.dict(us_auth.os.environ, {'US_INVITED_USER_IDS': identity}), \
+         patch.object(us_auth, 'MAX_AUTH_RESPONSE_BYTES', len(payload)), \
+         patch.object(us_auth.httpx, 'AsyncClient', provider_client(httpx.Response(200, content=payload))):
+        assert asyncio.run(us_auth.verify_us_token('test-session'))['id'] == identity
+
+
+def test_auth_deadline_also_bounds_stream_body_and_closes_response():
+    import asyncio
+    class Body(httpx.AsyncByteStream):
+        closed = False
+        async def __aiter__(self):
+            yield b'{'
+            await asyncio.Event().wait()
+        async def aclose(self):self.closed = True
+    body = Body()
+    client_factory = httpx.AsyncClient
+    def factory(**kwargs):
+        return client_factory(transport=httpx.MockTransport(
+            lambda request: httpx.Response(200, stream=body)), **kwargs)
+    config = SimpleNamespace(SUPABASE_URL='https://apidhmrlawbjvisnadht.supabase.co',
+                             SUPABASE_ANON_KEY='test-public-key')
+    async def exercise():
+        with patch.object(us_auth, 'settings', config), \
+             patch.object(us_auth, 'AUTH_DEADLINE_SECONDS', 0.01), \
+             patch.object(us_auth.httpx, 'AsyncClient', factory):
+            with pytest.raises(us_auth.HTTPException) as failure:
+                await asyncio.wait_for(us_auth.verify_us_token('test-session'), 1)
+            assert failure.value.status_code == 503
+            assert failure.value.detail == 'US authentication is temporarily unavailable'
+            assert body.closed
+    asyncio.run(exercise())

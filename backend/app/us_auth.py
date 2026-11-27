@@ -6,6 +6,7 @@ local user. The explicit loopback preview harness owns its test override.
 from __future__ import annotations
 
 import asyncio
+import json
 from datetime import datetime
 import os
 from uuid import UUID
@@ -17,6 +18,7 @@ from app.services.us_target import dedicated_supabase_origin
 
 
 AUTH_DEADLINE_SECONDS = 5.0
+MAX_AUTH_RESPONSE_BYTES = 256 * 1024
 
 def unauthorized():
     return HTTPException(401, 'Sign in to the US workspace', headers={'WWW-Authenticate':'Bearer'})
@@ -41,18 +43,29 @@ async def verify_us_token(token: str) -> dict:
         # request as well so a slow provider cannot hold private API requests open.
         async with asyncio.timeout(AUTH_DEADLINE_SECONDS):
             async with httpx.AsyncClient(timeout=5.0, follow_redirects=False) as client:
-                response = await client.get(origin + '/auth/v1/user', headers={
+                request = client.build_request('GET', origin + '/auth/v1/user', headers={
                     'Authorization':'Bearer ' + token,
                     'apikey':public_key,
                 })
+                response = await client.send(request, stream=True)
+                try:
+                    if response.status_code in {401,403}:
+                        raise unauthorized()
+                    if response.status_code != 200:
+                        raise HTTPException(503, 'US authentication is temporarily unavailable')
+                    body = bytearray()
+                    # Count decoded bytes; Content-Length can be absent, incorrect
+                    # or refer to a much smaller compressed representation.
+                    async for chunk in response.aiter_bytes(chunk_size=16384):
+                        if len(body) + len(chunk) > MAX_AUTH_RESPONSE_BYTES:
+                            raise HTTPException(503, 'US authentication returned an invalid response')
+                        body.extend(chunk)
+                finally:
+                    await response.aclose()
     except (httpx.HTTPError, TimeoutError):
         raise HTTPException(503, 'US authentication is temporarily unavailable') from None
-    if response.status_code in {401,403}:
-        raise unauthorized()
-    if response.status_code != 200:
-        raise HTTPException(503, 'US authentication is temporarily unavailable')
     try:
-        user = response.json()
+        user = json.loads(body)
     except ValueError:
         raise HTTPException(503, 'US authentication returned an invalid response') from None
     if not isinstance(user,dict) or not isinstance(user.get('id'),str) or not user['id'].strip():
